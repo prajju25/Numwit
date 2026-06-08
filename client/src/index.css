@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Fonts ───────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/* ── Design tokens ──────────────────────────────────────────────────────────── */
+:root {
+  --bg-deep:    #1a1a2e;
+  --bg-mid:     #16213e;
+  --bg-surface: #0f3460;
+  --glass-bg:   rgba(255, 255, 255, 0.07);
+  --glass-bg2:  rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.13);
+  --glass-border2: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Base reset ─────────────────────────────────────────────────────────────── */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  background: linear-gradient(135deg, var(--bg-deep) 0%, var(--bg-mid) 50%, var(--bg-surface) 100%);
+  background-attachment: fixed;
+  min-height: 100dvh;
+  color: white;
+}
+
+/* ── Glass card utilities ───────────────────────────────────────────────────── */
+@layer components {
+  .glass-card {
+    @apply rounded-2xl border;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-color: var(--glass-border);
+  }
+
+  .glass-card-sm {
+    @apply rounded-xl border;
+    background: var(--glass-bg2);
+    border-color: var(--glass-border2);
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400
+           text-white font-bold rounded-xl shadow-lg transition-all duration-200 active:scale-95;
+    box-shadow: 0 4px 24px rgba(124, 58, 237, 0.3);
+  }
+
+  .btn-secondary {
+    @apply bg-white/10 border border-white/20 text-white hover:bg-white/20
+           font-semibold rounded-xl transition-all duration-200 active:scale-95;
+  }
+
+  .btn-success {
+    @apply bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400
+           text-white font-bold rounded-xl shadow-lg transition-all duration-200 active:scale-95;
+    box-shadow: 0 4px 24px rgba(16, 185, 129, 0.25);
+  }
+
+  .input-dark {
+    @apply bg-white/10 border border-white/20 text-white placeholder:text-white/30
+           rounded-xl px-4 py-3 text-base outline-none transition-all duration-200
+           focus:border-violet-400 focus:ring-2 focus:ring-violet-400/20 w-full;
+  }
+
+  .label-muted {
+    @apply text-white/40 uppercase tracking-widest text-[10px] font-semibold;
+  }
+
+  .section-heading {
+    @apply text-white/50 uppercase tracking-widest text-xs font-semibold mb-3;
+  }
+}
+
+/* ── Existing animations (preserved) ───────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn { animation: fadeIn 0.35s ease-in-out; }
+
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.85); }
+  70%  { transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-popIn { animation: popIn 0.25s ease-out; }
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-1rem) translateX(-50%); }
+  to   { opacity: 1; transform: translateY(0) translateX(-50%); }
+}
+@layer utilities {
+  .animate-slide-down { animation: slideDown 0.3s ease-out; }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.5); }
+  70%  { box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+}
+.animate-pulse-ring { animation: pulse-ring 1.5s ease-out infinite; }
+
+@keyframes lockIn {
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  40%  { transform: scale(1.06); box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+  70%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+.animate-lock-in { animation: lockIn 0.45s ease-out; }
+
+@keyframes penaltyFill {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-penalty-fill { animation: penaltyFill 0.35s ease-out; }
+
+@keyframes eliminationFlash {
+  0%   { background-color: rgba(239, 68, 68, 0.2); }
+  50%  { background-color: rgba(239, 68, 68, 0.4); }
+  100% { background-color: transparent; }
+}
+.animate-elimination-flash { animation: eliminationFlash 0.8s ease-out; }
+
+@keyframes confettiFall {
+  0%   { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(80px) rotate(360deg); opacity: 0; }
+}
+.confetti-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confettiFall 1s ease-in forwards;
+}
+
+@keyframes floatUp {
+  0%   { opacity: 0; transform: translateY(12px); }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+.animate-float-up { animation: floatUp 2.5s ease-in-out forwards; }
+
+@keyframes duelGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.3); }
+  50%       { box-shadow: 0 0 20px 5px rgba(139, 92, 246, 0.15); }
+}
+.animate-duel-glow { animation: duelGlow 2s ease-in-out infinite; }
+
+/* ── Glow shimmer for countdown ring ─────────────────────────────────────────  */
+@keyframes glowPulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.6)); }
+  50%       { filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.9)); }
+}
+.animate-glow-pulse { animation: glowPulse 1.5s ease-in-out infinite; }
+
+@keyframes dangerPulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.6)); }
+  50%       { filter: drop-shadow(0 0 14px rgba(239, 68, 68, 1)); }
+}
+.animate-danger-pulse { animation: dangerPulse 0.6s ease-in-out infinite; }

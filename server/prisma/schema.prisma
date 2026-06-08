@@ -1,0 +1,72 @@
+// prisma/schema.prisma
+// ─────────────────────────────────────────────────────────────────────────────
+// Numwit — Platform data layer
+// Run: npx prisma migrate dev --name init
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── User ─────────────────────────────────────────────────────────────────────
+// One row per device (identified by UUID stored in localStorage).
+model User {
+  id        String   @id @default(uuid())
+  deviceId  String   @unique
+  name      String
+  avatar    String
+  xp        Int      @default(0)
+  level     Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessionStats    SessionStat[]
+  userAchievements UserAchievement[]
+}
+
+// ── SessionStat ───────────────────────────────────────────────────────────────
+// One row per completed game session.
+model SessionStat {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rounds       Int      @default(0)
+  wins         Int      @default(0)
+  penalties    Int      @default(0)
+  exactMatches Int      @default(0)
+  survived     Boolean  @default(false)  // true = last player standing
+  playedAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([playedAt])
+}
+
+// ── Achievement ───────────────────────────────────────────────────────────────
+// Static catalogue seeded once.
+model Achievement {
+  id          String @id   // e.g. "first_win"
+  name        String
+  description String
+  icon        String       // emoji
+
+  userAchievements UserAchievement[]
+}
+
+// ── UserAchievement ───────────────────────────────────────────────────────────
+// Junction — one row when a user unlocks an achievement.
+model UserAchievement {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}

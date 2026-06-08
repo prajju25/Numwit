@@ -1,0 +1,11 @@
+{
+  "name": "numwit",
+  "scripts": {
+    "client": "npm start --prefix client",
+    "server": "node server/server.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
