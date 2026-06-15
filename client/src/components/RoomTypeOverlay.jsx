@@ -39,6 +39,14 @@ export default function RoomTypeOverlay({ onClose }) {
           </button>
         </div>
 
+        <button
+          onClick={() => handleRoomSelection("solo")}
+          className="w-full py-3 px-4 rounded-xl font-bold text-sm transition-all duration-200 active:scale-95 border border-sky-500/40 text-sky-300 hover:bg-sky-500/20"
+          style={{ background: "rgba(14,165,233,0.12)" }}
+        >
+          🤖 Play vs Computer
+        </button>
+
         <button onClick={onClose} className="text-xs text-white/30 hover:text-white/60 transition">
           Cancel
         </button>

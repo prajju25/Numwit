@@ -8,8 +8,8 @@ import soundManager from "../services/soundManager";
  * CountdownTimer — circular SVG ring with time indicator.
  * Violet → amber at ≤10s → red + pulsing at ≤5s.
  */
-export default function CountdownTimer({ timerDuration }) {
-  const { timeLeft, isExpired } = useCountdown(timerDuration);
+export default function CountdownTimer({ timerDuration, paused }) {
+  const { timeLeft, isExpired } = useCountdown(timerDuration, paused);
   const lastTickRef = useRef(null);
 
   useEffect(() => {
@@ -103,4 +103,5 @@ export default function CountdownTimer({ timerDuration }) {
 
 CountdownTimer.propTypes = {
   timerDuration: PropTypes.number,
+  paused: PropTypes.bool,
 };

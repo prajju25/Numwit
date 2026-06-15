@@ -149,6 +149,12 @@ async function removeFromPublicSet(roomId) {
   await redis.sRem(PUBLIC_ROOMS_SET, roomId);
 }
 
+// ── deleteRoom (bot-fill cleanup: room with only bots left) ────────────────────
+async function deleteRoom(roomId) {
+  await redis.del(getRoomKey(roomId));
+  await redis.sRem(PUBLIC_ROOMS_SET, roomId);
+}
+
 module.exports = {
   addUserToRoom,
   removeUserFromRoom,
@@ -158,4 +164,5 @@ module.exports = {
   getRoomById,
   saveRoom,
   removeFromPublicSet,
+  deleteRoom,
 };

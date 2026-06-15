@@ -79,6 +79,7 @@ function GameBoard() {
           voidData={roundVoid || null}
           players={players}
           onDismiss={() => setShowOverlay(false)}
+          roomId={roomId}
         />
       )}
 
@@ -117,8 +118,9 @@ function GameBoard() {
         {/* Tutorial tips */}
         <TutorialOverlay />
 
-        {/* Countdown timer */}
-        <CountdownTimer key={timerKey} timerDuration={gameData.timerDuration} />
+        {/* Countdown timer — paused while the round-result overlay is showing,
+            so it doesn't keep ticking down (or hit 0) during the post-round pause */}
+        <CountdownTimer key={timerKey} timerDuration={gameData.timerDuration} paused={!!(roundResult || roundVoid)} />
 
         {/* Waiting indicator */}
         {waitingCount && (

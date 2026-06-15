@@ -1,27 +1,36 @@
 /**
  * botService.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Manages bot players for tutorial / solo-practice rooms.
+ * Manages bot players used to fill rooms that don't have enough real players.
+ * See BOT_FILL_FEATURE_DESIGN.md for the full design.
  *
- * How it works:
- *   1. When a tutorial room is created, call addBots(room, count).
- *   2. The bots are stored in `bots` map — fake user objects with bot socketIds.
- *   3. When the server calls getBotSubmission(roomId, botSocketId, round),
- *      the bot picks a random number (weighted toward the middle, 30-70).
- *   4. Bots respond with a delay of 1-4 seconds to feel human.
+ * Responsibilities:
+ *   1. scheduleBotFill(roomId, delayMs, onFire) — one-shot timer for public-room
+ *      auto-fill.
+ *   2. fillRoomWithBots(room, targetCount)      — mutate room.users with bot
+ *      entries up to targetCount.
+ *   3. scheduleBotSubmissions(roomId, game, submitFn) — make bots "play" each
+ *      round by calling the shared submitNumber() used for real players.
+ *   4. isBot(socketId) / hasOnlyBots(room)      — helpers used by lobby/game
+ *      handlers.
+ *   5. removeRoom(roomId)                       — clear all timers for a room.
  *
- * The game.js send_number handler does NOT need to change — bots submit
- * via the normal game.numbers path, triggered by scheduleBot().
+ * Bots are plain user objects pushed into room.users:
+ *   { socketId: "bot-<roomId>-<n>", name, avatar, isBot: true }
+ * They have no deviceId, so persistGameOver / statsService / achievementService
+ * (which all gate on `if (!deviceId) continue`) automatically ignore them —
+ * no DB schema changes needed.
  */
 
-var BOT_NAMES = ["Bot Alice", "Bot Bob", "Bot Carol", "Bot Dave"];
-var BOT_AVATARS = ["🤖", "👾", "🦾", "🧬"];
+var constants = require("../constants/constants");
+var BOT_NAMES = constants.BOT_NAMES;
+var BOT_AVATARS = constants.BOT_AVATARS;
 
-// Map<roomId, [{socketId, name, avatar, isBot:true}]>
-var botsByRoom = new Map();
+// Pending one-shot "fill this room with bots" timers: Map<roomId, timeoutId>
+var fillTimers = new Map();
 
-// Pending bot timeouts: Map<roomId, [timeoutId]>
-var botTimers = new Map();
+// Pending per-round bot submission timers: Map<roomId, [timeoutId]>
+var submissionTimers = new Map();
 
 /**
  * Generate a stable fake socketId for a bot.
@@ -31,82 +40,141 @@ function botId(roomId, index) {
 }
 
 /**
- * Create N bot user objects and record them for the room.
- * Returns the bot user objects (caller adds them to room.users).
- */
-function addBots(roomId, count) {
-  var bots = [];
-  for (var i = 0; i < count; i++) {
-    bots.push({
-      socketId: botId(roomId, i),
-      name: BOT_NAMES[i % BOT_NAMES.length],
-      avatar: BOT_AVATARS[i % BOT_AVATARS.length],
-      isBot: true,
-    });
-  }
-  botsByRoom.set(roomId, bots);
-  return bots;
-}
-
-/**
- * Get all bot socket IDs for a room.
- */
-function getBotIds(roomId) {
-  var bots = botsByRoom.get(roomId) || [];
-  return bots.map(function(b) { return b.socketId; });
-}
-
-/**
- * Get a bot's random submission number (weighted 30-70, slightly realistic).
- */
-function getBotNumber() {
-  // 70% chance: pick in 30-70 range, 30% chance: pick anywhere 0-100
-  if (Math.random() < 0.7) {
-    return Math.round(30 + Math.random() * 40);
-  }
-  return Math.round(Math.random() * 100);
-}
-
-/**
- * Schedule all bots in a room to submit within 1-4 seconds.
- * onSubmit(botSocketId, number) is called for each bot when ready.
- */
-function scheduleBots(roomId, onSubmit) {
-  clearBotTimers(roomId);
-  var bots = botsByRoom.get(roomId) || [];
-  var timers = [];
-  bots.forEach(function(bot) {
-    var delay = 1000 + Math.random() * 3000; // 1-4 s
-    var t = setTimeout(function() {
-      onSubmit(bot.socketId, getBotNumber());
-    }, delay);
-    timers.push(t);
-  });
-  botTimers.set(roomId, timers);
-}
-
-/**
- * Cancel all pending bot submission timers for a room.
- */
-function clearBotTimers(roomId) {
-  var timers = botTimers.get(roomId) || [];
-  timers.forEach(function(t) { clearTimeout(t); });
-  botTimers.delete(roomId);
-}
-
-/**
- * Remove all bot state for a room (call when room is deleted).
- */
-function removeRoom(roomId) {
-  clearBotTimers(roomId);
-  botsByRoom.delete(roomId);
-}
-
-/**
  * Check if a socketId belongs to a bot.
  */
 function isBot(socketId) {
-  return socketId.startsWith("bot-");
+  return typeof socketId === "string" && socketId.indexOf("bot-") === 0;
 }
 
-module.exports = { addBots, getBotIds, scheduleBots, clearBotTimers, removeRoom, isBot };
+/**
+ * Returns true if the room currently contains only bots (no real users left).
+ * Used to decide whether a room should be torn down once its last human leaves.
+ */
+function hasOnlyBots(room) {
+  if (!room || !room.users || room.users.length === 0) return false;
+  return room.users.every(function(u) { return isBot(u.socketId); });
+}
+
+/**
+ * Add bot users to room.users until it reaches targetCount.
+ * Mutates room.users in place and returns the bot objects that were added.
+ * Existing bot indices are skipped so a second fill doesn't collide socketIds.
+ */
+function fillRoomWithBots(room, targetCount) {
+  var existingBotCount = room.users.filter(function(u) { return isBot(u.socketId); }).length;
+  var added = [];
+  var index = existingBotCount;
+
+  while (room.users.length < targetCount) {
+    var bot = {
+      socketId: botId(room.id, index),
+      name: BOT_NAMES[index % BOT_NAMES.length],
+      avatar: BOT_AVATARS[index % BOT_AVATARS.length],
+      isBot: true,
+    };
+    room.users.push(bot);
+    added.push(bot);
+    index++;
+  }
+
+  return added;
+}
+
+/**
+ * Schedule a one-shot "should we fill this room with bots?" check, fired after
+ * delayMs. onFire(roomId) must re-read the room from Redis — state may have
+ * changed (e.g. real players joined, game already started, room deleted).
+ */
+function scheduleBotFill(roomId, delayMs, onFire) {
+  clearFillTimer(roomId);
+  var t = setTimeout(function() {
+    fillTimers.delete(roomId);
+    onFire(roomId);
+  }, delayMs);
+  fillTimers.set(roomId, t);
+}
+
+/**
+ * Cancel a pending bot-fill timer (e.g. room was deleted, or filled manually).
+ */
+function clearFillTimer(roomId) {
+  var t = fillTimers.get(roomId);
+  if (t) {
+    clearTimeout(t);
+    fillTimers.delete(roomId);
+  }
+}
+
+/**
+ * Pick a bot's submission for the current round.
+ * Round 1 (no previous target yet): weighted toward 30-70, same as the old
+ * tutorial-bot heuristic. Round 2+: biased around the previous round's target
+ * with a +/-15 spread, clamped to 0-100 — approximates "trying to guess the
+ * target" the way TECHNICAL_IMPLEMENTATION_PLAN.md described for tutorial bots.
+ */
+function getBotNumber(game) {
+  var target = game && typeof game.target === "number" ? game.target : null;
+  if (target === null) {
+    if (Math.random() < 0.7) return Math.round(30 + Math.random() * 40);
+    return Math.round(Math.random() * 100);
+  }
+  var spread = 15;
+  var n = target + (Math.random() * spread * 2 - spread);
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/**
+ * Schedule every active bot in game.turnOrder (not eliminated, hasn't submitted
+ * yet) to call submitFn(botSocketId, number) after a random 1-4s delay —
+ * mirrors a human reading the board and picking a number. submitFn is expected
+ * to be game.js's shared submitNumber(), so bots go through identical
+ * validation / round-resolution logic as real players.
+ */
+function scheduleBotSubmissions(roomId, game, submitFn) {
+  clearSubmissionTimers(roomId);
+  if (!game || !game.turnOrder) return;
+
+  var timers = [];
+  game.turnOrder.forEach(function(socketId) {
+    if (!isBot(socketId)) return;
+    if ((game.eliminatedPlayers || []).indexOf(socketId) !== -1) return;
+    if (game.numbers && game.numbers[socketId] !== undefined) return;
+
+    var delay = 1000 + Math.random() * 3000; // 1-4s
+    var t = setTimeout(function() {
+      submitFn(socketId, getBotNumber(game));
+    }, delay);
+    timers.push(t);
+  });
+  submissionTimers.set(roomId, timers);
+}
+
+/**
+ * Cancel all pending bot submission timers for a room (e.g. round resolved
+ * early because every human already submitted, or the game was reset).
+ */
+function clearSubmissionTimers(roomId) {
+  var timers = submissionTimers.get(roomId) || [];
+  timers.forEach(function(t) { clearTimeout(t); });
+  submissionTimers.delete(roomId);
+}
+
+/**
+ * Full cleanup for a room — call when a room is deleted / game ends for good.
+ */
+function removeRoom(roomId) {
+  clearFillTimer(roomId);
+  clearSubmissionTimers(roomId);
+}
+
+module.exports = {
+  isBot: isBot,
+  hasOnlyBots: hasOnlyBots,
+  fillRoomWithBots: fillRoomWithBots,
+  scheduleBotFill: scheduleBotFill,
+  clearFillTimer: clearFillTimer,
+  getBotNumber: getBotNumber,
+  scheduleBotSubmissions: scheduleBotSubmissions,
+  clearSubmissionTimers: clearSubmissionTimers,
+  removeRoom: removeRoom,
+};

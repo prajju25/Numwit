@@ -26,7 +26,7 @@ export default function PlayerScorePanel({ players, points, eliminatedPlayers })
               )}
             >
               <span className="truncate text-white/80 text-xs">
-                {p.avatar} {p.name}
+                {p.avatar} {p.name}{p.isBot ? " 🤖" : ""}
               </span>
               <span
                 className={twMerge(

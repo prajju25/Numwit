@@ -1,0 +1,54 @@
+import React from "react";
+import { render, screen, act } from "@testing-library/react";
+import RoundStartCountdown from "../RoundStartCountdown";
+
+describe("RoundStartCountdown", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("renders the round label and starts the countdown at 5", () => {
+    render(<RoundStartCountdown round={3} />);
+    expect(screen.getByText("Round 3 starting")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
+  });
+
+  test("renders a generic 'Round starting' label when round is not provided", () => {
+    render(<RoundStartCountdown />);
+    expect(screen.getByText("Round starting")).toBeInTheDocument();
+  });
+
+  test("counts down from 5 to 1 over 4 seconds", () => {
+    render(<RoundStartCountdown round={1} />);
+
+    act(() => { jest.advanceTimersByTime(1000); });
+    expect(screen.getByText("4")).toBeInTheDocument();
+
+    act(() => { jest.advanceTimersByTime(1000); });
+    expect(screen.getByText("3")).toBeInTheDocument();
+
+    act(() => { jest.advanceTimersByTime(1000); });
+    expect(screen.getByText("2")).toBeInTheDocument();
+
+    act(() => { jest.advanceTimersByTime(1000); });
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  test("shows 'Go!' once the countdown reaches 0, then disappears", () => {
+    render(<RoundStartCountdown round={1} />);
+
+    // Advance one second at a time so each effect re-schedules its timer
+    // (5 -> 4 -> 3 -> 2 -> 1 -> 0/"Go!")
+    for (let i = 0; i < 5; i++) {
+      act(() => { jest.advanceTimersByTime(1000); });
+    }
+    expect(screen.getByText("Go!")).toBeInTheDocument();
+
+    act(() => { jest.advanceTimersByTime(600); });
+    expect(screen.queryByText("Go!")).not.toBeInTheDocument();
+  });
+});

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useUser } from "../contexts/UserContext";
 import { useGame } from "../contexts/GameContext";
 import { MIN_PLAYERS } from "../constants/constants";
@@ -17,9 +17,10 @@ const DEFAULT_SETTINGS = {
 
 export default function WaitingRoom() {
   const { roomType, roomId, user } = useUser();
-  const { players, hostSocketId } = useGame();
+  const { players, hostSocketId, botFillAt } = useGame();
   const [copied, setCopied] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [fillCountdown, setFillCountdown] = useState(null);
 
   const mySocketId = user?.socketId ?? socket.id;
   const isHost = hostSocketId && mySocketId === hostSocketId;
@@ -34,6 +35,22 @@ export default function WaitingRoom() {
       setTimeout(() => setCopied(false), 2000);
     });
   };
+
+  // Live countdown for public-room auto bot-fill (botFillAt is an epoch ms
+  // deadline from the server, or null if no fill is pending).
+  useEffect(() => {
+    if (!botFillAt) {
+      setFillCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const secs = Math.max(0, Math.ceil((botFillAt - Date.now()) / 1000));
+      setFillCountdown(secs);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [botFillAt]);
 
   return (
     <div className="w-full max-w-md mx-auto space-y-4 animate-fadeIn">
@@ -66,6 +83,11 @@ export default function WaitingRoom() {
                 >
                   <span className="text-2xl">{player.avatar}</span>
                   <span className="font-semibold text-white flex-1 text-sm">{player.name}</span>
+                  {player.isBot && (
+                    <span className="text-xs bg-sky-500/20 text-sky-300 border border-sky-500/30 font-semibold px-2.5 py-1 rounded-full">
+                      🤖 Bot
+                    </span>
+                  )}
                   {isPlayerHost && (
                     <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1 rounded-full">
                       👑 Host
@@ -90,6 +112,13 @@ export default function WaitingRoom() {
           >
             {copied ? "✅ Link Copied!" : "🔗 Copy Invite Link"}
           </button>
+        )}
+
+        {/* Public room: server will auto-fill with bots if no one else joins */}
+        {roomType === "public" && !canStart && fillCountdown !== null && (
+          <div className="w-full py-2.5 px-4 rounded-xl text-sm text-center text-sky-300 border border-sky-500/20 bg-sky-500/10">
+            Looking for players… adding bots in {fillCountdown}s
+          </div>
         )}
 
         {/* Settings — host only */}

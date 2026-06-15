@@ -26,6 +26,11 @@ export const GameProvider = ({ children }) => {
   const [players,          setPlayers]          = useState([]);
   const [hostSocketId,     setHostSocketId]     = useState(null);
   const [spectatorSnapshot, setSpectatorSnapshot] = useState(null);
+  // botFillAt: epoch ms when the server will auto-fill this (public) room with
+  // bots if it's still below MIN_PLAYERS, or null/undefined if no fill is
+  // pending. Set from room_update — purely additive field, see
+  // BOT_FILL_FEATURE_DESIGN.md.
+  const [botFillAt,        setBotFillAt]        = useState(null);
 
   useEffect(() => {
     const onRoomUpdate = (room) => {
@@ -34,8 +39,12 @@ export const GameProvider = ({ children }) => {
       setHasStarted(true);
       setIsJoiningRoom(false);
       if (room.hostSocketId) setHostSocketId(room.hostSocketId);
+      setBotFillAt(room.botFillAt || null);
 
-      if (room.users.length >= MIN_PLAYERS && roomType === "public") {
+      if (room.users.length >= MIN_PLAYERS && (roomType === "public" || roomType === "solo")) {
+        // Public auto-fill and solo "Play vs Computer" both pad the room with
+        // bots and call startGameForRoom immediately server-side — skip the
+        // waiting room and go straight to GameBoard; next_round follows shortly.
         setIsInGame(true);
         setIsWaitingRoom(false);
       } else {
@@ -83,13 +92,14 @@ export const GameProvider = ({ children }) => {
   const resetGame = useCallback(() => {
     setPlayers([]);
     setHostSocketId(null);
+    setBotFillAt(null);
   }, []);
 
   const clearSpectatorSnapshot = useCallback(() => setSpectatorSnapshot(null), []);
 
   const providerValue = useMemo(
-    () => ({ players, hostSocketId, resetGame, spectatorSnapshot, clearSpectatorSnapshot }),
-    [players, hostSocketId, resetGame, spectatorSnapshot, clearSpectatorSnapshot]
+    () => ({ players, hostSocketId, resetGame, spectatorSnapshot, clearSpectatorSnapshot, botFillAt }),
+    [players, hostSocketId, resetGame, spectatorSnapshot, clearSpectatorSnapshot, botFillAt]
   );
 
   return (

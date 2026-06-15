@@ -1,5 +1,7 @@
 const express = require("express");
 const http    = require("http");
+const path    = require("path");
+const helmet  = require("helmet");
 const { Server } = require("socket.io");
 require("dotenv").config();
 
@@ -17,12 +19,26 @@ const achievementService = require("./db/achievementService");
 const app    = express();
 const server = http.createServer(app);
 
+// Security headers on every response. CSP is disabled for now since it needs
+// tuning for the inline scripts / websocket connections the client uses —
+// revisit once the production origin is finalized.
+app.use(helmet({ contentSecurityPolicy: false }));
+
 app.use(express.json());
 
+// Serve the built React client (see Dockerfile, which builds client/ into
+// client/dist next to server/). No-ops harmlessly if the directory doesn't
+// exist (e.g. local dev where the client runs via webpack-dev-server instead).
+app.use(express.static(path.join(__dirname, "../client/dist")));
+
+const CORS_ORIGIN          = process.env.CORS_ORIGIN || "*";
+const SOCKET_PING_INTERVAL = Number(process.env.SOCKET_PING_INTERVAL) || 5000;
+const SOCKET_PING_TIMEOUT  = Number(process.env.SOCKET_PING_TIMEOUT) || 3000;
+
 const io = new Server(server, {
-  cors: { origin: "*" },
-  pingInterval: 5000,
-  pingTimeout:  3000,
+  cors: { origin: CORS_ORIGIN },
+  pingInterval: SOCKET_PING_INTERVAL,
+  pingTimeout:  SOCKET_PING_TIMEOUT,
 });
 
 // ── @socket.io/redis-adapter (horizontal scaling) ─────────────────────────────
@@ -126,6 +142,17 @@ app.get("/api/player/:deviceId/stats", async (req, res) => {
   }
 });
 
+// ── SPA fallback ───────────────────────────────────────────────────────────────
+// Any GET that isn't /api/* or /socket.io/* falls back to the client's
+// index.html so React Router (client-side routing) can take over. Must be
+// registered after all /api routes above and after express.static, but
+// before server.listen.
+app.get(/^\/(?!api|socket\.io).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/dist/index.html"), (err) => {
+    if (err) res.status(404).send("Not found");
+  });
+});
+
 // ── Socket.IO ────────────────────────────────────────────────────────────────
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
@@ -138,3 +165,6 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Exported for testing (supertest against `app`, inspecting `io` wiring, etc.)
+module.exports = { app, server, io };

@@ -8,11 +8,22 @@ var saveRoom = roomManager.saveRoom;
 var removeFromPublicSet = roomManager.removeFromPublicSet;
 var NUMWIT_GAME_STATUS = require("../constants/constants").NUMWIT_GAME_STATUS;
 var timerService = require("../services/timerService");
+var botService = require("../services/botService");
 
 // Phase 4: DB services (all wrapped with graceful fallback)
 var userService = require("../db/userService");
 var statsService = require("../db/statsService");
 var achievementService = require("../db/achievementService");
+
+// Pause after a round_result is broadcast, before the next round begins.
+// Gives players time to read the result overlay and see the "next round
+// starting in..." countdown (was 5000ms, then 7000ms).
+var ROUND_RESULT_DELAY_MS = 10000;
+
+// Tracks the pending "advance to next round" setTimeout per room (keyed by
+// roomId), scheduled by scheduleRoundAdvance after a round_result is
+// broadcast. Lets skip_round_result and restart_game cancel/short-circuit it.
+var pendingRoundAdvance = {};
 
 module.exports = function handleGameEvents(io, socket) {
 
@@ -29,26 +40,7 @@ module.exports = function handleGameEvents(io, socket) {
       return socket.emit("error_message", { message: "Only the host can start the game" });
     }
 
-    await removeFromPublicSet(roomId);
-    io.to(roomId).emit("game_started");
-
-    var gameData = await createGameData(room, sanitizeSettings(settings));
-    if (gameData) {
-      var timerDuration = (gameData.settings && gameData.settings.timerDuration) || 30;
-      // Small delay so client has time to mount NumwitRuleProvider before next_round arrives
-      setTimeout(function() {
-        io.to(roomId).emit("next_round", {
-          round: gameData.round,
-          points: gameData.points,
-          turnOrder: gameData.turnOrder,
-          eliminatedPlayers: gameData.eliminatedPlayers,
-          hostSocketId: room.hostSocketId,
-          timerDuration: timerDuration,
-          gameSettings: gameData.settings,
-        });
-        timerService.startTimer(io, roomId, room, timerDuration, handleTimerExpiry);
-      }, 300);
-    }
+    await startGameForRoom(io, roomId, settings);
   });
 
   // ── send_number ─────────────────────────────────────────────────────────────
@@ -86,26 +78,8 @@ module.exports = function handleGameEvents(io, socket) {
       return socket.emit("round_already_completed");
     }
 
-    game.numbers[socket.id] = number;
-    game.submittedCount = (game.submittedCount || 0) + 1;
     socket.emit("number_received", { no: number });
-
-    var activePlayers = room.users.filter(function(u) {
-      return game.eliminatedPlayers.indexOf(u.socketId) === -1
-        && game.turnOrder.indexOf(u.socketId) !== -1;
-    });
-
-    if (game.submittedCount < activePlayers.length) {
-      await saveRoom(room);
-      io.to(roomId).emit("waiting_for_players", {
-        submitted: game.submittedCount,
-        total: activePlayers.length,
-      });
-      return;
-    }
-
-    timerService.clearTimer(roomId);
-    await resolveRound(io, room, activePlayers);
+    await submitNumber(io, room, socket.id, number);
   });
 
   // ── restart_game ────────────────────────────────────────────────────────────
@@ -121,6 +95,8 @@ module.exports = function handleGameEvents(io, socket) {
     }
 
     timerService.clearTimer(roomId);
+    botService.clearSubmissionTimers(roomId);
+    clearRoundAdvance(roomId);
     room.game = null;
     await saveRoom(room);
 
@@ -130,7 +106,107 @@ module.exports = function handleGameEvents(io, socket) {
     io.to(roomId).emit("game_reset");
     io.to(roomId).emit("room_update", room);
   });
+
+  // ── skip_round_result ───────────────────────────────────────────────────────
+  // Lets a player dismiss the round-result overlay early and start the next
+  // round immediately, instead of waiting out the full ROUND_RESULT_DELAY_MS.
+  socket.on("skip_round_result", async function(data) {
+    var roomId = data.roomId;
+    console.debug('Socket: "skip_round_result" Room=' + roomId);
+
+    // No-op if there's nothing pending (e.g. round already advanced, or this
+    // is a round_void rather than a round_result — those don't schedule an
+    // advance at all).
+    if (!pendingRoundAdvance[roomId]) return;
+
+    clearRoundAdvance(roomId);
+    await advanceToNextRound(io, roomId);
+  });
 };
+
+// ── startGameForRoom ────────────────────────────────────────────────────────
+// Shared by the start_game socket handler (human host clicked "Start Game")
+// and the bot-fill flow in lobby.js (server starts the game itself once a
+// brand-new public room has been padded with bots and there's no human host
+// action to wait for). Behavior is identical either way.
+async function startGameForRoom(io, roomId, settings) {
+  var room = await getRoomById(roomId);
+  if (!room) return;
+
+  await removeFromPublicSet(roomId);
+  io.to(roomId).emit("game_started");
+
+  var gameData = await createGameData(room, sanitizeSettings(settings));
+  if (!gameData) return;
+
+  var timerDuration = (gameData.settings && gameData.settings.timerDuration) || 30;
+  // Small delay so client has time to mount NumwitRuleProvider before next_round arrives
+  setTimeout(function() {
+    io.to(roomId).emit("next_round", {
+      round: gameData.round,
+      points: gameData.points,
+      turnOrder: gameData.turnOrder,
+      eliminatedPlayers: gameData.eliminatedPlayers,
+      hostSocketId: room.hostSocketId,
+      timerDuration: timerDuration,
+      gameSettings: gameData.settings,
+    });
+    timerService.startTimer(io, roomId, room, timerDuration, handleTimerExpiry);
+    botService.scheduleBotSubmissions(roomId, gameData, function(botSocketId, number) {
+      submitBotNumber(io, roomId, botSocketId, number);
+    });
+  }, 300);
+}
+
+// ── submitNumber ────────────────────────────────────────────────────────────
+// Shared by the send_number socket handler (real players) and
+// submitBotNumber (bot players). Caller is responsible for validating that
+// the room/game exist, socketId is in turnOrder, not eliminated, hasn't
+// already submitted this round, and the round isn't already COMPLETED.
+async function submitNumber(io, room, socketId, number) {
+  var roomId = room.id;
+  var game = room.game;
+  if (!game) return;
+
+  game.numbers[socketId] = number;
+  game.submittedCount = (game.submittedCount || 0) + 1;
+
+  var activePlayers = room.users.filter(function(u) {
+    return game.eliminatedPlayers.indexOf(u.socketId) === -1
+      && game.turnOrder.indexOf(u.socketId) !== -1;
+  });
+
+  if (game.submittedCount < activePlayers.length) {
+    await saveRoom(room);
+    io.to(roomId).emit("waiting_for_players", {
+      submitted: game.submittedCount,
+      total: activePlayers.length,
+    });
+    return;
+  }
+
+  timerService.clearTimer(roomId);
+  botService.clearSubmissionTimers(roomId);
+  await resolveRound(io, room, activePlayers);
+}
+
+// ── submitBotNumber ─────────────────────────────────────────────────────────
+// Called by botService after its random 1-4s "thinking" delay. Re-fetches the
+// room (the delay means the in-memory `room`/`game` from when scheduling
+// happened may be stale) and re-validates before submitting, mirroring the
+// guards in the send_number handler.
+async function submitBotNumber(io, roomId, botSocketId, number) {
+  var room = await getRoomById(roomId);
+  if (!room || !room.game) return;
+  var game = room.game;
+
+  if (game.turnOrder.indexOf(botSocketId) === -1) return;
+  if (game.eliminatedPlayers.indexOf(botSocketId) !== -1) return;
+  if (game.numbers[botSocketId] !== undefined) return;
+  if (game.status === NUMWIT_GAME_STATUS.COMPLETED) return;
+
+  await submitNumber(io, room, botSocketId, number);
+}
 
 // ── resolveRound ─────────────────────────────────────────────────────────────
 async function resolveRound(io, room, activePlayers) {
@@ -151,6 +227,9 @@ async function resolveRound(io, room, activePlayers) {
     });
     var voidTimer = (game.settings && game.settings.timerDuration) || 30;
     timerService.startTimer(io, roomId, room, voidTimer, handleTimerExpiry);
+    botService.scheduleBotSubmissions(roomId, game, function(botSocketId, number) {
+      submitBotNumber(io, roomId, botSocketId, number);
+    });
     return;
   }
 
@@ -201,6 +280,7 @@ async function resolveRound(io, room, activePlayers) {
       reason:         "elimination",
     };
     io.to(roomId).emit("game_over", gameOverData);
+    botService.clearSubmissionTimers(roomId);
 
     // ── Phase 4: persist stats + check achievements (non-blocking) ────────────
     persistGameOver(io, room, game, activePlayers, winnerPlayer, result).catch(function(e) {
@@ -210,52 +290,86 @@ async function resolveRound(io, room, activePlayers) {
     return;
   }
 
-  // 5-second pause — let players read the round_result overlay before next round begins.
+  // Pause — let players read the round_result overlay before next round begins.
   // game.status is already NUMWIT_GAME_STATUS.COMPLETED (set by evaluateRound),
   // which blocks any late send_number submissions during this window.
-  setTimeout(async function() {
-    // Re-fetch from Redis to guard against restart_game firing during the delay.
-    // The outer `room` / `game` closure references are stale if restart_game ran —
-    // it fetches a new object and nulls game, but our closure still holds the old one.
-    var room = await getRoomById(roomId);
-    if (!room || !room.game) return;
-    var game = room.game;
+  // A player clicking "Skip" on the overlay fires skip_round_result, which
+  // cancels this and calls advanceToNextRound immediately.
+  scheduleRoundAdvance(io, roomId);
+}
 
-    game.round       += 1;
-    game.numbers      = {};
-    game.submittedCount = 0;
-    game.status       = NUMWIT_GAME_STATUS.IN_PROGRESS;
-    game.average      = null;
-    game.target       = null;
-    game.winnerIds    = [];
-    game.winnerSocketId = null;
-
-    // Promote any mid-game joiners into the active turn order for this round.
-    var pending = game.pendingJoiners || [];
-    pending.forEach(function(id) {
-      if (game.turnOrder.indexOf(id) === -1) {
-        game.turnOrder.push(id);
-      }
-      if (game.points[id] === undefined) {
-        game.points[id] = 0;
-      }
+// ── scheduleRoundAdvance / clearRoundAdvance ─────────────────────────────────
+// Schedules advanceToNextRound to run after ROUND_RESULT_DELAY_MS, tracking
+// the timeout per room so it can be cancelled early (skip_round_result) or
+// torn down (restart_game).
+function scheduleRoundAdvance(io, roomId) {
+  clearRoundAdvance(roomId);
+  pendingRoundAdvance[roomId] = setTimeout(function() {
+    delete pendingRoundAdvance[roomId];
+    advanceToNextRound(io, roomId).catch(function(e) {
+      console.error("advanceToNextRound error:", e.message);
     });
-    game.pendingJoiners = [];
+  }, ROUND_RESULT_DELAY_MS);
+}
 
-    await saveRoom(room);
+function clearRoundAdvance(roomId) {
+  if (pendingRoundAdvance[roomId]) {
+    clearTimeout(pendingRoundAdvance[roomId]);
+    delete pendingRoundAdvance[roomId];
+  }
+}
 
-    var nextTimer = (game.settings && game.settings.timerDuration) || 30;
-    io.to(roomId).emit("next_round", {
-      round:             game.round,
-      points:            game.points,
-      turnOrder:         game.turnOrder,
-      eliminatedPlayers: game.eliminatedPlayers,
-      hostSocketId:      room.hostSocketId,
-      timerDuration:     nextTimer,
-      gameSettings:      game.settings,
-    });
-    timerService.startTimer(io, roomId, room, nextTimer, handleTimerExpiry);
-  }, 5000);
+// ── advanceToNextRound ────────────────────────────────────────────────────────
+// Moves the game to the next round and broadcasts next_round. Runs either
+// after the normal ROUND_RESULT_DELAY_MS pause (via scheduleRoundAdvance) or
+// immediately when a player clicks "Skip" (via skip_round_result).
+async function advanceToNextRound(io, roomId) {
+  // Defensive: ensure no stale timeout remains tracked for this room.
+  delete pendingRoundAdvance[roomId];
+
+  // Re-fetch from Redis to guard against restart_game firing in the meantime —
+  // it nulls game on a freshly-fetched room object.
+  var room = await getRoomById(roomId);
+  if (!room || !room.game) return;
+  var game = room.game;
+
+  game.round       += 1;
+  game.numbers      = {};
+  game.submittedCount = 0;
+  game.status       = NUMWIT_GAME_STATUS.IN_PROGRESS;
+  game.average      = null;
+  game.target       = null;
+  game.winnerIds    = [];
+  game.winnerSocketId = null;
+
+  // Promote any mid-game joiners into the active turn order for this round.
+  var pending = game.pendingJoiners || [];
+  pending.forEach(function(id) {
+    if (game.turnOrder.indexOf(id) === -1) {
+      game.turnOrder.push(id);
+    }
+    if (game.points[id] === undefined) {
+      game.points[id] = 0;
+    }
+  });
+  game.pendingJoiners = [];
+
+  await saveRoom(room);
+
+  var nextTimer = (game.settings && game.settings.timerDuration) || 30;
+  io.to(roomId).emit("next_round", {
+    round:             game.round,
+    points:            game.points,
+    turnOrder:         game.turnOrder,
+    eliminatedPlayers: game.eliminatedPlayers,
+    hostSocketId:      room.hostSocketId,
+    timerDuration:     nextTimer,
+    gameSettings:      game.settings,
+  });
+  timerService.startTimer(io, roomId, room, nextTimer, handleTimerExpiry);
+  botService.scheduleBotSubmissions(roomId, game, function(botSocketId, number) {
+    submitBotNumber(io, roomId, botSocketId, number);
+  });
 }
 
 // ── persistGameOver ───────────────────────────────────────────────────────────
@@ -268,7 +382,7 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer, last
   for (var i = 0; i < room.users.length; i++) {
     var u = room.users[i];
     var deviceId = u.deviceId;
-    if (!deviceId) continue;   // skip users without device identity
+    if (!deviceId) continue;   // skip users without device identity (includes all bots)
 
     var mySocketId = u.socketId;
     var survived   = winnerPlayer && winnerPlayer.socketId === mySocketId;
@@ -357,3 +471,7 @@ async function handleTimerExpiry(io, roomId) {
   if (activePlayers.length === 0) return;
   await resolveRound(io, room, activePlayers);
 }
+
+// Exported so lobby.js can start a game server-side once a brand-new public
+// room has been padded with bots (no human host action to wait for).
+module.exports.startGameForRoom = startGameForRoom;

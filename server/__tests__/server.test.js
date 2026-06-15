@@ -1,0 +1,382 @@
+jest.mock("dotenv", () => ({ config: jest.fn() }));
+
+const http = require("http");
+const listenSpy = jest.spyOn(http.Server.prototype, "listen");
+
+const mockIoOn = jest.fn();
+const mockIoAdapter = jest.fn();
+const mockServerConstructor = jest.fn(() => ({ on: mockIoOn, adapter: mockIoAdapter }));
+jest.mock("socket.io", () => ({ Server: mockServerConstructor }));
+
+jest.mock("../socketHandlers/lobby", () => jest.fn());
+jest.mock("../socketHandlers/game", () => jest.fn());
+jest.mock("../socketHandlers/chat", () => jest.fn());
+jest.mock("../socketHandlers/emote", () => jest.fn());
+jest.mock("../socketHandlers/voice", () => jest.fn());
+
+jest.mock("../services/codeService", () => ({
+  resolveCode: jest.fn(),
+  getOrCreateCode: jest.fn(),
+}));
+jest.mock("../db/statsService", () => ({
+  getWeeklyLeaderboard: jest.fn(),
+  getPlayerStats: jest.fn(),
+}));
+jest.mock("../db/achievementService", () => ({
+  seedAchievements: jest.fn(() => Promise.resolve()),
+}));
+jest.mock("../redisClient", () => ({
+  ping: jest.fn().mockResolvedValue("PONG"),
+  keys: jest.fn().mockResolvedValue([]),
+  get: jest.fn(),
+}));
+
+const supertest = require("supertest");
+
+function flush() {
+  return new Promise((r) => setImmediate(r));
+}
+
+describe("server.js", () => {
+  let app;
+  let io;
+  let connectionHandler;
+  let seedAchievementsCalledAtLoad;
+  let serverListenCalledWithPort;
+  let ioConstructorArgs;
+  let codeService;
+  let statsService;
+  let redisClient;
+  let handleLobbyEvents;
+  let handleGameEvents;
+  let handleChatEvents;
+  let handleEmoteEvents;
+  let handleVoiceEvents;
+
+  beforeAll(() => {
+    process.env.PORT = "0";
+    delete process.env.REDIS_URL;
+    delete process.env.REDIS_ADAPTER_URL;
+
+    const serverModule = require("../server");
+    app = serverModule.app;
+    io = serverModule.io;
+
+    const connectionCall = mockIoOn.mock.calls.find((c) => c[0] === "connection");
+    connectionHandler = connectionCall && connectionCall[1];
+
+    ioConstructorArgs = mockServerConstructor.mock.calls[0];
+
+    const achievementService = require("../db/achievementService");
+    seedAchievementsCalledAtLoad = achievementService.seedAchievements.mock.calls.length > 0;
+
+    serverListenCalledWithPort = listenSpy.mock.calls.some(
+      (c) => String(c[0]) === process.env.PORT
+    );
+
+    codeService = require("../services/codeService");
+    statsService = require("../db/statsService");
+    redisClient = require("../redisClient");
+    handleLobbyEvents = require("../socketHandlers/lobby");
+    handleGameEvents = require("../socketHandlers/game");
+    handleChatEvents = require("../socketHandlers/chat");
+    handleEmoteEvents = require("../socketHandlers/emote");
+    handleVoiceEvents = require("../socketHandlers/voice");
+  });
+
+  afterAll((done) => {
+    const realServer = require("../server").server;
+    if (realServer && realServer.listening) {
+      realServer.close(done);
+    } else {
+      done();
+    }
+  });
+
+  describe("startup wiring", () => {
+    test("constructs the Socket.IO server with CORS and ping config", () => {
+      expect(ioConstructorArgs).toBeDefined();
+      expect(ioConstructorArgs[1]).toEqual(
+        expect.objectContaining({
+          cors: { origin: "*" },
+          pingInterval: 5000,
+          pingTimeout: 3000,
+        })
+      );
+    });
+
+    test("seeds achievements on startup", () => {
+      expect(seedAchievementsCalledAtLoad).toBe(true);
+    });
+
+    test("starts listening on the configured port", () => {
+      expect(serverListenCalledWithPort).toBe(true);
+    });
+
+    test("registers all socket handler modules on a new connection", () => {
+      expect(typeof connectionHandler).toBe("function");
+
+      const fakeSocket = { id: "socket123" };
+      connectionHandler(fakeSocket);
+
+      expect(handleLobbyEvents).toHaveBeenCalledWith(io, fakeSocket);
+      expect(handleGameEvents).toHaveBeenCalledWith(io, fakeSocket);
+      expect(handleChatEvents).toHaveBeenCalledWith(io, fakeSocket);
+      expect(handleEmoteEvents).toHaveBeenCalledWith(io, fakeSocket);
+      expect(handleVoiceEvents).toHaveBeenCalledWith(io, fakeSocket);
+    });
+  });
+
+  describe("GET /api/health", () => {
+    test("reports redis ok when ping succeeds", async () => {
+      redisClient.ping.mockResolvedValueOnce("PONG");
+
+      const res = await supertest(app).get("/api/health");
+
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe("ok");
+      expect(res.body.redis).toBe("ok");
+      expect(typeof res.body.uptime).toBe("number");
+      expect(typeof res.body.timestamp).toBe("string");
+    });
+
+    test("reports redis unavailable when ping rejects", async () => {
+      redisClient.ping.mockRejectedValueOnce(new Error("down"));
+
+      const res = await supertest(app).get("/api/health");
+
+      expect(res.status).toBe(200);
+      expect(res.body.redis).toBe("unavailable");
+    });
+  });
+
+  describe("GET /api/stats", () => {
+    test("aggregates active rooms, players, and games in progress", async () => {
+      redisClient.keys.mockResolvedValueOnce(["room:1", "room:2", "room:3"]);
+      redisClient.get.mockImplementation((key) => {
+        if (key === "room:1") {
+          return Promise.resolve(JSON.stringify({ users: [{ socketId: "a" }, { socketId: "b" }], game: { round: 1 } }));
+        }
+        if (key === "room:2") {
+          return Promise.resolve(JSON.stringify({ users: [{ socketId: "c" }], game: null }));
+        }
+        return Promise.resolve(null);
+      });
+
+      const res = await supertest(app).get("/api/stats");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ activeRooms: 2, activePlayers: 3, gamesInProgress: 1 });
+    });
+
+    test("returns 500 when redis throws", async () => {
+      redisClient.keys.mockRejectedValueOnce(new Error("redis down"));
+
+      const res = await supertest(app).get("/api/stats");
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: "stats unavailable" });
+    });
+  });
+
+  describe("GET /api/leaderboard", () => {
+    test("returns the weekly leaderboard", async () => {
+      statsService.getWeeklyLeaderboard.mockResolvedValueOnce([{ deviceId: "d1", xp: 100 }]);
+
+      const res = await supertest(app).get("/api/leaderboard");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ leaderboard: [{ deviceId: "d1", xp: 100 }] });
+    });
+
+    test("returns an empty leaderboard when the service returns null", async () => {
+      statsService.getWeeklyLeaderboard.mockResolvedValueOnce(null);
+
+      const res = await supertest(app).get("/api/leaderboard");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ leaderboard: [] });
+    });
+
+    test("returns 500 when the service throws", async () => {
+      statsService.getWeeklyLeaderboard.mockRejectedValueOnce(new Error("db down"));
+
+      const res = await supertest(app).get("/api/leaderboard");
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: "leaderboard unavailable", leaderboard: [] });
+    });
+  });
+
+  describe("GET /api/room/:code", () => {
+    test("resolves a known code to a roomId", async () => {
+      codeService.resolveCode.mockReturnValueOnce("room42");
+
+      const res = await supertest(app).get("/api/room/ABC123");
+
+      expect(codeService.resolveCode).toHaveBeenCalledWith("abc123");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ roomId: "room42" });
+    });
+
+    test("returns 404 when the code is unknown", async () => {
+      codeService.resolveCode.mockReturnValueOnce(null);
+
+      const res = await supertest(app).get("/api/room/zzzzzz");
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: "Room not found or expired" });
+    });
+  });
+
+  describe("POST /api/room/code", () => {
+    test("creates or returns a code for a roomId", async () => {
+      codeService.getOrCreateCode.mockReturnValueOnce("abc123");
+
+      const res = await supertest(app).post("/api/room/code").send({ roomId: "room42" });
+
+      expect(codeService.getOrCreateCode).toHaveBeenCalledWith("room42");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ code: "abc123" });
+    });
+
+    test("returns 400 when roomId is missing", async () => {
+      const res = await supertest(app).post("/api/room/code").send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "roomId required" });
+    });
+  });
+
+  describe("security headers", () => {
+    test("applies helmet security headers to responses", async () => {
+      const res = await supertest(app).get("/api/health");
+      expect(res.headers["x-content-type-options"]).toBe("nosniff");
+      expect(res.headers["x-dns-prefetch-control"]).toBeDefined();
+    });
+  });
+
+  describe("SPA fallback", () => {
+    test("falls back to a 404 for unknown non-API routes when client/dist doesn't exist", async () => {
+      const res = await supertest(app).get("/some/client/route");
+      expect(res.status).toBe(404);
+    });
+
+    test("does not intercept /api/* routes that don't exist", async () => {
+      const res = await supertest(app).get("/api/does-not-exist");
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("GET /api/player/:deviceId/stats", () => {
+    test("returns player stats when found", async () => {
+      statsService.getPlayerStats.mockResolvedValueOnce({ xp: 50, level: 2 });
+
+      const res = await supertest(app).get("/api/player/dev1/stats");
+
+      expect(statsService.getPlayerStats).toHaveBeenCalledWith("dev1");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ xp: 50, level: 2 });
+    });
+
+    test("returns 404 when the player is not found", async () => {
+      statsService.getPlayerStats.mockResolvedValueOnce(null);
+
+      const res = await supertest(app).get("/api/player/unknown/stats");
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: "Player not found" });
+    });
+
+    test("returns 500 when the service throws", async () => {
+      statsService.getPlayerStats.mockRejectedValueOnce(new Error("db down"));
+
+      const res = await supertest(app).get("/api/player/dev1/stats");
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: "unavailable" });
+    });
+  });
+});
+
+describe("server.js redis adapter setup", () => {
+  afterEach(() => {
+    delete process.env.REDIS_URL;
+    delete process.env.REDIS_ADAPTER_URL;
+    jest.dontMock("@socket.io/redis-adapter");
+    jest.dontMock("redis");
+  });
+
+  test("activates the redis adapter when REDIS_URL is set and clients connect", async () => {
+    process.env.REDIS_URL = "redis://adapter-host:6379";
+    const consoleLogSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+
+    let mod;
+    jest.isolateModules(() => {
+      mod = require("../server");
+    });
+
+    await flush();
+    await flush();
+
+    expect(mockIoAdapter).toHaveBeenCalled();
+    consoleLogSpy.mockRestore();
+    if (mod.server && mod.server.listening) {
+      await new Promise((r) => mod.server.close(r));
+    }
+  });
+
+  test("warns when the redis-adapter package cannot be loaded", async () => {
+    process.env.REDIS_URL = "redis://adapter-host:6379";
+    const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    jest.doMock("@socket.io/redis-adapter", () => {
+      throw new Error("Cannot find module");
+    });
+
+    let mod;
+    jest.isolateModules(() => {
+      mod = require("../server");
+    });
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("redis-adapter module missing"),
+      expect.any(String)
+    );
+    consoleWarnSpy.mockRestore();
+    if (mod.server && mod.server.listening) {
+      await new Promise((r) => mod.server.close(r));
+    }
+  });
+
+  test("warns when the redis-adapter clients fail to connect", async () => {
+    process.env.REDIS_URL = "redis://adapter-host:6379";
+    const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+    jest.doMock("redis", () => ({
+      createClient: jest.fn(() => ({
+        connect: jest.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+        duplicate: jest.fn(() => ({
+          connect: jest.fn().mockRejectedValue(new Error("ECONNREFUSED")),
+        })),
+      })),
+    }));
+
+    let mod;
+    jest.isolateModules(() => {
+      mod = require("../server");
+    });
+
+    await flush();
+    await flush();
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("redis-adapter unavailable"),
+      expect.any(String)
+    );
+    consoleWarnSpy.mockRestore();
+    if (mod.server && mod.server.listening) {
+      await new Promise((r) => mod.server.close(r));
+    }
+  });
+});

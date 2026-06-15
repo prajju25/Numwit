@@ -1,0 +1,40 @@
+import React, { useEffect, useState } from "react";
+import PropTypes from "prop-types";
+
+// Purely cosmetic "Get ready!" banner shown for a few seconds at the start
+// of every round. Does NOT affect the real per-round submission timer
+// (CountdownTimer / useCountdown) — it's just a heads-up for players.
+const COUNTDOWN_SECONDS = 5;
+
+export default function RoundStartCountdown({ round }) {
+  const [count, setCount] = useState(COUNTDOWN_SECONDS);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    if (count <= 0) {
+      const t = setTimeout(() => setVisible(false), 600);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setCount((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [count]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-fadeIn">
+      <div className="glass-card px-6 py-3 flex items-center gap-3 border border-violet-500/30 shadow-lg">
+        <span className="text-xs uppercase tracking-widest text-white/40 font-bold whitespace-nowrap">
+          {round != null ? `Round ${round}` : "Round"} starting
+        </span>
+        <span className="text-2xl font-extrabold text-violet-400 font-mono animate-pulse min-w-[2ch] text-center">
+          {count > 0 ? count : "Go!"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+RoundStartCountdown.propTypes = {
+  round: PropTypes.number,
+};
