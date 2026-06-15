@@ -5,12 +5,12 @@ import { useUser } from "../contexts/UserContext";
 import socket from "../socket";
 
 export default function RoomTypeOverlay({ onClose }) {
-  const { user, setRoomType, setIsJoiningRoom, roomId } = useUser();
+  const { user, deviceId, setRoomType, setIsJoiningRoom, roomId } = useUser();
 
   const handleRoomSelection = (type) => {
     setRoomType(type);
     setIsJoiningRoom(true);
-    socket.emit("join_room", { roomId, user, roomType: type });
+    socket.emit("join_room", { roomId, user, roomType: type, deviceId });
     onClose();
   };
 

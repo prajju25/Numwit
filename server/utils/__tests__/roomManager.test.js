@@ -71,6 +71,57 @@ describe("roomManager", () => {
       expect(room.users[0].name).toBe("Alice2");
     });
 
+    test("replaces a stale entry from the same device when reconnecting with a new socketId", async () => {
+      await addUserToRoom(
+        "room1",
+        { socketId: "s1", name: "Alice", deviceId: "dev-1" },
+        "public",
+        true
+      );
+      // Page refresh: new socket.id, same deviceId
+      const room = await addUserToRoom(
+        "room1",
+        { socketId: "s2", name: "Alice", deviceId: "dev-1" },
+        "public"
+      );
+      expect(room.users).toHaveLength(1);
+      expect(room.users[0].socketId).toBe("s2");
+    });
+
+    test("transfers host to the new connection when the stale host entry is replaced", async () => {
+      await addUserToRoom(
+        "room1",
+        { socketId: "s1", name: "Alice", deviceId: "dev-1" },
+        "public",
+        true
+      );
+      await addUserToRoom("room1", { socketId: "s2", name: "Bob" }, "public");
+
+      // Host (Alice) refreshes — new socketId, same deviceId
+      const room = await addUserToRoom(
+        "room1",
+        { socketId: "s3", name: "Alice", deviceId: "dev-1" },
+        "public"
+      );
+      expect(room.users).toHaveLength(2);
+      expect(room.hostSocketId).toBe("s3");
+    });
+
+    test("does not dedupe across different devices even with the same name", async () => {
+      await addUserToRoom(
+        "room1",
+        { socketId: "s1", name: "Alice", deviceId: "dev-1" },
+        "public",
+        true
+      );
+      const room = await addUserToRoom(
+        "room1",
+        { socketId: "s2", name: "Alice", deviceId: "dev-2" },
+        "public"
+      );
+      expect(room.users).toHaveLength(2);
+    });
+
     test("throws 'Room is full' when MAX_PLAYERS already reached", async () => {
       let room;
       for (let i = 0; i < 8; i++) {

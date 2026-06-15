@@ -50,6 +50,11 @@ module.exports = function handleLobbyEvents(io, socket) {
     try {
       socket.join(roomNo);
       user.socketId = socket.id;
+      // Phase 4: tag the in-room user with their stable device id so
+      // addUserToRoom can replace a stale entry from a previous connection
+      // (e.g. a page refresh, which gets a brand-new socket.id) instead of
+      // leaving a duplicate row behind.
+      if (deviceId) user.deviceId = deviceId;
       var room = await addUserToRoom(roomNo, user, roomType, !roomId);
 
       // Play vs Computer: always a brand-new, single-occupant room. Fill it

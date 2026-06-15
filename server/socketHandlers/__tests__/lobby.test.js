@@ -102,6 +102,43 @@ describe("lobby socket handler", () => {
       expect(userService.upsertUser).not.toHaveBeenCalled();
     });
 
+    test("tags the in-room user with deviceId so a refresh can replace its stale entry", async () => {
+      roomManager.addUserToRoom.mockResolvedValue({ id: "room1", users: [{ socketId: "s1" }] });
+      const io = makeIo();
+      const socket = makeSocket("s1");
+      handleLobbyEvents(io, socket);
+
+      await getHandler(socket, "join_room")({
+        roomId: "room1",
+        user: { name: "Alice" },
+        roomType: "private",
+        deviceId: "dev1",
+      });
+
+      expect(roomManager.addUserToRoom).toHaveBeenCalledWith(
+        "room1",
+        expect.objectContaining({ name: "Alice", socketId: "s1", deviceId: "dev1" }),
+        "private",
+        false
+      );
+    });
+
+    test("does not set deviceId on the in-room user when not provided", async () => {
+      roomManager.addUserToRoom.mockResolvedValue({ id: "room1", users: [{ socketId: "s1" }] });
+      const io = makeIo();
+      const socket = makeSocket("s1");
+      handleLobbyEvents(io, socket);
+
+      await getHandler(socket, "join_room")({
+        roomId: "room1",
+        user: { name: "Alice" },
+        roomType: "private",
+      });
+
+      const passedUser = roomManager.addUserToRoom.mock.calls[0][1];
+      expect(passedUser.deviceId).toBeUndefined();
+    });
+
     test("solo mode fills room with bots and starts the game immediately", async () => {
       const room = { id: "roomSolo", users: [{ socketId: "s1" }], game: null };
       roomManager.addUserToRoom.mockResolvedValue(room);

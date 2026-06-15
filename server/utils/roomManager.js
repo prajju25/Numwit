@@ -44,7 +44,19 @@ async function addUserToRoom(roomId, user, roomType, isCreator) {
   }
 
   room.type = roomType;
-  room.users = room.users.filter(function(u) { return u.socketId !== user.socketId; });
+
+  // Remove any stale entry for this user — either the same socket
+  // reconnecting, or (Phase 4) the same device rejoining with a fresh
+  // socket.id after a page refresh. If the stale entry was the host,
+  // transfer host status to the new connection.
+  room.users = room.users.filter(function(u) {
+    var isStale = u.socketId === user.socketId ||
+      (user.deviceId && u.deviceId === user.deviceId);
+    if (isStale && room.hostSocketId === u.socketId) {
+      room.hostSocketId = user.socketId;
+    }
+    return !isStale;
+  });
   room.users.push(user);
 
   await redis.set(key, JSON.stringify(room), { EX: ROOM_TTL_SECONDS });

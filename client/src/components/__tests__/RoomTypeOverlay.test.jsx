@@ -18,6 +18,7 @@ describe("RoomTypeOverlay", () => {
     onClose = jest.fn();
     useUser.mockReturnValue({
       user: { name: "Alice", avatar: "🐱" },
+      deviceId: "dev1",
       setRoomType,
       setIsJoiningRoom,
       roomId: "room1",
@@ -44,6 +45,7 @@ describe("RoomTypeOverlay", () => {
       roomId: "room1",
       user: { name: "Alice", avatar: "🐱" },
       roomType: "public",
+      deviceId: "dev1",
     });
     expect(onClose).toHaveBeenCalled();
   });
