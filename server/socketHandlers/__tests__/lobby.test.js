@@ -190,6 +190,37 @@ describe("lobby socket handler", () => {
       expect(io._emit).toHaveBeenCalledWith("room_update", expect.objectContaining({ id: createdRoomId }));
     });
 
+    test("does not schedule bot-fill for a new public room when BOT_FILL_ENABLED is false", async () => {
+      const constants = require("../../constants/constants");
+      const original = constants.BOT_FILL_ENABLED;
+      constants.BOT_FILL_ENABLED = false;
+
+      try {
+        roomManager.getPublicRooms.mockResolvedValue(null);
+        let createdRoomId;
+        roomManager.addUserToRoom.mockImplementation((roomNo) => {
+          createdRoomId = roomNo;
+          return Promise.resolve({ id: roomNo, users: [{ socketId: "s3b" }], game: null });
+        });
+
+        const io = makeIo();
+        const socket = makeSocket("s3b");
+        handleLobbyEvents(io, socket);
+
+        await getHandler(socket, "join_room")({
+          roomId: null,
+          user: { name: "Dana" },
+          roomType: "public",
+        });
+
+        expect(botService.scheduleBotFill).not.toHaveBeenCalled();
+        expect(roomManager.saveRoom).not.toHaveBeenCalled();
+        expect(io._emit).toHaveBeenCalledWith("room_update", expect.objectContaining({ id: createdRoomId }));
+      } finally {
+        constants.BOT_FILL_ENABLED = original;
+      }
+    });
+
     test("private room joins with the supplied roomId", async () => {
       roomManager.addUserToRoom.mockResolvedValue({ id: "priv1", users: [{ socketId: "s4" }], game: null });
 

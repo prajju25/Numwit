@@ -11,9 +11,14 @@ const NUMWIT_GAME_STATUS = {
 };
 
 // ── Bot-fill feature ──────────────────────────────────────────────────────────
+// Set BOT_FILL_ENABLED=false (env var) to turn off automatic bot-filling of
+// public rooms entirely — rooms below MIN_PLAYERS will just keep waiting for
+// real players instead of being padded with bots.
+const BOT_FILL_ENABLED = process.env.BOT_FILL_ENABLED !== "false";
+
 // How long a brand-new public room waits for real players before the server
 // fills the remaining seats (up to MIN_PLAYERS) with bots and starts the game.
-const BOT_FILL_DELAY_MS = 15000;
+const BOT_FILL_DELAY_MS = 60000;
 
 // Bot identity pools (cycled with modulo if more bots are needed than entries).
 const BOT_NAMES = ["Bot Ada", "Bot Theo", "Bot Lin", "Bot Max", "Bot Nia", "Bot Vex"];
@@ -26,6 +31,7 @@ module.exports = {
   ELIMINATION_THRESHOLD,
   TOTAL_ROUNDS_DEFAULT,
   NUMWIT_GAME_STATUS,
+  BOT_FILL_ENABLED,
   BOT_FILL_DELAY_MS,
   BOT_NAMES,
   BOT_AVATARS,

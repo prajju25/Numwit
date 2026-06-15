@@ -5,7 +5,8 @@ const {
   getRoomById,
   deleteRoom,
 } = require("../utils/roomManager");
-const { MIN_PLAYERS, BOT_FILL_DELAY_MS } = require("../constants/constants");
+const constants = require("../constants/constants");
+const { MIN_PLAYERS, BOT_FILL_DELAY_MS } = constants;
 const { clear: clearRateLimit } = require("../utils/rateLimiter");
 const { upsertUser } = require("../db/userService");
 const timerService = require("../services/timerService");
@@ -70,8 +71,9 @@ module.exports = function handleLobbyEvents(io, socket) {
       // Bot-fill: a brand-new public room has nobody to match with yet.
       // Schedule a one-shot check — if it's still below MIN_PLAYERS after
       // BOT_FILL_DELAY_MS, the server pads it with bots and starts the game
-      // itself (see fillRoomWithBotsAndStart below).
-      if (isNewPublicRoom && !room.game && room.users.length < MIN_PLAYERS) {
+      // itself (see fillRoomWithBotsAndStart below). Can be disabled entirely
+      // via the BOT_FILL_ENABLED env var.
+      if (constants.BOT_FILL_ENABLED && isNewPublicRoom && !room.game && room.users.length < MIN_PLAYERS) {
         room.botFillAt = Date.now() + BOT_FILL_DELAY_MS;
         await saveRoom(room);
         botService.scheduleBotFill(roomNo, BOT_FILL_DELAY_MS, function(rid) {

@@ -209,4 +209,72 @@ describe("App", () => {
 
     expect(screen.getByTestId("achievement-toast")).toBeInTheDocument();
   });
+
+  test("shows a Leave Room button while in the waiting room or game, which leaves and returns home", () => {
+    const resetGame = jest.fn();
+    const resetUser = jest.fn();
+    useGame.mockReturnValue({ resetGame });
+    useUser.mockReturnValue(
+      baseUser({
+        hasStarted: true,
+        isInGame: true,
+        user: { socketId: "p0", name: "Bob", avatar: "🐶" },
+        resetUser,
+      })
+    );
+    render(<App />);
+
+    const leaveButton = screen.getByRole("button", { name: /leave room/i });
+    fireEvent.click(leaveButton);
+
+    expect(socket.emit).toHaveBeenCalledWith("leave_room");
+    expect(resetGame).toHaveBeenCalled();
+    expect(resetUser).toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  test("does not show a Leave Room button on the login/landing screens", () => {
+    useUser.mockReturnValue(baseUser());
+    render(<App />);
+
+    expect(screen.queryByRole("button", { name: /leave room/i })).not.toBeInTheDocument();
+  });
+
+  test("clicking the Numwit logo while in game leaves the room and returns home", () => {
+    const resetGame = jest.fn();
+    const resetUser = jest.fn();
+    useGame.mockReturnValue({ resetGame });
+    useUser.mockReturnValue(
+      baseUser({
+        hasStarted: true,
+        isInGame: true,
+        user: { socketId: "p0", name: "Bob", avatar: "🐶" },
+        resetUser,
+      })
+    );
+    render(<App />);
+
+    fireEvent.click(screen.getByText("Numwit"));
+
+    expect(socket.emit).toHaveBeenCalledWith("leave_room");
+    expect(resetGame).toHaveBeenCalled();
+    expect(resetUser).toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  test("clicking the Numwit logo from the login screen returns home without emitting leave_room", () => {
+    const resetGame = jest.fn();
+    const resetUser = jest.fn();
+    useGame.mockReturnValue({ resetGame });
+    window.history.pushState({}, "", "/abcdef");
+    useUser.mockReturnValue(baseUser({ resetUser }));
+    render(<App />);
+
+    fireEvent.click(screen.getByText("Numwit"));
+
+    expect(socket.emit).not.toHaveBeenCalledWith("leave_room");
+    expect(resetGame).toHaveBeenCalled();
+    expect(resetUser).toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/");
+  });
 });

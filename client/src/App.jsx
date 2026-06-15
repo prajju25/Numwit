@@ -93,6 +93,18 @@ function AppInner() {
   // Landing page: only shown when nothing else is active and user chose to see it
   const showLandingPage = showLanding && showLogin && !isJoiningRoom;
 
+  // Leave the current room (if any) and return to the home/landing page.
+  // Used both by the "Leave Room" button and by clicking the Numwit logo.
+  const goHome = () => {
+    if (showWaiting || showGame) {
+      socket.emit("leave_room");
+    }
+    resetGame();
+    resetUser();
+    setShowLanding(true);
+    window.history.pushState({}, "", "/");
+  };
+
   return (
     <div className={twMerge(
       "min-h-screen w-full flex flex-col items-center",
@@ -117,7 +129,12 @@ function AppInner() {
           <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-5 py-3 border-b border-white/10"
             style={{ background: "rgba(26,26,46,0.85)", backdropFilter: "blur(20px)" }}
           >
-            <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+            <h1
+              onClick={goHome}
+              role="button"
+              title="Back to home"
+              className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2 cursor-pointer select-none"
+            >
               <span>🧠</span>
               <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
                 Numwit
@@ -125,6 +142,14 @@ function AppInner() {
             </h1>
             {(showWaiting || showGame) && user && (
               <div className="flex items-center gap-2">
+                <button
+                  onClick={goHome}
+                  title="Leave room"
+                  aria-label="Leave room"
+                  className="text-sm font-semibold px-3 py-2 rounded-full bg-white/10 hover:bg-red-500/20 hover:text-red-300 border border-white/10 transition-all duration-200"
+                >
+                  🚪 Leave
+                </button>
                 <MuteButton />
                 <div className="flex items-center gap-2 glass-card-sm px-3 py-1.5">
                   <span className="text-lg">{user.avatar}</span>

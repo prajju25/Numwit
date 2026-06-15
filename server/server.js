@@ -3,7 +3,10 @@ const http    = require("http");
 const path    = require("path");
 const helmet  = require("helmet");
 const { Server } = require("socket.io");
-require("dotenv").config();
+// Always load server/.env regardless of the process's current working
+// directory (e.g. `npm run server` from the repo root runs with cwd at the
+// repo root, where dotenv's default lookup would find nothing).
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const handleLobbyEvents = require("./socketHandlers/lobby");
 const handleGameEvents  = require("./socketHandlers/game");
@@ -20,7 +23,7 @@ const app    = express();
 const server = http.createServer(app);
 
 // Security headers on every response. CSP is disabled for now since it needs
-// tuning for the inline scripts / websocket connections the client uses —
+// tuning for the inline scripts / websocket connections the client uses --
 // revisit once the production origin is finalized.
 app.use(helmet({ contentSecurityPolicy: false }));
 
@@ -41,7 +44,7 @@ const io = new Server(server, {
   pingTimeout:  SOCKET_PING_TIMEOUT,
 });
 
-// ── @socket.io/redis-adapter (horizontal scaling) ─────────────────────────────
+// -- @socket.io/redis-adapter (horizontal scaling) -----------------------------
 // Only active when REDIS_ADAPTER_URL is set (same Redis or separate instance).
 if (process.env.REDIS_ADAPTER_URL || process.env.REDIS_URL) {
   try {
@@ -55,20 +58,20 @@ if (process.env.REDIS_ADAPTER_URL || process.env.REDIS_URL) {
     Promise.all([pubClient.connect(), subClient.connect()])
       .then(() => {
         io.adapter(createAdapter(pubClient, subClient));
-        console.log("✅ Socket.IO redis-adapter active");
+        console.log("Socket.IO redis-adapter active");
       })
       .catch((err) => {
-        console.warn("⚠️  redis-adapter unavailable, running single-node:", err.message);
+        console.warn("redis-adapter unavailable, running single-node:", err.message);
       });
   } catch (err) {
-    console.warn("⚠️  redis-adapter module missing:", err.message);
+    console.warn("redis-adapter module missing:", err.message);
   }
 }
 
-// ── Seed achievements on startup ─────────────────────────────────────────────
+// -- Seed achievements on startup -----------------------------------------------
 achievementService.seedAchievements().catch(() => {});
 
-// ── REST: GET /api/health ─────────────────────────────────────────────────────
+// -- REST: GET /api/health --------------------------------------------------------
 app.get("/api/health", async (req, res) => {
   let redisStatus = "ok";
   try {
@@ -85,7 +88,7 @@ app.get("/api/health", async (req, res) => {
   });
 });
 
-// ── REST: GET /api/stats ──────────────────────────────────────────────────────
+// -- REST: GET /api/stats -----------------------------------------------------------
 app.get("/api/stats", async (req, res) => {
   try {
     const redis = require("./redisClient");
@@ -105,7 +108,7 @@ app.get("/api/stats", async (req, res) => {
   }
 });
 
-// ── REST: GET /api/leaderboard ────────────────────────────────────────────────
+// -- REST: GET /api/leaderboard ------------------------------------------------------
 app.get("/api/leaderboard", async (req, res) => {
   try {
     const board = await statsService.getWeeklyLeaderboard();
@@ -115,7 +118,7 @@ app.get("/api/leaderboard", async (req, res) => {
   }
 });
 
-// ── REST: GET /api/room/:code ─────────────────────────────────────────────────
+// -- REST: GET /api/room/:code -------------------------------------------------------
 app.get("/api/room/:code", (req, res) => {
   const code   = String(req.params.code).toLowerCase().trim();
   const roomId = codeService.resolveCode(code);
@@ -123,7 +126,7 @@ app.get("/api/room/:code", (req, res) => {
   res.json({ roomId });
 });
 
-// ── REST: POST /api/room/code ─────────────────────────────────────────────────
+// -- REST: POST /api/room/code -------------------------------------------------------
 app.post("/api/room/code", (req, res) => {
   const { roomId } = req.body || {};
   if (!roomId) return res.status(400).json({ error: "roomId required" });
@@ -131,7 +134,7 @@ app.post("/api/room/code", (req, res) => {
   res.json({ code });
 });
 
-// ── REST: GET /api/player/:deviceId/stats ────────────────────────────────────
+// -- REST: GET /api/player/:deviceId/stats -------------------------------------------
 app.get("/api/player/:deviceId/stats", async (req, res) => {
   try {
     const stats = await statsService.getPlayerStats(req.params.deviceId);
@@ -142,7 +145,7 @@ app.get("/api/player/:deviceId/stats", async (req, res) => {
   }
 });
 
-// ── SPA fallback ───────────────────────────────────────────────────────────────
+// -- SPA fallback ---------------------------------------------------------------------
 // Any GET that isn't /api/* or /socket.io/* falls back to the client's
 // index.html so React Router (client-side routing) can take over. Must be
 // registered after all /api routes above and after express.static, but
@@ -153,7 +156,7 @@ app.get(/^\/(?!api|socket\.io).*/, (req, res) => {
   });
 });
 
-// ── Socket.IO ────────────────────────────────────────────────────────────────
+// -- Socket.IO --------------------------------------------------------------------
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
   handleLobbyEvents(io, socket);
