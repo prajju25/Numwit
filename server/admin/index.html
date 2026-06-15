@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Numwit Admin</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: rgba(255, 255, 255, 0.05);
+    --border: rgba(255, 255, 255, 0.1);
+    --text: #ffffff;
+    --text-dim: rgba(255, 255, 255, 0.5);
+    --accent: #8b5cf6;
+    --accent2: #22d3ee;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --err: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1 span.accent {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .subtitle { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 24px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .card .value { font-size: 1.6rem; font-weight: 800; line-height: 1.2; }
+  .card .label { font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; }
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .section h2 {
+    font-size: 1rem;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .section h2 .controls { display: flex; gap: 8px; align-items: center; font-size: 0.8rem; font-weight: 400; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-dim); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td.message { max-width: 360px; white-space: pre-wrap; word-break: break-word; }
+  select, button {
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  select:hover, button:hover { background: rgba(255,255,255,0.15); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .badge.open { background: rgba(248,113,113,0.15); color: var(--err); }
+  .badge.in_review { background: rgba(251,191,36,0.15); color: var(--warn); }
+  .badge.resolved { background: rgba(52,211,153,0.15); color: var(--ok); }
+  .empty, .error, .loading { color: var(--text-dim); font-size: 0.85rem; padding: 12px 0; }
+  .error { color: var(--err); }
+  .byType { margin-top: 10px; font-size: 0.8rem; color: var(--text-dim); }
+  .byType span { color: var(--text); font-weight: 600; }
+  .roomGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .roomCard {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .roomCard .roomHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .roomCard .roomId { font-weight: 700; font-size: 0.85rem; word-break: break-all; }
+  .roomCard .players { color: var(--text-dim); font-size: 0.8rem; line-height: 1.5; }
+  .badge.public { background: rgba(34,211,238,0.15); color: var(--accent2); }
+  .badge.private { background: rgba(139,92,246,0.15); color: var(--accent); }
+  .badge.solo { background: rgba(255,255,255,0.1); color: var(--text-dim); }
+  .badge.inprogress { background: rgba(251,191,36,0.15); color: var(--warn); }
+  .badge.waiting { background: rgba(52,211,153,0.15); color: var(--ok); }
+  .healthGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .healthGrid .card .value { font-size: 1.2rem; }
+</style>
+</head>
+<body>
+  <h1>🧠 Numwit <span class="accent">Admin</span></h1>
+  <div class="subtitle">Live room stats and player feedback</div>
+
+  <div id="statsError" class="error" style="display:none"></div>
+
+  <div class="grid" id="roomStats">
+    <div class="loading">Loading stats…</div>
+  </div>
+
+  <div class="section">
+    <h2>
+      Active Rooms
+      <span class="controls" id="activeRoomsSummary"></span>
+    </h2>
+    <div id="activeRoomsContainer"><div class="loading">Loading rooms…</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Server Health &amp; Live Stats</h2>
+    <div class="healthGrid" id="healthContainer"><div class="loading">Loading health…</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Weekly Leaderboard</h2>
+    <div id="leaderboardContainer"><div class="loading">Loading leaderboard…</div></div>
+  </div>
+
+  <div class="section">
+    <h2>
+      Feedback
+      <span class="controls">
+        <label for="statusFilter" style="color:var(--text-dim)">Status:</label>
+        <select id="statusFilter">
+          <option value="">All</option>
+          <option value="open">Open</option>
+          <option value="in_review">In review</option>
+          <option value="resolved">Resolved</option>
+        </select>
+        <button id="refreshBtn">↻ Refresh</button>
+      </span>
+    </h2>
+    <div id="feedbackContainer"><div class="loading">Loading feedback…</div></div>
+  </div>
+
+  <script>
+    const API_STATS = "/api/admin/stats";
+    const API_FEEDBACK = "/api/admin/feedback";
+    const API_ROOMS = "/api/admin/rooms";
+    const API_HEALTH = "/api/health";
+    const API_PUBLIC_STATS = "/api/stats";
+    const API_LEADERBOARD = "/api/leaderboard";
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleString();
+    }
+
+    async function fetchJson(url, options) {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || ("HTTP " + res.status));
+      }
+      return res.json();
+    }
+
+    function renderStats(data) {
+      const rooms = data.rooms || {};
+      const feedback = data.feedback || {};
+      const users = data.users || {};
+      const byType = rooms.byType || {};
+
+      const cards = [
+        { label: "Total Rooms", value: rooms.totalRooms || 0 },
+        { label: "Total Players (live)", value: rooms.totalPlayers || 0 },
+        { label: "Waiting Rooms", value: rooms.waitingRooms || 0 },
+        { label: "Games In Progress", value: rooms.gamesInProgress || 0 },
+        { label: "Unique Players (all-time)", value: users.total || 0 },
+        { label: "Feedback — Open", value: feedback.open || 0 },
+        { label: "Feedback — In Review", value: feedback.in_review || 0 },
+        { label: "Feedback — Resolved", value: feedback.resolved || 0 },
+      ];
+
+      const cardsHtml = cards.map((c) =>
+        '<div class="card"><div class="value">' + c.value + '</div><div class="label">' + c.label + '</div></div>'
+      ).join("");
+
+      const typeRows = ["public", "private", "solo"].map((t) => {
+        const entry = byType[t] || { rooms: 0, players: 0 };
+        return '<span>' + entry.rooms + '</span> rooms / <span>' + entry.players + '</span> players (' + t + ')';
+      }).join(" &nbsp;·&nbsp; ");
+
+      document.getElementById("roomStats").innerHTML =
+        cardsHtml + '<div class="byType" style="grid-column:1/-1">' + typeRows + '</div>';
+    }
+
+    function renderActiveRooms(rooms) {
+      const container = document.getElementById("activeRoomsContainer");
+      const summary = document.getElementById("activeRoomsSummary");
+      summary.textContent = rooms.length + " active";
+
+      if (!rooms.length) {
+        container.innerHTML = '<div class="empty">No active rooms.</div>';
+        return;
+      }
+
+      container.innerHTML = '<div class="roomGrid">' + rooms.map((room) => {
+        const typeBadge = '<span class="badge ' + escapeHtml(room.type) + '">' + escapeHtml(room.type) + '</span>';
+        const statusBadge = room.inProgress
+          ? '<span class="badge inprogress">In progress' + (room.round ? " · round " + escapeHtml(room.round) : "") + '</span>'
+          : '<span class="badge waiting">Waiting</span>';
+
+        const players = (room.players || []).map((p) =>
+          escapeHtml((p.avatar ? p.avatar + " " : "") + (p.name || "?") + (p.isBot ? " (bot)" : ""))
+        ).join(", ");
+
+        return (
+          '<div class="roomCard">' +
+            '<div class="roomHead"><span class="roomId">' + escapeHtml(room.id) + '</span>' + typeBadge + '</div>' +
+            '<div class="players">' + (room.playerCount || 0) + ' player' + (room.playerCount === 1 ? "" : "s") +
+              (players ? ': ' + players : '') +
+            '</div>' +
+            '<div style="margin-top:8px">' + statusBadge + '</div>' +
+          '</div>'
+        );
+      }).join("") + '</div>';
+    }
+
+    function renderHealth(health, publicStats) {
+      const cards = [];
+      if (health) {
+        cards.push({ label: "Server Status", value: health.status || "?" });
+        cards.push({ label: "Redis", value: health.redis || "?" });
+        cards.push({ label: "Uptime (s)", value: health.uptime != null ? health.uptime : "?" });
+      }
+      if (publicStats) {
+        cards.push({ label: "Active Rooms (/api/stats)", value: publicStats.activeRooms || 0 });
+        cards.push({ label: "Active Players (/api/stats)", value: publicStats.activePlayers || 0 });
+        cards.push({ label: "Games In Progress (/api/stats)", value: publicStats.gamesInProgress || 0 });
+      }
+
+      if (!cards.length) {
+        document.getElementById("healthContainer").innerHTML = '<div class="empty">No data.</div>';
+        return;
+      }
+
+      document.getElementById("healthContainer").innerHTML = cards.map((c) =>
+        '<div class="card"><div class="value">' + escapeHtml(c.value) + '</div><div class="label">' + c.label + '</div></div>'
+      ).join("");
+    }
+
+    function renderLeaderboard(board) {
+      const container = document.getElementById("leaderboardContainer");
+      if (!board.length) {
+        container.innerHTML = '<div class="empty">No leaderboard data yet.</div>';
+        return;
+      }
+
+      const rows = board.map((entry, i) => (
+        "<tr>" +
+          '<td>' + (i + 1) + '</td>' +
+          '<td>' + escapeHtml((entry.avatar ? entry.avatar + " " : "") + (entry.name || "?")) + '</td>' +
+          '<td>' + escapeHtml(entry.level != null ? entry.level : "") + '</td>' +
+          '<td>' + escapeHtml(entry.wins != null ? entry.wins : 0) + '</td>' +
+          '<td>' + escapeHtml(entry.survived != null ? entry.survived : 0) + '</td>' +
+        "</tr>"
+      )).join("");
+
+      container.innerHTML =
+        '<table><thead><tr>' +
+          '<th>#</th><th>Player</th><th>Level</th><th>Wins (7d)</th><th>Survived (7d)</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    function statusOptions(current) {
+      return ["open", "in_review", "resolved"].map((s) =>
+        '<option value="' + s + '"' + (s === current ? " selected" : "") + '>' +
+          s.replace("_", " ") + '</option>'
+      ).join("");
+    }
+
+    function renderFeedback(items) {
+      const container = document.getElementById("feedbackContainer");
+      if (!items.length) {
+        container.innerHTML = '<div class="empty">No feedback yet.</div>';
+        return;
+      }
+
+      const rows = items.map((item) => {
+        const badgeClass = item.status || "open";
+        return (
+          "<tr>" +
+            '<td>' + escapeHtml(formatDate(item.createdAt)) + '</td>' +
+            '<td><span class="badge ' + badgeClass + '">' + escapeHtml((item.category || "other")) + '</span></td>' +
+            '<td class="message">' + escapeHtml(item.message) + '</td>' +
+            '<td>' + escapeHtml(item.context) + '</td>' +
+            '<td>' + escapeHtml(item.name) + '</td>' +
+            '<td>' +
+              '<select data-id="' + escapeHtml(item.id) + '" class="statusSelect">' +
+                statusOptions(item.status) +
+              '</select>' +
+            '</td>' +
+          "</tr>"
+        );
+      }).join("");
+
+      container.innerHTML =
+        '<table><thead><tr>' +
+          '<th>Date</th><th>Category</th><th>Message</th><th>Context</th><th>Name</th><th>Status</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>';
+
+      container.querySelectorAll(".statusSelect").forEach((select) => {
+        select.addEventListener("change", async (e) => {
+          const id = e.target.getAttribute("data-id");
+          const status = e.target.value;
+          e.target.disabled = true;
+          try {
+            await fetchJson(API_FEEDBACK + "/" + encodeURIComponent(id), {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status }),
+            });
+            await loadAll();
+          } catch (err) {
+            alert("Failed to update status: " + err.message);
+            e.target.disabled = false;
+          }
+        });
+      });
+    }
+
+    async function loadAll() {
+      const errEl = document.getElementById("statsError");
+      errEl.style.display = "none";
+
+      try {
+        const stats = await fetchJson(API_STATS);
+        renderStats(stats);
+      } catch (err) {
+        errEl.textContent = "Failed to load stats: " + err.message;
+        errEl.style.display = "block";
+      }
+
+      try {
+        const data = await fetchJson(API_ROOMS);
+        renderActiveRooms(data.rooms || []);
+      } catch (err) {
+        document.getElementById("activeRoomsContainer").innerHTML =
+          '<div class="error">Failed to load rooms: ' + escapeHtml(err.message) + '</div>';
+      }
+
+      try {
+        const [health, publicStats] = await Promise.all([
+          fetchJson(API_HEALTH).catch(() => null),
+          fetchJson(API_PUBLIC_STATS).catch(() => null),
+        ]);
+        renderHealth(health, publicStats);
+      } catch (err) {
+        document.getElementById("healthContainer").innerHTML =
+          '<div class="error">Failed to load health: ' + escapeHtml(err.message) + '</div>';
+      }
+
+      try {
+        const data = await fetchJson(API_LEADERBOARD);
+        renderLeaderboard(data.leaderboard || []);
+      } catch (err) {
+        document.getElementById("leaderboardContainer").innerHTML =
+          '<div class="error">Failed to load leaderboard: ' + escapeHtml(err.message) + '</div>';
+      }
+
+      try {
+        const status = document.getElementById("statusFilter").value;
+        const url = API_FEEDBACK + (status ? "?status=" + encodeURIComponent(status) : "");
+        const data = await fetchJson(url);
+        renderFeedback(data.feedback || []);
+      } catch (err) {
+        document.getElementById("feedbackContainer").innerHTML =
+          '<div class="error">Failed to load feedback: ' + escapeHtml(err.message) + '</div>';
+      }
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", loadAll);
+    document.getElementById("statusFilter").addEventListener("change", loadAll);
+
+    loadAll();
+    setInterval(loadAll, 30000);
+  </script>
+</body>
+</html>

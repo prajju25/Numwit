@@ -90,4 +90,13 @@ async function getProfile(deviceId) {
   );
 }
 
-module.exports = { upsertUser, awardXp, getProfile, xpToLevel, xpForNextLevel, XP_THRESHOLDS };
+/**
+ * Total number of unique players (by device) that have ever played, all-time.
+ * Used by the admin dashboard. Returns 0 if the DB is unavailable.
+ */
+async function getTotalUsers() {
+  const count = await db((p) => p.user.count());
+  return count || 0;
+}
+
+module.exports = { upsertUser, awardXp, getProfile, getTotalUsers, xpToLevel, xpForNextLevel, XP_THRESHOLDS };

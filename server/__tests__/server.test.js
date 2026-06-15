@@ -13,6 +13,7 @@ jest.mock("../socketHandlers/game", () => jest.fn());
 jest.mock("../socketHandlers/chat", () => jest.fn());
 jest.mock("../socketHandlers/emote", () => jest.fn());
 jest.mock("../socketHandlers/voice", () => jest.fn());
+jest.mock("../socketHandlers/feedback", () => jest.fn());
 
 jest.mock("../services/codeService", () => ({
   resolveCode: jest.fn(),
@@ -52,6 +53,7 @@ describe("server.js", () => {
   let handleChatEvents;
   let handleEmoteEvents;
   let handleVoiceEvents;
+  let handleFeedbackEvents;
 
   beforeAll(() => {
     process.env.PORT = "0";
@@ -82,6 +84,7 @@ describe("server.js", () => {
     handleChatEvents = require("../socketHandlers/chat");
     handleEmoteEvents = require("../socketHandlers/emote");
     handleVoiceEvents = require("../socketHandlers/voice");
+    handleFeedbackEvents = require("../socketHandlers/feedback");
   });
 
   afterAll((done) => {
@@ -124,6 +127,7 @@ describe("server.js", () => {
       expect(handleChatEvents).toHaveBeenCalledWith(io, fakeSocket);
       expect(handleEmoteEvents).toHaveBeenCalledWith(io, fakeSocket);
       expect(handleVoiceEvents).toHaveBeenCalledWith(io, fakeSocket);
+      expect(handleFeedbackEvents).toHaveBeenCalledWith(io, fakeSocket);
     });
   });
 

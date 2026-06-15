@@ -13,11 +13,14 @@ const handleGameEvents  = require("./socketHandlers/game");
 const handleChatEvents  = require("./socketHandlers/chat");
 const handleEmoteEvents = require("./socketHandlers/emote");
 const handleVoiceEvents = require("./socketHandlers/voice");
+const handleFeedbackEvents = require("./socketHandlers/feedback");
 
 const roomManager      = require("./utils/roomManager");
 const codeService      = require("./services/codeService");
 const statsService     = require("./db/statsService");
 const achievementService = require("./db/achievementService");
+const adminAuth        = require("./middleware/adminAuth");
+const adminRoutes      = require("./routes/admin");
 
 const app    = express();
 const server = http.createServer(app);
@@ -145,6 +148,12 @@ app.get("/api/player/:deviceId/stats", async (req, res) => {
   }
 });
 
+// -- Admin API (Basic Auth via ADMIN_PASSWORD) -----------------------------------------
+app.use("/api/admin", adminAuth, adminRoutes);
+
+// -- Admin dashboard (static page, same Basic Auth) ------------------------------------
+app.use("/admin", adminAuth, express.static(path.join(__dirname, "admin")));
+
 // -- SPA fallback ---------------------------------------------------------------------
 // Any GET that isn't /api/* or /socket.io/* falls back to the client's
 // index.html so React Router (client-side routing) can take over. Must be
@@ -164,6 +173,7 @@ io.on("connection", (socket) => {
   handleChatEvents(io, socket);
   handleEmoteEvents(io, socket);
   handleVoiceEvents(io, socket);
+  handleFeedbackEvents(io, socket);
 });
 
 const PORT = process.env.PORT || 5000;

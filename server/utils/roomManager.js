@@ -145,6 +145,78 @@ async function getRoomsByType(roomType) {
   return rooms;
 }
 
+// ── getRoomCounts (admin dashboard) ────────────────────────────────────────────
+// Aggregate live counts across all rooms: totals plus a breakdown by room
+// type (public / private / solo) and waiting-vs-in-progress.
+async function getRoomCounts() {
+  const keys = await redis.keys(ROOM_PREFIX + "*");
+
+  const counts = {
+    totalRooms: 0,
+    totalPlayers: 0,
+    waitingRooms: 0,
+    gamesInProgress: 0,
+    byType: {
+      public:  { rooms: 0, players: 0 },
+      private: { rooms: 0, players: 0 },
+      solo:    { rooms: 0, players: 0 },
+    },
+  };
+
+  for (var i = 0; i < keys.length; i++) {
+    var raw = await redis.get(keys[i]);
+    if (!raw) continue;
+    var room = JSON.parse(raw);
+    var type = room.type || "public";
+    var playerCount = (room.users || []).length;
+
+    counts.totalRooms++;
+    counts.totalPlayers += playerCount;
+    if (room.game) counts.gamesInProgress++;
+    else counts.waitingRooms++;
+
+    if (!counts.byType[type]) counts.byType[type] = { rooms: 0, players: 0 };
+    counts.byType[type].rooms++;
+    counts.byType[type].players += playerCount;
+  }
+
+  return counts;
+}
+
+// ── getActiveRooms (admin dashboard) ───────────────────────────────────────────
+// Full list of live rooms with enough detail to render "active room" cards:
+// id, type, player count/names, and whether a game is currently in progress.
+// In-progress rooms are sorted first, then by player count (descending).
+async function getActiveRooms() {
+  const keys = await redis.keys(ROOM_PREFIX + "*");
+  const rooms = [];
+
+  for (var i = 0; i < keys.length; i++) {
+    var raw = await redis.get(keys[i]);
+    if (!raw) continue;
+    var room = JSON.parse(raw);
+    var users = room.users || [];
+
+    rooms.push({
+      id: room.id,
+      type: room.type || "public",
+      playerCount: users.length,
+      players: users.map(function(u) {
+        return { name: u.name, avatar: u.avatar, isBot: !!u.isBot };
+      }),
+      inProgress: !!room.game,
+      round: room.game ? (room.game.round || null) : null,
+    });
+  }
+
+  rooms.sort(function(a, b) {
+    if (a.inProgress !== b.inProgress) return a.inProgress ? -1 : 1;
+    return b.playerCount - a.playerCount;
+  });
+
+  return rooms;
+}
+
 // ── getRoom / getRoomById ──────────────────────────────────────────────────────
 async function getRoom(roomId) {
   var roomData = await redis.get(getRoomKey(roomId));
@@ -171,6 +243,8 @@ module.exports = {
   addUserToRoom,
   removeUserFromRoom,
   getRoomsByType,
+  getRoomCounts,
+  getActiveRooms,
   getPublicRooms,
   getRoom,
   getRoomById,

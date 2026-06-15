@@ -7,6 +7,7 @@ const {
   upsertUser,
   awardXp,
   getProfile,
+  getTotalUsers,
   xpToLevel,
   xpForNextLevel,
   XP_THRESHOLDS,
@@ -169,6 +170,32 @@ describe("userService", () => {
       db.mockResolvedValue(null);
       const result = await getProfile("dev1");
       expect(result).toBeNull();
+    });
+  });
+
+  describe("getTotalUsers", () => {
+    test("returns the total user count from prisma", async () => {
+      db.mockImplementation(async (fn) => fn({
+        user: { count: jest.fn().mockResolvedValue(42) },
+      }));
+
+      const result = await getTotalUsers();
+      expect(result).toBe(42);
+    });
+
+    test("returns 0 when db is unavailable", async () => {
+      db.mockResolvedValue(null);
+      const result = await getTotalUsers();
+      expect(result).toBe(0);
+    });
+
+    test("returns 0 when count resolves to 0", async () => {
+      db.mockImplementation(async (fn) => fn({
+        user: { count: jest.fn().mockResolvedValue(0) },
+      }));
+
+      const result = await getTotalUsers();
+      expect(result).toBe(0);
     });
   });
 });

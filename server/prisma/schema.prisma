@@ -70,3 +70,22 @@ model UserAchievement {
   @@unique([userId, achievementId])
   @@index([userId])
 }
+
+// ── Feedback ─────────────────────────────────────────────────────────────────
+// User-submitted bug reports / feature requests / general feedback.
+// Not tied via FK to User (deviceId may not have an associated User row yet,
+// and feedback should persist even if the user record is later removed).
+model Feedback {
+  id        String   @id @default(uuid())
+  deviceId  String?
+  name      String?
+  category  String   @default("other") // bug | feature | other
+  message   String
+  context   String?  // e.g. roomId or page the user was on
+  userAgent String?
+  status    String   @default("open")  // open | in_review | resolved
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}

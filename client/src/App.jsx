@@ -13,6 +13,7 @@ import { ChatProvider } from "./contexts/ChatContext";
 import { SoundProvider, useSound } from "./contexts/SoundContext";
 import { VoiceProvider } from "./contexts/VoiceContext";
 import AchievementToast from "./components/AchievementToast";
+import FeedbackWidget from "./components/FeedbackWidget";
 
 // Mute toggle button — reads from SoundContext
 function MuteButton() {
@@ -188,6 +189,7 @@ function AppInner() {
       )}
 
       <AchievementToast />
+      <FeedbackWidget />
     </div>
   );
 }

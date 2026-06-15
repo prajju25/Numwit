@@ -44,7 +44,7 @@ async function getWeeklyLeaderboard() {
     p.sessionStat.groupBy({
       by: ["userId"],
       where: { playedAt: { gte: since } },
-      _sum: { wins: true, survived: true },
+      _sum: { wins: true },
       orderBy: { _sum: { wins: "desc" } },
       take: 10,
     })
@@ -52,6 +52,20 @@ async function getWeeklyLeaderboard() {
   if (!rows || rows.length === 0) return [];
 
   const userIds = rows.map((r) => r.userId);
+
+  // survived is Boolean so it can't be summed — count rows where survived=true instead
+  const survivedRows = await db((p) =>
+    p.sessionStat.groupBy({
+      by: ["userId"],
+      where: { playedAt: { gte: since }, survived: true, userId: { in: userIds } },
+      _count: { id: true },
+    })
+  );
+  const survivedMap = {};
+  if (survivedRows) {
+    survivedRows.forEach((r) => { survivedMap[r.userId] = r._count.id; });
+  }
+
   const users = await db((p) =>
     p.user.findMany({
       where: { id: { in: userIds } },
@@ -65,8 +79,8 @@ async function getWeeklyLeaderboard() {
 
   return rows.map((r) => ({
     ...(userMap[r.userId] || {}),
-    wins:     r._sum.wins     || 0,
-    survived: r._sum.survived || 0,
+    wins:     r._sum.wins          || 0,
+    survived: survivedMap[r.userId] || 0,
   })).filter((r) => r.name);
 }
 
@@ -83,19 +97,27 @@ async function getPlayerStats(deviceId) {
   const agg = await db((p) =>
     p.sessionStat.aggregate({
       where: { userId: user.id },
-      _sum:   { rounds: true, wins: true, penalties: true, exactMatches: true, survived: true },
+      _sum:   { rounds: true, wins: true, penalties: true, exactMatches: true },
       _count: { id: true },
     })
   );
   if (!agg) return null;
 
+  // survived is Boolean — count rows where survived=true separately
+  const survivedAgg = await db((p) =>
+    p.sessionStat.aggregate({
+      where: { userId: user.id, survived: true },
+      _count: { id: true },
+    })
+  );
+
   return {
-    gamesPlayed:  agg._count.id              || 0,
-    totalRounds:  agg._sum.rounds            || 0,
-    totalWins:    agg._sum.wins              || 0,
-    totalPenalties: agg._sum.penalties       || 0,
-    exactMatches: agg._sum.exactMatches      || 0,
-    survived:     agg._sum.survived          || 0,
+    gamesPlayed:    agg._count.id                                  || 0,
+    totalRounds:    agg._sum.rounds                                || 0,
+    totalWins:      agg._sum.wins                                  || 0,
+    totalPenalties: agg._sum.penalties                             || 0,
+    exactMatches:   agg._sum.exactMatches                          || 0,
+    survived:       (survivedAgg && survivedAgg._count.id)         || 0,
   };
 }
 

@@ -3,6 +3,8 @@ const {
   addUserToRoom,
   removeUserFromRoom,
   getRoomsByType,
+  getRoomCounts,
+  getActiveRooms,
   getPublicRooms,
   getRoom,
   getRoomById,
@@ -257,6 +259,103 @@ describe("roomManager", () => {
       // Directly poke a key with no value isn't really possible via the mock,
       // but an empty result set should just return [].
       const rooms = await getRoomsByType("solo");
+      expect(rooms).toEqual([]);
+    });
+  });
+
+  describe("getRoomCounts", () => {
+    test("returns zeroed counts when there are no rooms", async () => {
+      expect(await getRoomCounts()).toEqual({
+        totalRooms: 0,
+        totalPlayers: 0,
+        waitingRooms: 0,
+        gamesInProgress: 0,
+        byType: {
+          public:  { rooms: 0, players: 0 },
+          private: { rooms: 0, players: 0 },
+          solo:    { rooms: 0, players: 0 },
+        },
+      });
+    });
+
+    test("aggregates totals, waiting vs in-progress, and per-type breakdowns", async () => {
+      var pub = await addUserToRoom("pub1", { socketId: "s1", name: "Alice" }, "public", true);
+      await addUserToRoom("pub1", { socketId: "s2", name: "Bob" }, "public", false);
+
+      var priv = await addUserToRoom("priv1", { socketId: "s3", name: "Carl" }, "private", true);
+      priv.game = { round: 1 };
+      await saveRoom(priv);
+
+      await addUserToRoom("solo1", { socketId: "s4", name: "Dee" }, "solo", true);
+
+      const counts = await getRoomCounts();
+      expect(counts.totalRooms).toBe(3);
+      expect(counts.totalPlayers).toBe(4);
+      expect(counts.gamesInProgress).toBe(1);
+      expect(counts.waitingRooms).toBe(2);
+      expect(counts.byType.public).toEqual({ rooms: 1, players: 2 });
+      expect(counts.byType.private).toEqual({ rooms: 1, players: 1 });
+      expect(counts.byType.solo).toEqual({ rooms: 1, players: 1 });
+    });
+
+    test("skips keys with no data", async () => {
+      redisClient.__store.set("room:ghost", null);
+      const counts = await getRoomCounts();
+      expect(counts.totalRooms).toBe(0);
+    });
+  });
+
+  describe("getActiveRooms", () => {
+    test("returns an empty array when there are no rooms", async () => {
+      expect(await getActiveRooms()).toEqual([]);
+    });
+
+    test("returns room summaries with players, type, and in-progress status", async () => {
+      await addUserToRoom("pub1", { socketId: "s1", name: "Alice", avatar: "cat" }, "public", true);
+      await addUserToRoom("pub1", { socketId: "s2", name: "Bob", avatar: "dog", isBot: true }, "public");
+
+      var priv = await addUserToRoom("priv1", { socketId: "s3", name: "Carl" }, "private", true);
+      priv.game = { round: 2 };
+      await saveRoom(priv);
+
+      const rooms = await getActiveRooms();
+      expect(rooms).toHaveLength(2);
+
+      const pub = rooms.find((r) => r.id === "pub1");
+      expect(pub.type).toBe("public");
+      expect(pub.playerCount).toBe(2);
+      expect(pub.players).toEqual([
+        { name: "Alice", avatar: "cat", isBot: false },
+        { name: "Bob", avatar: "dog", isBot: true },
+      ]);
+      expect(pub.inProgress).toBe(false);
+      expect(pub.round).toBeNull();
+
+      const priv2 = rooms.find((r) => r.id === "priv1");
+      expect(priv2.type).toBe("private");
+      expect(priv2.inProgress).toBe(true);
+      expect(priv2.round).toBe(2);
+    });
+
+    test("sorts in-progress rooms first, then by player count descending", async () => {
+      await addUserToRoom("small", { socketId: "s1", name: "Alice" }, "public", true);
+
+      await addUserToRoom("big", { socketId: "s2", name: "Bob" }, "public", true);
+      await addUserToRoom("big", { socketId: "s3", name: "Carl" }, "public");
+
+      var gameRoom = await addUserToRoom("gameroom", { socketId: "s4", name: "Dee" }, "public", true);
+      gameRoom.game = { round: 1 };
+      await saveRoom(gameRoom);
+
+      const rooms = await getActiveRooms();
+      expect(rooms[0].id).toBe("gameroom"); // in-progress first
+      expect(rooms[1].id).toBe("big"); // then by player count desc
+      expect(rooms[2].id).toBe("small");
+    });
+
+    test("skips keys with no data", async () => {
+      redisClient.__store.set("room:ghost", null);
+      const rooms = await getActiveRooms();
       expect(rooms).toEqual([]);
     });
   });
