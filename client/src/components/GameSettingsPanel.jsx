@@ -4,7 +4,7 @@ import { twMerge } from "tailwind-merge";
 
 const TIMER_OPTIONS      = [{ value: 20, label: "20s" }, { value: 30, label: "30s" }, { value: 60, label: "60s" }];
 const ELIM_OPTIONS       = [{ value: 3, label: "3 pts" }, { value: 5, label: "5 pts" }, { value: 7, label: "7 pts" }];
-const MULTIPLIER_OPTIONS = [{ value: 0.6, label: "60%" }, { value: 0.8, label: "80%" }, { value: 1.0, label: "100%" }];
+const MULTIPLIER_OPTIONS = [{ value: 0.6, label: "60%" }, { value: 0.8, label: "80%" }, { value: 0.9, label: "90%" }];
 
 function OptionRow({ label, options, value, onChange }) {
   return (

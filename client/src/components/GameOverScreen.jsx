@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import PropTypes from "prop-types";
 import socket from "../socket";
 import { useUser } from "../contexts/UserContext";
 import { useNumwit } from "../contexts/NumwitRuleContext";
 import { twMerge } from "tailwind-merge";
 import SessionStats from "./SessionStats";
-import ShareResults from "./ShareResults";
+import RoundHistory from "./RoundHistory";
 import LevelBadge from "./LevelBadge";
 import { useGame } from "../contexts/GameContext";
 
@@ -20,6 +20,7 @@ export default function GameOverScreen({ data, players }) {
   const iWon = data?.winnerSocketId === mySocketId;
   const isHost = mySocketId === hostSocketId;
   const disconnectReason = data?.reason === "opponent_disconnected";
+  const [showHistory, setShowHistory] = useState(false);
 
   const handleRestart = () => socket.emit("restart_game", { roomId });
 
@@ -100,8 +101,24 @@ export default function GameOverScreen({ data, players }) {
         {/* Session stats */}
         <SessionStats history={history} mySocketId={mySocketId} />
 
-        {/* Share */}
-        <ShareResults history={history} mySocketId={mySocketId} players={players} />
+        {/* Round History */}
+        {history && history.length > 0 && (
+          <div className="w-full">
+            <button
+              onClick={() => setShowHistory((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold border border-white/10 text-white/60 hover:text-white/90 hover:border-white/20 transition-all"
+              style={{ background: "rgba(255,255,255,0.04)" }}
+            >
+              <span>📋 Round History</span>
+              <span className="text-white/30 text-xs">{showHistory ? "▲ hide" : "▼ show"}</span>
+            </button>
+            {showHistory && (
+              <div className="mt-2">
+                <RoundHistory />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Play again — only host can trigger; others wait */}
         {isHost ? (
