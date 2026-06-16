@@ -4,6 +4,7 @@ const {
   getPublicRooms,
   getRoomById,
   deleteRoom,
+  saveRoom,
 } = require("../utils/roomManager");
 const constants = require("../constants/constants");
 const { MIN_PLAYERS, BOT_FILL_DELAY_MS } = constants;
@@ -13,7 +14,15 @@ const timerService = require("../services/timerService");
 const botService = require("../services/botService");
 const gameHandlers = require("./game");
 const startGameForRoom = gameHandlers.startGameForRoom;
-const saveRoom = require("../utils/roomManager").saveRoom;
+
+// ── Reconnection grace-period state ───────────────────────────────────────────
+// When a user disconnects (e.g. mobile switching apps) we wait 60 s before
+// actually removing them from the room. If they rejoin within that window the
+// timer is cancelled and the game continues as if nothing happened.
+var DISCONNECT_GRACE_MS = 60 * 1000;
+var pendingDisconnects = {};  // deviceId  → { timer, oldSocketId, roomId }
+var socketToDevice    = {};   // socketId  → deviceId
+var socketToRoom      = {};   // socketId  → roomId
 
 module.exports = function handleLobbyEvents(io, socket) {
 
@@ -28,6 +37,13 @@ module.exports = function handleLobbyEvents(io, socket) {
     // Persist / update user record in DB (fire-and-forget, non-blocking)
     if (deviceId && user && user.name) {
       upsertUser(deviceId, user.name, user.avatar || "😎").catch(() => {});
+    }
+
+    // Cancel any pending grace-period disconnect for this device
+    if (deviceId && pendingDisconnects[deviceId]) {
+      clearTimeout(pendingDisconnects[deviceId].timer);
+      delete pendingDisconnects[deviceId];
+      console.log("Reconnect: cancelled disconnect timer for deviceId " + deviceId);
     }
 
     var roomNo = roomId;
@@ -56,6 +72,17 @@ module.exports = function handleLobbyEvents(io, socket) {
       // leaving a duplicate row behind.
       if (deviceId) user.deviceId = deviceId;
       var room = await addUserToRoom(roomNo, user, roomType, !roomId);
+
+      // Track socket → device/room for grace-period reconnection
+      if (deviceId) socketToDevice[socket.id] = deviceId;
+      socketToRoom[socket.id] = roomNo;
+
+      // Clear any stale disconnected flag left by a previous grace period
+      var rejoiningUser = room.users.find(function(u) { return u.socketId === socket.id; });
+      if (rejoiningUser && rejoiningUser.disconnected) {
+        rejoiningUser.disconnected = false;
+        await saveRoom(room);
+      }
 
       // Play vs Computer: always a brand-new, single-occupant room. Fill it
       // with bots up to MIN_PLAYERS immediately (no countdown, no waiting
@@ -117,6 +144,16 @@ module.exports = function handleLobbyEvents(io, socket) {
 
   socket.on("leave_room", async function(callback) {
     console.debug('Socket: "leave_room" ' + socket.id);
+
+    // Intentional leave — cancel any pending grace timer and clean up maps
+    var dId = socketToDevice[socket.id];
+    if (dId && pendingDisconnects[dId]) {
+      clearTimeout(pendingDisconnects[dId].timer);
+      delete pendingDisconnects[dId];
+    }
+    delete socketToDevice[socket.id];
+    delete socketToRoom[socket.id];
+
     var room = await removeUserFromRoom(socket.id);
     if (room) {
       socket.leave(room.id);
@@ -132,28 +169,73 @@ module.exports = function handleLobbyEvents(io, socket) {
 
     clearRateLimit(socket.id);
 
-    var room = await removeUserFromRoom(socket.id);
-    if (room) {
-      if (room.game) {
-        var activePlayers = room.users.filter(function(u) {
-          return room.game.eliminatedPlayers.indexOf(u.socketId) === -1
-            && room.game.turnOrder.indexOf(u.socketId) !== -1;
-        });
-        if (activePlayers.length < MIN_PLAYERS) {
-          var lastPlayer = activePlayers[0];
-          io.to(room.id).emit("game_over", {
-            winnerSocketId: lastPlayer ? lastPlayer.socketId : null,
-            points: room.game.points,
-            reason: "opponent_disconnected",
-          });
-        }
-      }
+    var deviceId = socketToDevice[socket.id];
+    var roomId   = socketToRoom[socket.id];
+    delete socketToDevice[socket.id];
+    delete socketToRoom[socket.id];
 
-      await cleanupIfBotsOnly(io, room);
+    // Grace period: if we know the device, hold the room slot for 60 s so a
+    // mobile user switching apps (or a brief network drop) can come back.
+    if (deviceId && roomId) {
+      var room = await getRoomById(roomId);
+      if (room) {
+        // Mark user as temporarily disconnected so the client can show it
+        var disconnectedUser = room.users.find(function(u) { return u.socketId === socket.id; });
+        if (disconnectedUser) {
+          disconnectedUser.disconnected = true;
+          await saveRoom(room);
+          io.to(room.id).emit("room_update", room);
+        }
+
+        var oldSocketId = socket.id;
+        pendingDisconnects[deviceId] = {
+          oldSocketId: oldSocketId,
+          roomId: roomId,
+          timer: setTimeout(async function() {
+            delete pendingDisconnects[deviceId];
+            console.log("Grace period expired for deviceId " + deviceId + " — removing from room");
+            var r = await removeUserFromRoom(oldSocketId);
+            if (r) {
+              await handlePostRemove(io, r);
+            }
+          }, DISCONNECT_GRACE_MS),
+        };
+
+        console.log("Disconnect grace period started for deviceId " + deviceId + " (60s)");
+        return;
+      }
     }
-    console.log("User disconnected:", socket.id);
+
+    // No deviceId (anonymous) or room already gone — immediate cleanup
+    var r = await removeUserFromRoom(socket.id);
+    if (r) {
+      await handlePostRemove(io, r);
+    }
+    console.log("User disconnected (immediate):", socket.id);
   });
 };
+
+// ── handlePostRemove ──────────────────────────────────────────────────────────
+// Called after a user is fully removed from a room (grace period expired or
+// immediate). Triggers game_over if too few active players remain, then
+// cleans up bot-only rooms.
+async function handlePostRemove(io, room) {
+  if (room.game) {
+    var activePlayers = room.users.filter(function(u) {
+      return room.game.eliminatedPlayers.indexOf(u.socketId) === -1
+        && room.game.turnOrder.indexOf(u.socketId) !== -1;
+    });
+    if (activePlayers.length < MIN_PLAYERS) {
+      var lastPlayer = activePlayers[0];
+      io.to(room.id).emit("game_over", {
+        winnerSocketId: lastPlayer ? lastPlayer.socketId : null,
+        points: room.game.points,
+        reason: "opponent_disconnected",
+      });
+    }
+  }
+  await cleanupIfBotsOnly(io, room);
+}
 
 // ── cleanupIfBotsOnly ──────────────────────────────────────────────────────
 // If the room that just lost a real user now contains only bots, tear it
