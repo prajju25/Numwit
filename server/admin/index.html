@@ -86,6 +86,17 @@
     cursor: pointer;
   }
   select:hover, button:hover { background: rgba(255,255,255,0.15); }
+  /* Dark background for native dropdown options */
+  select option { background-color: #1a1a2e; color: #ffffff; }
+  .btn-danger {
+    background: rgba(248,113,113,0.12);
+    color: var(--err);
+    border-color: rgba(248,113,113,0.3);
+    padding: 3px 6px;
+    font-size: 1rem;
+    line-height: 1;
+  }
+  .btn-danger:hover { background: rgba(248,113,113,0.25); }
   .badge {
     display: inline-block;
     padding: 2px 8px;
@@ -124,6 +135,7 @@
   .badge.private { background: rgba(139,92,246,0.15); color: var(--accent); }
   .badge.solo { background: rgba(255,255,255,0.1); color: var(--text-dim); }
   .badge.inprogress { background: rgba(251,191,36,0.15); color: var(--warn); }
+  .badge.gameover { background: rgba(139,92,246,0.15); color: var(--accent); }
   .badge.waiting { background: rgba(52,211,153,0.15); color: var(--ok); }
   .healthGrid {
     display: grid;
@@ -240,6 +252,28 @@
         cardsHtml + '<div class="byType" style="grid-column:1/-1">' + typeRows + '</div>';
     }
 
+    function timeAgo(ts) {
+      if (!ts) return "unknown";
+      const secs = Math.floor((Date.now() - ts) / 1000);
+      if (secs < 60) return secs + "s ago";
+      const mins = Math.floor(secs / 60);
+      if (mins < 60) return mins + "m ago";
+      const hrs = Math.floor(mins / 60);
+      return hrs + "h " + (mins % 60) + "m ago";
+    }
+
+    const API_ROOMS_DELETE = "/api/admin/rooms";
+
+    async function deleteRoom(roomId) {
+      if (!confirm("Delete room " + roomId + "? This will immediately end the game for all players in it.")) return;
+      try {
+        await fetchJson(API_ROOMS_DELETE + "/" + encodeURIComponent(roomId), { method: "DELETE" });
+        await loadAll();
+      } catch (err) {
+        alert("Failed to delete room: " + err.message);
+      }
+    }
+
     function renderActiveRooms(rooms) {
       const container = document.getElementById("activeRoomsContainer");
       const summary = document.getElementById("activeRoomsSummary");
@@ -252,21 +286,32 @@
 
       container.innerHTML = '<div class="roomGrid">' + rooms.map((room) => {
         const typeBadge = '<span class="badge ' + escapeHtml(room.type) + '">' + escapeHtml(room.type) + '</span>';
-        const statusBadge = room.inProgress
-          ? '<span class="badge inprogress">In progress' + (room.round ? " · round " + escapeHtml(room.round) : "") + '</span>'
-          : '<span class="badge waiting">Waiting</span>';
+        const statusBadge = !room.inProgress
+          ? '<span class="badge waiting">Waiting</span>'
+          : room.gameEnded
+            ? '<span class="badge gameover">Game Over · round ' + escapeHtml(room.round) + '</span>'
+            : '<span class="badge inprogress">In Progress · round ' + escapeHtml(room.round) + '</span>';
 
         const players = (room.players || []).map((p) =>
           escapeHtml((p.avatar ? p.avatar + " " : "") + (p.name || "?") + (p.isBot ? " (bot)" : ""))
         ).join(", ");
 
+        const safeId = escapeHtml(room.id);
         return (
           '<div class="roomCard">' +
-            '<div class="roomHead"><span class="roomId">' + escapeHtml(room.id) + '</span>' + typeBadge + '</div>' +
+            '<div class="roomHead">' +
+              '<span class="roomId">' + safeId + '</span>' +
+              '<span style="display:flex;gap:6px;align-items:center">' + typeBadge +
+                '<button class="btn-danger" onclick="deleteRoom(\'' + safeId + '\')" title="Delete room">🗑</button>' +
+              '</span>' +
+            '</div>' +
             '<div class="players">' + (room.playerCount || 0) + ' player' + (room.playerCount === 1 ? "" : "s") +
               (players ? ': ' + players : '') +
             '</div>' +
-            '<div style="margin-top:8px">' + statusBadge + '</div>' +
+            '<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:6px">' +
+              statusBadge +
+              '<span style="font-size:0.72rem;color:var(--text-dim)">' + timeAgo(room.lastActiveAt) + '</span>' +
+            '</div>' +
           '</div>'
         );
       }).join("") + '</div>';

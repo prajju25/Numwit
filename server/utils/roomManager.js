@@ -11,6 +11,7 @@ function getRoomKey(roomId) {
 
 // ── saveRoom ───────────────────────────────────────────────────────────────────
 async function saveRoom(room) {
+  room.lastActiveAt = Date.now();
   const key = getRoomKey(room.id);
   await redis.set(key, JSON.stringify(room), { EX: ROOM_TTL_SECONDS });
   return room;
@@ -58,6 +59,7 @@ async function addUserToRoom(roomId, user, roomType, isCreator) {
     return !isStale;
   });
   room.users.push(user);
+  room.lastActiveAt = Date.now();
 
   await redis.set(key, JSON.stringify(room), { EX: ROOM_TTL_SECONDS });
 
@@ -205,7 +207,9 @@ async function getActiveRooms() {
         return { name: u.name, avatar: u.avatar, isBot: !!u.isBot };
       }),
       inProgress: !!room.game,
+      gameEnded: !!room.gameEnded,
       round: room.game ? (room.game.round || null) : null,
+      lastActiveAt: room.lastActiveAt || null,
     });
   }
 

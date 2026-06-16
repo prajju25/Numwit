@@ -6,9 +6,11 @@ var roomManager = require("../utils/roomManager");
 var getRoomById = roomManager.getRoomById;
 var saveRoom = roomManager.saveRoom;
 var removeFromPublicSet = roomManager.removeFromPublicSet;
+var deleteRoom = roomManager.deleteRoom;
 var NUMWIT_GAME_STATUS = require("../constants/constants").NUMWIT_GAME_STATUS;
 var timerService = require("../services/timerService");
 var botService = require("../services/botService");
+var roomCleanup = require("../services/roomCleanup");
 
 // Phase 4: DB services (all wrapped with graceful fallback)
 var userService = require("../db/userService");
@@ -97,7 +99,23 @@ module.exports = function handleGameEvents(io, socket) {
     timerService.clearTimer(roomId);
     botService.clearSubmissionTimers(roomId);
     clearRoundAdvance(roomId);
+    roomCleanup.cancelPostGameDelete(roomId);
     room.game = null;
+    room.gameEnded = false;
+
+    // Solo rooms: re-fill with bots and restart immediately.
+    // Must emit game_reset first so the client clears GameOverScreen state,
+    // then start the game — the brief WaitingRoom flash is acceptable.
+    if (room.type === "solo") {
+      const { MIN_PLAYERS } = require("../constants/constants");
+      botService.fillRoomWithBots(room, MIN_PLAYERS);
+      await saveRoom(room);
+      io.to(roomId).emit("game_reset");
+      io.to(roomId).emit("room_update", room);
+      await startGameForRoom(io, roomId, {});
+      return;
+    }
+
     await saveRoom(room);
 
     // Return everyone to the waiting room.
@@ -132,6 +150,9 @@ module.exports = function handleGameEvents(io, socket) {
 async function startGameForRoom(io, roomId, settings) {
   var room = await getRoomById(roomId);
   if (!room) return;
+
+  // Game is starting — cancel any pending idle-delete timer
+  roomCleanup.cancelIdleDelete(roomId);
 
   await removeFromPublicSet(roomId);
   io.to(roomId).emit("game_started");
@@ -282,10 +303,17 @@ async function resolveRound(io, room, activePlayers) {
     io.to(roomId).emit("game_over", gameOverData);
     botService.clearSubmissionTimers(roomId);
 
+    // Mark room as ended so admin dashboard shows correct status
+    room.gameEnded = true;
+    saveRoom(room).catch(function(e) { console.error("saveRoom(gameEnded) error:", e.message); });
+
     // ── Phase 4: persist stats + check achievements (non-blocking) ────────────
     persistGameOver(io, room, game, activePlayers, winnerPlayer, result).catch(function(e) {
       console.error("persistGameOver error:", e.message);
     });
+
+    // Schedule room deletion after 5 min if no "Play Again" arrives
+    roomCleanup.schedulePostGameDelete(io, roomId);
 
     return;
   }

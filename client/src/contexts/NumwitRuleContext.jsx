@@ -118,6 +118,7 @@ export const NumwitRuleProvider = ({ children }) => {
     socket.on("player_eliminated",       onPlayerEliminated);
     socket.on("game_over",               onGameOver);
     socket.on("game_reset",              onGameReset);
+    socket.on("room_deleted",            onGameReset); // clear gameOver when room is auto-deleted
     socket.on("invalid_number",          onInvalidNumber);
     socket.on("duplicate_submission",    onDuplicateSubmission);
     socket.on("round_already_completed", onRoundAlreadyCompleted);
@@ -131,6 +132,7 @@ export const NumwitRuleProvider = ({ children }) => {
       socket.off("player_eliminated",       onPlayerEliminated);
       socket.off("game_over",               onGameOver);
       socket.off("game_reset",              onGameReset);
+      socket.off("room_deleted",            onGameReset);
       socket.off("invalid_number",          onInvalidNumber);
       socket.off("duplicate_submission",    onDuplicateSubmission);
       socket.off("round_already_completed", onRoundAlreadyCompleted);

@@ -134,15 +134,6 @@ function GameBoard() {
             so it doesn't keep ticking down (or hit 0) during the post-round pause */}
         <CountdownTimer key={timerKey} timerDuration={gameData.timerDuration} paused={!!(roundResult || roundVoid)} />
 
-        {/* Waiting indicator */}
-        {waitingCount && (
-          <div className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm text-cyan-300 border border-cyan-500/25"
-            style={{ background: "rgba(6,182,212,0.08)" }}>
-            <span className="animate-spin text-base">⏳</span>
-            Waiting — <span className="font-bold">{waitingCount.submitted}/{waitingCount.total}</span> submitted
-          </div>
-        )}
-
         {/* Main area */}
         {isDuel ? (
           <DuelView players={players} points={gameData.points} eliminatedPlayers={eliminatedPlayers} mySocketId={mySocketId}>
@@ -151,7 +142,7 @@ function GameBoard() {
         ) : (
           <div className="flex flex-col sm:flex-row gap-4 sm:items-start">
             {/* Scores — below number pick on mobile, left column on desktop */}
-            <div className="order-2 sm:order-1 sm:shrink-0 w-full sm:w-auto">
+            <div className="order-3 sm:order-1 sm:shrink-0 w-full sm:w-auto">
               <PlayerScorePanel players={players} points={gameData.points} eliminatedPlayers={eliminatedPlayers} />
             </div>
             {/* Vertical divider — desktop only */}
@@ -160,6 +151,14 @@ function GameBoard() {
             <div className="order-1 sm:order-3 w-full">
               {numberInput}
             </div>
+            {/* Waiting indicator — between pick and scores on mobile, below pick on desktop */}
+            {waitingCount && (
+              <div className="order-2 sm:order-4 w-full flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm text-cyan-300 border border-cyan-500/25"
+                style={{ background: "rgba(6,182,212,0.08)" }}>
+                <span className="animate-spin text-base">⏳</span>
+                Waiting — <span className="font-bold">{waitingCount.submitted}/{waitingCount.total}</span> submitted
+              </div>
+            )}
           </div>
         )}
 

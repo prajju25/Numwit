@@ -18,6 +18,7 @@ export const GameProvider = ({ children }) => {
     setIsInGame,
     setIsWaitingRoom,
     roomType,
+    setRoomType,
     setRoomId,
     setHasStarted,
     setIsJoiningRoom,
@@ -64,6 +65,17 @@ export const GameProvider = ({ children }) => {
       setIsWaitingRoom(true);
     };
 
+    // room_deleted: server auto-deleted the room (idle timeout or post-game
+    // cleanup). Reset everything and return the user to the home screen.
+    const onRoomDeleted = () => {
+      resetGame();
+      setIsInGame(false);
+      setIsWaitingRoom(false);
+      setHasStarted(false);
+      setRoomId(null);
+      setRoomType(null);
+    };
+
     // game_in_progress: received by a player who joins while a game is running.
     // Store the snapshot for NumwitRuleContext to read on mount, then navigate to GameBoard.
     const onGameInProgress = (data) => {
@@ -72,16 +84,18 @@ export const GameProvider = ({ children }) => {
       setIsWaitingRoom(false);
     };
 
-    socket.on("room_update",     onRoomUpdate);
-    socket.on("game_started",    onGameStarted);
-    socket.on("game_reset",      onGameReset);
+    socket.on("room_update",      onRoomUpdate);
+    socket.on("game_started",     onGameStarted);
+    socket.on("game_reset",       onGameReset);
     socket.on("game_in_progress", onGameInProgress);
+    socket.on("room_deleted",     onRoomDeleted);
 
     return () => {
-      socket.off("room_update",     onRoomUpdate);
-      socket.off("game_started",    onGameStarted);
-      socket.off("game_reset",      onGameReset);
+      socket.off("room_update",      onRoomUpdate);
+      socket.off("game_started",     onGameStarted);
+      socket.off("game_reset",       onGameReset);
       socket.off("game_in_progress", onGameInProgress);
+      socket.off("room_deleted",     onRoomDeleted);
     };
   // roomType is intentionally excluded: it's set once on mount and never changes
   // after the user joins. Including it would cause the effect to re-register on

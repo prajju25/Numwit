@@ -7,6 +7,8 @@ const express = require("express");
 const roomManager = require("../utils/roomManager");
 const feedbackService = require("../db/feedbackService");
 const userService = require("../db/userService");
+const timerService = require("../services/timerService");
+const botService = require("../services/botService");
 
 const router = express.Router();
 
@@ -56,6 +58,22 @@ router.get("/feedback", async (req, res) => {
     res.json({ feedback: items });
   } catch (err) {
     res.status(500).json({ error: "feedback unavailable" });
+  }
+});
+
+// -- DELETE /api/admin/rooms/:id ------------------------------------------------------
+// Force-delete a room by ID. Clears timers and bot state, then removes from Redis.
+router.delete("/rooms/:id", async (req, res) => {
+  const roomId = req.params.id;
+  try {
+    // Always clear in-memory state (no-ops if room isn't tracked)
+    timerService.clearTimer(roomId);
+    botService.removeRoom(roomId);
+    // Delete from Redis — idempotent: if already gone that's fine
+    await roomManager.deleteRoom(roomId);
+    res.json({ ok: true, deleted: roomId });
+  } catch (err) {
+    res.status(500).json({ error: "delete failed" });
   }
 });
 

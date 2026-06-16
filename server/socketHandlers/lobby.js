@@ -12,6 +12,7 @@ const { clear: clearRateLimit } = require("../utils/rateLimiter");
 const { upsertUser } = require("../db/userService");
 const timerService = require("../services/timerService");
 const botService = require("../services/botService");
+const roomCleanup = require("../services/roomCleanup");
 const gameHandlers = require("./game");
 const startGameForRoom = gameHandlers.startGameForRoom;
 
@@ -39,9 +40,14 @@ module.exports = function handleLobbyEvents(io, socket) {
       upsertUser(deviceId, user.name, user.avatar || "😎").catch(() => {});
     }
 
-    // Cancel any pending grace-period disconnect for this device
+    // Cancel any pending grace-period disconnect for this device.
+    // Save it first — we may need to clean up the old room below if the user
+    // is joining a *different* room (e.g. starting a brand-new solo game while
+    // the grace timer is still counting down for a previous room).
+    var cancelledPending = null;
     if (deviceId && pendingDisconnects[deviceId]) {
-      clearTimeout(pendingDisconnects[deviceId].timer);
+      cancelledPending = pendingDisconnects[deviceId];
+      clearTimeout(cancelledPending.timer);
       delete pendingDisconnects[deviceId];
       console.log("Reconnect: cancelled disconnect timer for deviceId " + deviceId);
     }
@@ -63,6 +69,18 @@ module.exports = function handleLobbyEvents(io, socket) {
       console.debug('Socket: "join_room" new room created: ' + roomNo);
     }
 
+    // If the user cancelled a grace-period for a DIFFERENT room (e.g. they
+    // started a new solo game instead of rejoining the previous one), remove
+    // them from the old room immediately.  Without this the old room keeps a
+    // ghost "disconnected" user entry forever and cleanupIfBotsOnly never fires.
+    if (cancelledPending && cancelledPending.roomId !== roomNo) {
+      console.log("Joining different room — cleaning up old room " + cancelledPending.roomId);
+      var abandonedRoom = await removeUserFromRoom(cancelledPending.oldSocketId);
+      if (abandonedRoom) {
+        await handlePostRemove(io, abandonedRoom);
+      }
+    }
+
     try {
       socket.join(roomNo);
       user.socketId = socket.id;
@@ -82,6 +100,13 @@ module.exports = function handleLobbyEvents(io, socket) {
       if (rejoiningUser && rejoiningUser.disconnected) {
         rejoiningUser.disconnected = false;
         await saveRoom(room);
+      }
+
+      // Schedule idle-delete for new public/private waiting rooms.
+      // Solo rooms start immediately so no idle timer is needed for them.
+      // The timer is cancelled in startGameForRoom when the game kicks off.
+      if (roomType !== "solo" && !room.game && !roomId) {
+        roomCleanup.scheduleIdleDelete(io, roomNo);
       }
 
       // Play vs Computer: always a brand-new, single-occupant room. Fill it
@@ -157,6 +182,8 @@ module.exports = function handleLobbyEvents(io, socket) {
     var room = await removeUserFromRoom(socket.id);
     if (room) {
       socket.leave(room.id);
+      roomCleanup.cancelPostGameDelete(room.id);
+      roomCleanup.cancelIdleDelete(room.id);
       await cleanupIfBotsOnly(io, room);
       if (callback) callback({ status: "ok" });
     } else {
@@ -232,6 +259,8 @@ async function handlePostRemove(io, room) {
         points: room.game.points,
         reason: "opponent_disconnected",
       });
+      // Schedule 5-min post-game delete (cancelled if a real user clicks Play Again)
+      roomCleanup.schedulePostGameDelete(io, room.id);
     }
   }
   await cleanupIfBotsOnly(io, room);
@@ -242,6 +271,8 @@ async function handlePostRemove(io, room) {
 // down — bots never "play alone". Otherwise broadcast the usual room_update.
 async function cleanupIfBotsOnly(io, room) {
   if (botService.hasOnlyBots(room)) {
+    roomCleanup.cancelPostGameDelete(room.id);
+    roomCleanup.cancelIdleDelete(room.id);
     timerService.clearTimer(room.id);
     botService.removeRoom(room.id);
     await deleteRoom(room.id);
@@ -272,6 +303,8 @@ async function fillRoomWithBotsAndStart(io, roomId) {
   var addedBots = botService.fillRoomWithBots(room, MIN_PLAYERS);
   room.botFillAt = null;
   await saveRoom(room);
+
+  roomCleanup.cancelIdleDelete(roomId);
 
   io.to(roomId).emit("room_update", room);
   if (addedBots.length > 0) {
