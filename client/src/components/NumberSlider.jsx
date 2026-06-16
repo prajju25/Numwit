@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import PropTypes from "prop-types";
 import { twMerge } from "tailwind-merge";
 
@@ -19,16 +19,9 @@ import { twMerge } from "tailwind-merge";
 export default function NumberSlider({ onSelect, disabled, selectedNumber }) {
   // The value currently shown on the slider — NOT yet submitted
   const [pendingValue, setPendingValue] = useState(50);
-  const [snapToFive, setSnapToFive] = useState(true);
-
-  // Snap helper: rounds to nearest 5
-  const snap = useCallback(
-    (v) => (snapToFive ? Math.round(v / 5) * 5 : v),
-    [snapToFive]
-  );
 
   const handleSliderChange = (e) => {
-    setPendingValue(snap(Number(e.target.value)));
+    setPendingValue(Number(e.target.value));
   };
 
   const handleLockIn = () => {
@@ -41,7 +34,7 @@ export default function NumberSlider({ onSelect, disabled, selectedNumber }) {
     const raw = Number(e.target.value);
     if (!isNaN(raw)) {
       const clamped = Math.max(0, Math.min(100, Math.round(raw)));
-      setPendingValue(snap(clamped));
+      setPendingValue(clamped);
     }
   };
 
@@ -74,34 +67,6 @@ export default function NumberSlider({ onSelect, disabled, selectedNumber }) {
         />
       </div>
 
-      {/* Snap-to-5 toggle */}
-      {!isLocked && (
-        <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-          <span>Snap to 5</span>
-          <button
-            type="button"
-            onClick={() => {
-              const next = !snapToFive;
-              setSnapToFive(next);
-              // Re-apply snap immediately when toggling on
-              if (next) setPendingValue(Math.round(pendingValue / 5) * 5);
-            }}
-            aria-pressed={snapToFive}
-            className={twMerge(
-              "relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400",
-              snapToFive ? "bg-indigo-600" : "bg-gray-300"
-            )}
-          >
-            <span
-              className={twMerge(
-                "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200",
-                snapToFive ? "translate-x-4" : "translate-x-0.5"
-              )}
-            />
-          </button>
-        </div>
-      )}
-
       {/* Slider track */}
       {!isLocked && (
         <div className="relative px-1">
@@ -119,7 +84,7 @@ export default function NumberSlider({ onSelect, disabled, selectedNumber }) {
             type="range"
             min="0"
             max="100"
-            step={snapToFive ? 5 : 1}
+            step={1}
             value={pendingValue}
             onChange={handleSliderChange}
             disabled={disabled}

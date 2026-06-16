@@ -25,10 +25,19 @@ function GameBoard() {
   } = useNumwit();
 
   const [showOverlay, setShowOverlay] = useState(false);
+  const [tipDismissed, setTipDismissed] = useState({});
+  const handleTipDismiss = (round) => setTipDismissed((d) => ({ ...d, [round]: true }));
+  const timerRef = React.useRef(null);
 
   useEffect(() => {
     if (roundResult || roundVoid) setShowOverlay(true);
   }, [roundResult, roundVoid]);
+
+  useEffect(() => {
+    if (timerKey && timerRef.current) {
+      timerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [timerKey]);
 
   if (gameOver) return <GameOverScreen data={gameOver} players={players} />;
 
@@ -70,7 +79,7 @@ function GameBoard() {
   );
 
   return (
-    <div className="w-full max-w-2xl space-y-4 animate-fadeIn">
+    <div ref={timerRef} className="w-full max-w-2xl space-y-4 animate-fadeIn scroll-mt-16">
       {alert && <FloatingAlert message={alert.message} onClose={() => setAlert(null)} />}
 
       {showOverlay && (roundResult || roundVoid) && (
@@ -115,8 +124,11 @@ function GameBoard() {
           </div>
         </div>
 
-        {/* Tutorial tips */}
-        <TutorialOverlay />
+        {/* Strategy tip — desktop only here (between header and timer).
+            On mobile it renders below scores to avoid pushing the timer/grid down. */}
+        <div className="hidden sm:block">
+          <TutorialOverlay dismissed={tipDismissed} onDismiss={handleTipDismiss} />
+        </div>
 
         {/* Countdown timer — paused while the round-result overlay is showing,
             so it doesn't keep ticking down (or hit 0) during the post-round pause */}
@@ -137,12 +149,24 @@ function GameBoard() {
             {numberInput}
           </DuelView>
         ) : (
-          <div className="flex gap-4 items-start">
-            <PlayerScorePanel players={players} points={gameData.points} eliminatedPlayers={eliminatedPlayers} />
-            <div className="w-px bg-white/10 self-stretch" />
-            {numberInput}
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-start">
+            {/* Scores — below number pick on mobile, left column on desktop */}
+            <div className="order-2 sm:order-1 sm:shrink-0 w-full sm:w-auto">
+              <PlayerScorePanel players={players} points={gameData.points} eliminatedPlayers={eliminatedPlayers} />
+            </div>
+            {/* Vertical divider — desktop only */}
+            <div className="hidden sm:block sm:order-2 w-px bg-white/10 self-stretch" />
+            {/* Number pick — top on mobile, right column on desktop */}
+            <div className="order-1 sm:order-3 w-full">
+              {numberInput}
+            </div>
           </div>
         )}
+
+        {/* Strategy tip — mobile only, below scores so it doesn't disrupt the pick area */}
+        <div className="sm:hidden">
+          <TutorialOverlay dismissed={tipDismissed} onDismiss={handleTipDismiss} />
+        </div>
 
         {/* Round history */}
         <RoundHistory />

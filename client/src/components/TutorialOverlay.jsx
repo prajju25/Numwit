@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import PropTypes from "prop-types";
 import { useNumwit } from "../contexts/NumwitRuleContext";
 
+
 /**
  * TutorialOverlay
  * ─────────────────────────────────────────────────────────────────────────────
@@ -26,17 +27,29 @@ const TIPS = {
   },
 };
 
-export default function TutorialOverlay() {
+/**
+ * dismissed: { [round]: bool } — controlled from GameBoard so two instances share state
+ * onDismiss: (round) => void
+ */
+export default function TutorialOverlay({ dismissed, onDismiss }) {
   const { gameData } = useNumwit();
-  const [dismissed, setDismissed] = useState({});
+  // fall back to local state when used standalone (e.g. tests)
+  const [localDismissed, setLocalDismissed] = useState({});
 
   const round = gameData && gameData.round;
   const tip = TIPS[round];
 
-  if (!tip || dismissed[round]) return null;
+  const isDismissed = dismissed ? dismissed[round] : localDismissed[round];
+  const handleDismiss = () => {
+    if (onDismiss) onDismiss(round);
+    else setLocalDismissed((d) => ({ ...d, [round]: true }));
+  };
+
+  if (!tip || isDismissed) return null;
 
   return (
-    <div className="w-full animate-fadeIn">
+    <div className="w-full" style={{ animation: "slideDown 0.25s ease-out" }}>
+      <style>{`@keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       <div className="flex items-start gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
         <span className="text-2xl shrink-0">{tip.icon}</span>
         <div className="flex-1 text-left">
@@ -44,7 +57,7 @@ export default function TutorialOverlay() {
           <p className="text-xs text-indigo-600 mt-0.5 leading-relaxed">{tip.body}</p>
         </div>
         <button
-          onClick={() => setDismissed((d) => ({ ...d, [round]: true }))}
+          onClick={handleDismiss}
           className="text-indigo-400 hover:text-indigo-700 text-lg leading-none shrink-0"
           aria-label="Dismiss tip"
         >
@@ -55,4 +68,7 @@ export default function TutorialOverlay() {
   );
 }
 
-TutorialOverlay.propTypes = {};
+TutorialOverlay.propTypes = {
+  dismissed: PropTypes.object,
+  onDismiss: PropTypes.func,
+};
