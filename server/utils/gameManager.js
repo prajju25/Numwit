@@ -25,7 +25,7 @@ function shuffleArray(arr) {
 // ── Valid setting ranges ───────────────────────────────────────────────────────
 var VALID_TIMER_DURATIONS      = [20, 30, 60];
 var VALID_ELIM_THRESHOLDS      = [3, 5, 7];
-var VALID_TARGET_MULTIPLIERS   = [0.6, 0.8, 1.0];
+var VALID_TARGET_MULTIPLIERS   = [0.6, 0.8, 0.9];
 
 /**
  * Validate and clamp host-supplied settings. Unknown keys are ignored.
@@ -108,6 +108,7 @@ function evaluateRound(game, activePlayers) {
   var eliminationThreshold= gs.eliminationThreshold!= null ? gs.eliminationThreshold: null; // null = use RULES default
   var duplicateRuleEnabled= gs.duplicateRuleEnabled!= null ? gs.duplicateRuleEnabled: true;
 
+  // All submissions, including non-submitters (number === undefined)
   var submissions = activePlayers.map(function(u) {
     return { socketId: u.socketId, number: game.numbers[u.socketId] };
   });
@@ -115,24 +116,43 @@ function evaluateRound(game, activePlayers) {
   var activePlayerCount = activePlayers.length;
   var allPlayerIds = activePlayers.map(function(u) { return u.socketId; });
 
+  // ── Filter non-submitters ─────────────────────────────────────────────────
+  // Players who ran out of time without picking get number=undefined.
+  // Exclude them from average/target/winner logic but keep them in allPlayerIds
+  // so computePenalties still awards them a penalty point.
+  var actualSubmissions = submissions.filter(function(s) {
+    return typeof s.number === "number" && !isNaN(s.number);
+  });
+
+  // If nobody submitted at all, replay the round
+  if (actualSubmissions.length === 0) {
+    return {
+      roundVoid: true,
+      reason: "No submissions — round replayed.",
+      submissions: submissions,
+      round: game.round,
+    };
+  }
+
   // ── Step 2: 2-player cycle rule ──────────────────────────────────────────
   var cycleWinnerId = null;
-  if (activePlayerCount === 2) {
-    cycleWinnerId = applyTwoPlayerCycle(submissions);
+  if (activePlayerCount === 2 && actualSubmissions.length === 2) {
+    cycleWinnerId = applyTwoPlayerCycle(actualSubmissions);
   }
 
   // ── Step 3: Duplicate filter (3+ players only, unless disabled) ──────────
+  // Use only actualSubmissions so non-submitters don't distort duplicate counts
   var filtered;
   if (duplicateRuleEnabled) {
-    filtered = applyDuplicateRule(submissions, activePlayerCount);
+    filtered = applyDuplicateRule(actualSubmissions, activePlayerCount);
   } else {
-    filtered = { valid: submissions.slice(), invalid: [] };
+    filtered = { valid: actualSubmissions.slice(), invalid: [] };
   }
   var validSubmissions = filtered.valid;
   var invalidSubmissions = filtered.invalid;
 
   // ── Step 4: Round void check ─────────────────────────────────────────────
-  var voidCheck = isRoundVoid(validSubmissions, submissions, activePlayerCount);
+  var voidCheck = isRoundVoid(validSubmissions, actualSubmissions, activePlayerCount);
   if (voidCheck.isVoid) {
     return {
       roundVoid: true,
@@ -143,7 +163,8 @@ function evaluateRound(game, activePlayers) {
   }
 
   // ── Step 5: Average + target (uses per-game targetMultiplier) ────────────
-  var computeBase = (cycleWinnerId !== null) ? submissions : validSubmissions;
+  // Base is always from actual submitters only — non-submitters don't skew the average
+  var computeBase = (cycleWinnerId !== null) ? actualSubmissions : validSubmissions;
   var sum = computeBase.reduce(function(acc, s) { return acc + s.number; }, 0);
   var average = sum / computeBase.length;
   var target = average * targetMultiplier;
