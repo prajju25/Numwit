@@ -34,10 +34,12 @@ async function writeSessionStat(deviceId, stats) {
 }
 
 /**
- * Weekly leaderboard — top 10 players by wins in the last 7 days.
+ * Weekly leaderboard — top N players by wins in the last 7 days.
  * Returns [{ name, avatar, level, wins, survived }]
+ * @param {number} limit  How many rows to return (default 10, max 100)
  */
-async function getWeeklyLeaderboard() {
+async function getWeeklyLeaderboard(limit = 10) {
+  const take = Math.min(Math.max(1, Number(limit) || 10), 100);
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const rows = await db((p) =>
@@ -46,7 +48,7 @@ async function getWeeklyLeaderboard() {
       where: { playedAt: { gte: since } },
       _sum: { wins: true },
       orderBy: { _sum: { wins: "desc" } },
-      take: 10,
+      take,
     })
   );
   if (!rows || rows.length === 0) return [];

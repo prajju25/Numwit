@@ -9,6 +9,7 @@ const feedbackService = require("../db/feedbackService");
 const userService = require("../db/userService");
 const timerService = require("../services/timerService");
 const botService = require("../services/botService");
+const statsService = require("../db/statsService");
 
 const router = express.Router();
 
@@ -74,6 +75,18 @@ router.delete("/rooms/:id", async (req, res) => {
     res.json({ ok: true, deleted: roomId });
   } catch (err) {
     res.status(500).json({ error: "delete failed" });
+  }
+});
+
+// -- GET /api/admin/leaderboard -------------------------------------------------------
+// Weekly leaderboard with configurable limit (default 50, max 100) for the admin UI.
+router.get("/leaderboard", async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    const board = await statsService.getWeeklyLeaderboard(limit);
+    res.json({ leaderboard: board || [] });
+  } catch (err) {
+    res.status(500).json({ error: "leaderboard unavailable", leaderboard: [] });
   }
 });
 
