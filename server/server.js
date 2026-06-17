@@ -114,7 +114,8 @@ app.get("/api/stats", async (req, res) => {
 // -- REST: GET /api/leaderboard ------------------------------------------------------
 app.get("/api/leaderboard", async (req, res) => {
   try {
-    const board = await statsService.getWeeklyLeaderboard();
+    const limit = Math.min(Number(req.query.limit) || 10, 50);
+    const board = await statsService.getWeeklyLeaderboard(limit);
     res.json({ leaderboard: board || [] });
   } catch (err) {
     res.status(500).json({ error: "leaderboard unavailable", leaderboard: [] });

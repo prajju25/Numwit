@@ -34,40 +34,73 @@ async function writeSessionStat(deviceId, stats) {
 }
 
 /**
- * Weekly leaderboard — top N players by wins in the last 7 days.
- * Returns [{ name, avatar, level, wins, survived }]
+ * Weekly leaderboard — top N players by round wins in the last 7 days.
+ * Returns [{
+ *   name, avatar, level,
+ *   weekGamesPlayed, weekGamesWon, weekRoundWins,   ← 7-day
+ *   allTimeGamesPlayed, allTimeGamesWon, allTimeRoundWins  ← all-time
+ * }]
  * @param {number} limit  How many rows to return (default 10, max 100)
  */
 async function getWeeklyLeaderboard(limit = 10) {
   const take = Math.min(Math.max(1, Number(limit) || 10), 100);
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-  const rows = await db((p) =>
+  // Weekly: round wins + games played in one groupBy
+  const weekRows = await db((p) =>
     p.sessionStat.groupBy({
       by: ["userId"],
       where: { playedAt: { gte: since } },
-      _sum: { wins: true },
+      _sum:   { wins: true },
+      _count: { id: true },
       orderBy: { _sum: { wins: "desc" } },
       take,
     })
   );
-  if (!rows || rows.length === 0) return [];
+  if (!weekRows || weekRows.length === 0) return [];
 
-  const userIds = rows.map((r) => r.userId);
+  const userIds = weekRows.map((r) => r.userId);
 
-  // survived is Boolean so it can't be summed — count rows where survived=true instead
-  const survivedRows = await db((p) =>
+  // Weekly games won (survived=true is Boolean — must count separately)
+  const weekWonRows = await db((p) =>
     p.sessionStat.groupBy({
       by: ["userId"],
       where: { playedAt: { gte: since }, survived: true, userId: { in: userIds } },
       _count: { id: true },
     })
   );
-  const survivedMap = {};
-  if (survivedRows) {
-    survivedRows.forEach((r) => { survivedMap[r.userId] = r._count.id; });
-  }
+  const weekWonMap = {};
+  (weekWonRows || []).forEach((r) => { weekWonMap[r.userId] = r._count.id; });
 
+  // All-time: round wins + games played
+  const allTimeRows = await db((p) =>
+    p.sessionStat.groupBy({
+      by: ["userId"],
+      where: { userId: { in: userIds } },
+      _sum:   { wins: true },
+      _count: { id: true },
+    })
+  );
+  const allTimeMap = {};
+  (allTimeRows || []).forEach((r) => {
+    allTimeMap[r.userId] = {
+      gamesPlayed: r._count.id    || 0,
+      roundWins:   r._sum.wins    || 0,
+    };
+  });
+
+  // All-time games won (survived=true)
+  const allTimeWonRows = await db((p) =>
+    p.sessionStat.groupBy({
+      by: ["userId"],
+      where: { userId: { in: userIds }, survived: true },
+      _count: { id: true },
+    })
+  );
+  const allTimeWonMap = {};
+  (allTimeWonRows || []).forEach((r) => { allTimeWonMap[r.userId] = r._count.id; });
+
+  // User profiles
   const users = await db((p) =>
     p.user.findMany({
       where: { id: { in: userIds } },
@@ -79,10 +112,16 @@ async function getWeeklyLeaderboard(limit = 10) {
   const userMap = {};
   users.forEach((u) => { userMap[u.id] = u; });
 
-  return rows.map((r) => ({
+  return weekRows.map((r) => ({
     ...(userMap[r.userId] || {}),
-    wins:     r._sum.wins          || 0,
-    survived: survivedMap[r.userId] || 0,
+    // 7-day
+    weekGamesPlayed: r._count.id             || 0,
+    weekGamesWon:    weekWonMap[r.userId]     || 0,
+    weekRoundWins:   r._sum.wins             || 0,
+    // all-time
+    allTimeGamesPlayed: (allTimeMap[r.userId] || {}).gamesPlayed || 0,
+    allTimeGamesWon:    allTimeWonMap[r.userId]                  || 0,
+    allTimeRoundWins:   (allTimeMap[r.userId] || {}).roundWins   || 0,
   })).filter((r) => r.name);
 }
 

@@ -14,6 +14,7 @@ import { SoundProvider, useSound } from "./contexts/SoundContext";
 import { VoiceProvider } from "./contexts/VoiceContext";
 import AchievementToast from "./components/AchievementToast";
 import FeedbackWidget from "./components/FeedbackWidget";
+import LeaderboardPage from "./components/LeaderboardPage";
 
 // Mute toggle button — reads from SoundContext
 function MuteButton() {
@@ -50,9 +51,11 @@ function AppInner() {
   // Landing page: shown to visitors who haven't started yet and aren't deep-linking into a room
   // Once they click "Play Now" we flip this flag and show Login.
   const [showLanding, setShowLanding] = useState(() => {
-    // If they arrived via a room link (/some-room-id) skip the landing
     const path = window.location.pathname.replace("/", "").trim();
-    return !path;
+    return !path && path !== "leaderboard";
+  });
+  const [showLeaderboard, setShowLeaderboard] = useState(() => {
+    return window.location.pathname.replace("/", "").trim() === "leaderboard";
   });
 
   useEffect(() => {
@@ -103,6 +106,19 @@ function AppInner() {
     resetGame();
     resetUser();
     setShowLanding(true);
+    setShowLeaderboard(false);
+    window.history.pushState({}, "", "/");
+  };
+
+  const openLeaderboard = () => {
+    setShowLeaderboard(true);
+    setShowLanding(false);
+    window.history.pushState({}, "", "/leaderboard");
+  };
+
+  const closeLeaderboard = () => {
+    setShowLeaderboard(false);
+    setShowLanding(true);
     window.history.pushState({}, "", "/");
   };
 
@@ -118,9 +134,14 @@ function AppInner() {
         />
       )}
 
+      {/* Leaderboard page */}
+      {showLeaderboard && (
+        <LeaderboardPage onBack={closeLeaderboard} />
+      )}
+
       {/* Landing page */}
-      {showLandingPage && (
-        <LandingPage onPlay={() => setShowLanding(false)} />
+      {showLandingPage && !showLeaderboard && (
+        <LandingPage onPlay={() => setShowLanding(false)} onLeaderboard={openLeaderboard} />
       )}
 
       {/* After "Play Now" — normal app flow */}
@@ -141,23 +162,35 @@ function AppInner() {
                 Numwit
               </span>
             </h1>
-            {(showWaiting || showGame) && user && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {/* Leaderboard button — always visible in the non-landing flow */}
+              {!showWaiting && !showGame && (
                 <button
-                  onClick={goHome}
-                  title="Leave room"
-                  aria-label="Leave room"
-                  className="text-sm font-semibold px-3 py-2 rounded-full bg-white/10 hover:bg-red-500/20 hover:text-red-300 border border-white/10 transition-all duration-200"
+                  onClick={openLeaderboard}
+                  title="View leaderboard"
+                  className="text-sm font-semibold px-3 py-2 rounded-full bg-white/10 hover:bg-yellow-500/20 hover:text-yellow-300 border border-white/10 transition-all duration-200"
                 >
-                  🚪 Leave
+                  🏆 Leaderboard
                 </button>
-                <MuteButton />
-                <div className="flex items-center gap-2 glass-card-sm px-3 py-1.5">
-                  <span className="text-lg">{user.avatar}</span>
-                  <span className="font-semibold text-white text-sm">{user.name}</span>
-                </div>
-              </div>
-            )}
+              )}
+              {(showWaiting || showGame) && user && (
+                <>
+                  <button
+                    onClick={goHome}
+                    title="Leave room"
+                    aria-label="Leave room"
+                    className="text-sm font-semibold px-3 py-2 rounded-full bg-white/10 hover:bg-red-500/20 hover:text-red-300 border border-white/10 transition-all duration-200"
+                  >
+                    🚪 Leave
+                  </button>
+                  <MuteButton />
+                  <div className="flex items-center gap-2 glass-card-sm px-3 py-1.5">
+                    <span className="text-lg">{user.avatar}</span>
+                    <span className="font-semibold text-white text-sm">{user.name}</span>
+                  </div>
+                </>
+              )}
+            </div>
           </header>
 
           {/* Page content — padded below navbar */}

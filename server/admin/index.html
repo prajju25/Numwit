@@ -456,31 +456,55 @@
       const totalPages = Math.max(1, Math.ceil(allLeaderboard.length / LB_PER_PAGE));
       if (lbPage > totalPages) lbPage = totalPages;
 
-      const start   = (lbPage - 1) * LB_PER_PAGE;
-      const page    = allLeaderboard.slice(start, start + LB_PER_PAGE);
-      const offset  = start; // for rank numbering
+      const start  = (lbPage - 1) * LB_PER_PAGE;
+      const page   = allLeaderboard.slice(start, start + LB_PER_PAGE);
+      const offset = start;
 
       summary.textContent = allLeaderboard.length + " players";
 
-      const rows = page.map((entry, i) => {
-        const rank = offset + i + 1;
+      const n = (v) => escapeHtml(v != null ? v : 0);
+
+      const rows = page.map((e, i) => {
+        const rank      = offset + i + 1;
         const rankClass = rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "";
-        const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank;
+        const medal     = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank;
         return (
           "<tr>" +
             '<td class="' + rankClass + '">' + medal + '</td>' +
-            '<td>' + escapeHtml((entry.avatar ? entry.avatar + " " : "") + (entry.name || "?")) + '</td>' +
-            '<td>' + escapeHtml(entry.level   != null ? entry.level   : "") + '</td>' +
-            '<td>' + escapeHtml(entry.wins     != null ? entry.wins     : 0) + '</td>' +
-            '<td>' + escapeHtml(entry.survived != null ? entry.survived : 0) + '</td>' +
+            '<td>' + escapeHtml((e.avatar ? e.avatar + " " : "") + (e.name || "?")) + '</td>' +
+            '<td style="text-align:center">' + n(e.level) + '</td>' +
+            // 7-day
+            '<td style="text-align:center">' + n(e.weekGamesPlayed) + '</td>' +
+            '<td style="text-align:center">' + n(e.weekGamesWon)    + '</td>' +
+            '<td style="text-align:center">' + n(e.weekRoundWins)   + '</td>' +
+            // all-time
+            '<td style="text-align:center;color:var(--text-dim)">' + n(e.allTimeGamesPlayed) + '</td>' +
+            '<td style="text-align:center;color:var(--text-dim)">' + n(e.allTimeGamesWon)    + '</td>' +
+            '<td style="text-align:center;color:var(--text-dim)">' + n(e.allTimeRoundWins)   + '</td>' +
           "</tr>"
         );
       }).join("");
 
       container.innerHTML =
-        '<table><thead><tr>' +
-          '<th>#</th><th>Player</th><th>Level</th><th>Wins (7d)</th><th>Survived (7d)</th>' +
-        '</tr></thead><tbody>' + rows + '</tbody></table>';
+        '<table>' +
+          '<thead>' +
+            '<tr>' +
+              '<th colspan="3"></th>' +
+              '<th colspan="3" style="text-align:center;border-bottom:1px solid var(--accent2);color:var(--accent2)">This Week</th>' +
+              '<th colspan="3" style="text-align:center;border-bottom:1px solid var(--border);color:var(--text-dim)">All Time</th>' +
+            '</tr>' +
+            '<tr>' +
+              '<th>#</th><th>Player</th><th style="text-align:center">Level</th>' +
+              '<th style="text-align:center">Games Played</th>' +
+              '<th style="text-align:center">Games Won</th>' +
+              '<th style="text-align:center">Round Wins</th>' +
+              '<th style="text-align:center">Games Played</th>' +
+              '<th style="text-align:center">Games Won</th>' +
+              '<th style="text-align:center">Round Wins</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>';
 
       makePagination("leaderboardPagination", lbPage, totalPages, (p) => { lbPage = p; renderLeaderboardPage(); });
     }

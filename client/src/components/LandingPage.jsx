@@ -28,7 +28,7 @@ const HOW_IT_WORKS = [
   { icon: "💀", title: "Last one standing", body: "5 penalty points = eliminated. The last player standing wins." },
 ];
 
-export default function LandingPage({ onPlay }) {
+export default function LandingPage({ onPlay, onLeaderboard }) {
   const stats = useLiveStats();
 
   return (
@@ -52,14 +52,23 @@ export default function LandingPage({ onPlay }) {
           </p>
         </div>
 
-        {/* CTA */}
-        <button
-          onClick={onPlay}
-          className="btn-primary inline-flex items-center gap-3 text-lg px-10 py-4 mt-2"
-        >
-          <span>▶</span>
-          <span>Play Now — Free</span>
-        </button>
+        {/* CTAs */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-2">
+          <button
+            onClick={onPlay}
+            className="btn-primary inline-flex items-center gap-3 text-lg px-10 py-4"
+          >
+            <span>▶</span>
+            <span>Play Now — Free</span>
+          </button>
+          <button
+            onClick={onLeaderboard}
+            className="btn-secondary inline-flex items-center gap-2 text-base px-6 py-4"
+          >
+            <span>🏆</span>
+            <span>Leaderboard</span>
+          </button>
+        </div>
 
         {/* Live stats pill */}
         {(stats.activePlayers > 0 || stats.gamesPlayedToday > 0) && (
@@ -122,5 +131,6 @@ export default function LandingPage({ onPlay }) {
 }
 
 LandingPage.propTypes = {
-  onPlay: PropTypes.func.isRequired,
+  onPlay:        PropTypes.func.isRequired,
+  onLeaderboard: PropTypes.func.isRequired,
 };
