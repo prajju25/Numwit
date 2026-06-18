@@ -99,4 +99,31 @@ async function getTotalUsers() {
   return count || 0;
 }
 
-module.exports = { upsertUser, awardXp, getProfile, getTotalUsers, xpToLevel, xpForNextLevel, XP_THRESHOLDS };
+/**
+ * Update the consecutive game-win streak for a player.
+ * If survived=true, increments; if survived=false, resets to 0.
+ * Returns the new consecutiveGameWins value (or 0 on failure).
+ */
+async function updateConsecutiveGameWins(deviceId, survived) {
+  const user = await db((p) =>
+    p.user.findUnique({ where: { deviceId }, select: { consecutiveGameWins: true } })
+  );
+  if (!user) return 0;
+
+  const newStreak = survived ? (user.consecutiveGameWins || 0) + 1 : 0;
+
+  await db((p) =>
+    p.user.update({
+      where: { deviceId },
+      data: { consecutiveGameWins: newStreak },
+    })
+  );
+
+  return newStreak;
+}
+
+module.exports = {
+  upsertUser, awardXp, getProfile, getTotalUsers,
+  updateConsecutiveGameWins,
+  xpToLevel, xpForNextLevel, XP_THRESHOLDS,
+};

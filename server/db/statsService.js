@@ -9,7 +9,10 @@ const { db } = require("./prismaClient");
 /**
  * Write one session stat row for a user.
  * @param {string} deviceId
- * @param {object} stats  { rounds, wins, penalties, exactMatches, survived }
+ * @param {object} stats  {
+ *   rounds, wins, penalties, exactMatches, survived,
+ *   roomType, isDuel, playerCount, maxConsecRoundWins, wasLastPlace
+ * }
  */
 async function writeSessionStat(deviceId, stats) {
   // Resolve userId from deviceId
@@ -22,12 +25,17 @@ async function writeSessionStat(deviceId, stats) {
   return db((p) =>
     p.sessionStat.create({
       data: {
-        userId: user.id,
-        rounds:       stats.rounds       || 0,
-        wins:         stats.wins         || 0,
-        penalties:    stats.penalties    || 0,
-        exactMatches: stats.exactMatches || 0,
-        survived:     stats.survived     || false,
+        userId:            user.id,
+        rounds:            stats.rounds            || 0,
+        wins:              stats.wins              || 0,
+        penalties:         stats.penalties         || 0,
+        exactMatches:      stats.exactMatches      || 0,
+        survived:          stats.survived          || false,
+        roomType:          stats.roomType          || "public",
+        isDuel:            stats.isDuel            || false,
+        playerCount:       stats.playerCount       || 0,
+        maxConsecRoundWins: stats.maxConsecRoundWins || 0,
+        wasLastPlace:      stats.wasLastPlace      || false,
       },
     })
   );
@@ -127,11 +135,12 @@ async function getWeeklyLeaderboard(limit = 10) {
 
 /**
  * Get all-time stats for a device.
+ * Includes duelWins and soloWins for achievement checks.
  */
 async function getPlayerStats(deviceId) {
   const user = await db((p) => p.user.findUnique({
     where: { deviceId },
-    select: { id: true },
+    select: { id: true, consecutiveGameWins: true },
   }));
   if (!user) return null;
 
@@ -152,13 +161,32 @@ async function getPlayerStats(deviceId) {
     })
   );
 
+  // Duel wins: isDuel=true AND survived=true
+  const duelWonAgg = await db((p) =>
+    p.sessionStat.aggregate({
+      where: { userId: user.id, isDuel: true, survived: true },
+      _count: { id: true },
+    })
+  );
+
+  // Solo wins: roomType='solo' AND survived=true
+  const soloWonAgg = await db((p) =>
+    p.sessionStat.aggregate({
+      where: { userId: user.id, roomType: "solo", survived: true },
+      _count: { id: true },
+    })
+  );
+
   return {
-    gamesPlayed:    agg._count.id                                  || 0,
-    totalRounds:    agg._sum.rounds                                || 0,
-    totalWins:      agg._sum.wins                                  || 0,
-    totalPenalties: agg._sum.penalties                             || 0,
-    exactMatches:   agg._sum.exactMatches                          || 0,
-    survived:       (survivedAgg && survivedAgg._count.id)         || 0,
+    gamesPlayed:          agg._count.id                                  || 0,
+    totalRounds:          agg._sum.rounds                                || 0,
+    totalWins:            agg._sum.wins                                  || 0,
+    totalPenalties:       agg._sum.penalties                             || 0,
+    exactMatches:         agg._sum.exactMatches                          || 0,
+    survived:             (survivedAgg && survivedAgg._count.id)         || 0,
+    duelWins:             (duelWonAgg  && duelWonAgg._count.id)          || 0,
+    soloWins:             (soloWonAgg  && soloWonAgg._count.id)          || 0,
+    consecutiveGameWins:  user.consecutiveGameWins                       || 0,
   };
 }
 

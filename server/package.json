@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
+    "start": "npx prisma migrate deploy && node server.js",
     "test": "jest --coverage"
   },
   "keywords": [],

@@ -70,8 +70,11 @@ async function createGameData(room, settings) {
       eliminatedPlayers: [],
       submittedCount: 0,
       settings: cleanSettings,
-      winHistory: {},         // { [socketId]: number } — incremented each round a player wins
-      exactMatchHistory: {},  // { [socketId]: number } — incremented on exact-match wins
+      winHistory: {},          // { [socketId]: number } — incremented each round a player wins
+      exactMatchHistory: {},   // { [socketId]: number } — incremented on exact-match wins
+      consecWinHistory: {},    // { [socketId]: number } — current consecutive round-win streak
+      maxConsecWinHistory: {}, // { [socketId]: number } — max consecutive round-win streak
+      wasLastPlaceSet: {},     // { [socketId]: boolean } — was ever the player with most penalties
     };
 
     socketIds.forEach(function(id) { gameData.points[id] = 0; });

@@ -16,34 +16,43 @@ datasource db {
 // ── User ─────────────────────────────────────────────────────────────────────
 // One row per device (identified by UUID stored in localStorage).
 model User {
-  id        String   @id @default(uuid())
-  deviceId  String   @unique
-  name      String
-  avatar    String
-  xp        Int      @default(0)
-  level     Int      @default(1)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  deviceId            String   @unique
+  name                String
+  avatar              String
+  xp                  Int      @default(0)
+  level               Int      @default(1)
+  consecutiveGameWins Int      @default(0)  // current win streak (reset to 0 on loss)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  sessionStats    SessionStat[]
+  sessionStats     SessionStat[]
   userAchievements UserAchievement[]
 }
 
 // ── SessionStat ───────────────────────────────────────────────────────────────
 // One row per completed game session.
 model SessionStat {
-  id           String   @id @default(uuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rounds       Int      @default(0)
-  wins         Int      @default(0)
-  penalties    Int      @default(0)
-  exactMatches Int      @default(0)
-  survived     Boolean  @default(false)  // true = last player standing
-  playedAt     DateTime @default(now())
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rounds             Int      @default(0)
+  wins               Int      @default(0)
+  penalties          Int      @default(0)
+  exactMatches       Int      @default(0)
+  survived           Boolean  @default(false)  // true = last player standing
+  // ── New achievement-tracking fields ──────────────────────────────────────
+  roomType           String   @default("public")  // public | private | solo
+  isDuel             Boolean  @default(false)      // exactly 2 human players
+  playerCount        Int      @default(0)          // total players at game start (for Full House)
+  maxConsecRoundWins Int      @default(0)          // longest round-win streak this session (On a Roll)
+  wasLastPlace       Boolean  @default(false)      // was ever in last place (most penalties)
+  playedAt           DateTime @default(now())
 
   @@index([userId])
   @@index([playedAt])
+  @@index([isDuel, survived])   // for duel win queries
+  @@index([roomType, survived]) // for solo win queries
 }
 
 // ── Achievement ───────────────────────────────────────────────────────────────

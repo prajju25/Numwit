@@ -26,6 +26,8 @@ const HOW_IT_WORKS = [
   { icon: "📐", title: "Target = 80% of average", body: "The winning target is 80% of the average of all valid picks." },
   { icon: "🏆", title: "Closest wins", body: "The player closest to the target wins the round. Others get a penalty point." },
   { icon: "💀", title: "Last one standing", body: "5 penalty points = eliminated. The last player standing wins." },
+  { icon: "🔄", title: "1v1 secret rule", body: "In a duel, 100 beats 0, 0 beats 1, and 1 beats 100 — rock-paper-scissors style. The normal 80% rule still applies for any other numbers." },
+  { icon: "⚡", title: "No copying allowed", body: "If 3+ players pick the same number, those picks are invalid. So you can't just copy others — think for yourself." },
 ];
 
 export default function LandingPage({ onPlay, onLeaderboard }) {
@@ -108,12 +110,6 @@ export default function LandingPage({ onPlay, onLeaderboard }) {
           ))}
         </div>
 
-        {/* Twist callout */}
-        <div className="mt-4 border border-cyan-500/30 rounded-2xl p-4 text-sm text-cyan-300"
-          style={{ background: "rgba(6,182,212,0.08)" }}>
-          <span className="font-bold">⚡ Twist:</span> If 3+ players pick the same number, those picks are
-          invalid — so you can&apos;t just copy others. Think for yourself.
-        </div>
       </div>
 
       {/* ── Footer CTA ──────────────────────────────────────────────────────────── */}

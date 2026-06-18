@@ -11,16 +11,28 @@ const { db } = require("./prismaClient");
 
 // ── Catalogue ─────────────────────────────────────────────────────────────────
 const ACHIEVEMENTS = [
-  { id: "first_win",        name: "First Blood",    icon: "🏆", description: "Win your first round" },
-  { id: "survivor",         name: "Survivor",       icon: "🛡️", description: "Win a game (last player standing)" },
-  { id: "sharp_shooter",    name: "Sharp Shooter",  icon: "🎯", description: "Hit the exact target" },
-  { id: "hat_trick",        name: "Hat Trick",      icon: "🎩", description: "Win 3 rounds in a single game" },
-  { id: "no_mercy",         name: "No Mercy",       icon: "💀", description: "Eliminate 3 players in one game" },
-  { id: "comeback_kid",     name: "Comeback Kid",   icon: "🔥", description: "Win a round after reaching 4 penalty points" },
-  { id: "untouchable",      name: "Untouchable",    icon: "✨", description: "Win a game with 0 penalty points" },
-  { id: "veteran",          name: "Veteran",        icon: "🎖️", description: "Play 10 games" },
-  { id: "mind_reader",      name: "Mind Reader",    icon: "🧠", description: "Win 3 exact matches total" },
-  { id: "duel_champion",    name: "Duel Champion",  icon: "⚔️", description: "Win a 1v1 duel" },
+  // Original achievements
+  { id: "first_win",        name: "First Blood",      icon: "🏆", description: "Win your first round" },
+  { id: "survivor",         name: "Survivor",         icon: "🛡️", description: "Win a game (last player standing)" },
+  { id: "sharp_shooter",    name: "Sharp Shooter",    icon: "🎯", description: "Hit the exact target" },
+  { id: "hat_trick",        name: "Hat Trick",        icon: "🎩", description: "Win 3 rounds in a single game" },
+  { id: "no_mercy",         name: "No Mercy",         icon: "💀", description: "Eliminate 3 players in one game" },
+  { id: "comeback_kid",     name: "Comeback Kid",     icon: "🔥", description: "Win a round after reaching 4 penalty points" },
+  { id: "untouchable",      name: "Untouchable",      icon: "✨", description: "Win a game with 0 penalty points" },
+  { id: "veteran",          name: "Veteran",          icon: "🎖️", description: "Play 10 games" },
+  { id: "mind_reader",      name: "Mind Reader",      icon: "🧠", description: "Win 3 exact matches total" },
+  { id: "duel_champion",    name: "Duel Champion",    icon: "⚔️", description: "Win a 1v1 duel" },
+  // New achievements
+  { id: "golden_hat_trick", name: "Golden Hat Trick", icon: "🥇", description: "Win 3 games in a row" },
+  { id: "duel_ace",         name: "Duel Ace",         icon: "🗡️", description: "Win 3 x 1v1 duels" },
+  { id: "duel_legend",      name: "Duel Legend",      icon: "👑", description: "Win 10 x 1v1 duels" },
+  { id: "bot_slayer",       name: "Bot Slayer",       icon: "🤖", description: "Win 10 solo games" },
+  { id: "mentalist",        name: "Mentalist",        icon: "🧙", description: "Hit the exact target 3 times in one game" },
+  { id: "on_a_roll",        name: "On a Roll",        icon: "🎳", description: "Win 3 consecutive rounds in one game" },
+  { id: "marathoner",       name: "Marathoner",       icon: "🏅", description: "Play 50 games" },
+  { id: "century",          name: "Century",          icon: "💯", description: "Play 100 games" },
+  { id: "full_house",       name: "Full House",       icon: "🎉", description: "Play in a full 8-player room" },
+  { id: "dragon_energy",    name: "Dragon Energy",    icon: "🐉", description: "Win a game after being in last place" },
 ];
 
 // Seed achievements into DB once (idempotent)
@@ -69,10 +81,16 @@ async function unlock(userId, achievementId) {
 /**
  * Check and award achievements after a game session.
  *
- * @param {string}   userId        — DB user id
- * @param {object}   sessionData   — { wins, exactMatches, penalties, survived, eliminatedCount, isDuel, myPoints }
- * @param {object}   allTimeStats  — { totalWins, exactMatches, gamesPlayed } (from statsService)
- * @returns {Array}  newly unlocked achievement objects
+ * @param {string} userId       — DB user id
+ * @param {object} sessionData  — {
+ *   wins, exactMatches, penalties, survived, eliminatedCount, isDuel, cameBackFrom4,
+ *   roomType, playerCount, maxConsecRoundWins, wasLastPlace
+ * }
+ * @param {object} allTimeStats — {
+ *   gamesPlayed, totalWins, exactMatches,
+ *   duelWins, soloWins, consecutiveGameWins
+ * }
+ * @returns {Array} newly unlocked achievement objects
  */
 async function checkAndAward(userId, sessionData, allTimeStats) {
   const already = await getUnlocked(userId);
@@ -88,6 +106,7 @@ async function checkAndAward(userId, sessionData, allTimeStats) {
   const s = sessionData;
   const t = allTimeStats || {};
 
+  // ── Original achievements ─────────────────────────────────────────────────
   await check("first_win",      s.wins >= 1);
   await check("survivor",       s.survived);
   await check("sharp_shooter",  s.exactMatches >= 1);
@@ -98,6 +117,29 @@ async function checkAndAward(userId, sessionData, allTimeStats) {
   await check("veteran",        (t.gamesPlayed || 0) >= 10);
   await check("mind_reader",    ((t.exactMatches || 0) + s.exactMatches) >= 3);
   await check("duel_champion",  s.isDuel && s.survived);
+
+  // ── New achievements ──────────────────────────────────────────────────────
+  // consecutiveGameWins is already updated before checkAndAward is called
+  await check("golden_hat_trick", (t.consecutiveGameWins || 0) >= 3);
+
+  // Duel milestones (duelWins includes this game if isDuel+survived)
+  await check("duel_ace",    (t.duelWins || 0) >= 3);
+  await check("duel_legend", (t.duelWins || 0) >= 10);
+
+  // Solo milestones
+  await check("bot_slayer",  (t.soloWins || 0) >= 10);
+
+  // Single-game feats
+  await check("mentalist",  s.exactMatches >= 3);
+  await check("on_a_roll",  (s.maxConsecRoundWins || 0) >= 3);
+
+  // Volume milestones (gamesPlayed includes this game already)
+  await check("marathoner", (t.gamesPlayed || 0) >= 50);
+  await check("century",    (t.gamesPlayed || 0) >= 100);
+
+  // Situational
+  await check("full_house",    (s.playerCount || 0) >= 8);
+  await check("dragon_energy", s.wasLastPlace && s.survived);
 
   return newlyUnlocked;
 }

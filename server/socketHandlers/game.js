@@ -257,13 +257,40 @@ async function resolveRound(io, room, activePlayers) {
   Object.assign(game, result.updatedGame);
 
   // Track per-round wins and exact matches so persistGameOver can read them.
-  // winHistory and exactMatchHistory are initialized as {} in createGameData.
+  // winHistory, exactMatchHistory, consecWinHistory, maxConsecWinHistory,
+  // and wasLastPlaceSet are all initialized as {} in createGameData.
   result.winnerIds.forEach(function(id) {
     game.winHistory[id] = (game.winHistory[id] || 0) + 1;
   });
   if (result.exactMatch) {
     result.winnerIds.forEach(function(id) {
       game.exactMatchHistory[id] = (game.exactMatchHistory[id] || 0) + 1;
+    });
+  }
+
+  // Track consecutive round-win streaks
+  result.winnerIds.forEach(function(id) {
+    game.consecWinHistory[id] = (game.consecWinHistory[id] || 0) + 1;
+    game.maxConsecWinHistory[id] = Math.max(
+      game.maxConsecWinHistory[id] || 0,
+      game.consecWinHistory[id]
+    );
+  });
+  activePlayers.forEach(function(u) {
+    if (result.winnerIds.indexOf(u.socketId) === -1) {
+      game.consecWinHistory[u.socketId] = 0;
+    }
+  });
+
+  // Track last-place (player(s) with the highest penalty count this round)
+  if (activePlayers.length > 1) {
+    var maxPenalty = Math.max.apply(null, activePlayers.map(function(u) {
+      return result.points[u.socketId] || 0;
+    }));
+    activePlayers.forEach(function(u) {
+      if ((result.points[u.socketId] || 0) === maxPenalty) {
+        game.wasLastPlaceSet[u.socketId] = true;
+      }
     });
   }
 
@@ -404,7 +431,9 @@ async function advanceToNextRound(io, roomId) {
 // Writes session stats, awards XP, checks achievements, emits unlocked ones.
 async function persistGameOver(io, room, game, activePlayers, winnerPlayer, lastResult) {
   var roomId = room.id;
-  var isDuel = activePlayers.length === 2;
+  // isDuel = exactly 2 human (non-bot) players
+  var humanPlayers = activePlayers.filter(function(u) { return !u.isBot; });
+  var isDuel = humanPlayers.length === 2;
 
   // Build per-player stats from game state
   for (var i = 0; i < room.users.length; i++) {
@@ -416,18 +445,25 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer, last
     var survived   = winnerPlayer && winnerPlayer.socketId === mySocketId;
     var myPoints   = (game.points && game.points[mySocketId]) || 0;
 
-    // Count wins/exactMatches/penalties from game history stored on game
-    // (We track this simply as: penalties = points, since each penalty = 1 or 2 pts)
     var sessionStats = {
-      rounds:       game.round,
-      wins:         (game.winHistory && game.winHistory[mySocketId]) || 0,
-      penalties:    myPoints,
-      exactMatches: (game.exactMatchHistory && game.exactMatchHistory[mySocketId]) || 0,
-      survived:     survived,
+      rounds:             game.round,
+      wins:               (game.winHistory && game.winHistory[mySocketId]) || 0,
+      penalties:          myPoints,
+      exactMatches:       (game.exactMatchHistory && game.exactMatchHistory[mySocketId]) || 0,
+      survived:           survived,
+      // New achievement-tracking fields
+      roomType:           room.type || "public",
+      isDuel:             isDuel,
+      playerCount:        activePlayers.length,
+      maxConsecRoundWins: (game.maxConsecWinHistory && game.maxConsecWinHistory[mySocketId]) || 0,
+      wasLastPlace:       !!(game.wasLastPlaceSet && game.wasLastPlaceSet[mySocketId]),
     };
 
     // Write to DB (non-blocking per user)
     statsService.writeSessionStat(deviceId, sessionStats).catch(() => {});
+
+    // Update consecutive game-win streak (must await — we need the result for achievement check)
+    var newStreak = await userService.updateConsecutiveGameWins(deviceId, survived).catch(function() { return 0; });
 
     // Award XP
     var xpResult = await userService.awardXp(deviceId, sessionStats);
@@ -436,16 +472,23 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer, last
     var userRecord = await userService.getProfile(deviceId);
     if (!userRecord) continue;
 
+    // Fetch all-time stats (includes duelWins, soloWins from the new DB fields)
     var allTimeStats = await statsService.getPlayerStats(deviceId).catch(function() { return null; });
+    // Override consecutiveGameWins with the freshly updated value
+    if (allTimeStats) allTimeStats.consecutiveGameWins = newStreak;
 
     var sessionDataForAchievements = {
-      wins:            sessionStats.wins,
-      exactMatches:    sessionStats.exactMatches,
-      penalties:       sessionStats.penalties,
-      survived:        survived,
-      eliminatedCount: (game.eliminatedPlayers || []).length,
-      isDuel:          isDuel,
-      cameBackFrom4:   myPoints >= 4 && survived,
+      wins:               sessionStats.wins,
+      exactMatches:       sessionStats.exactMatches,
+      penalties:          sessionStats.penalties,
+      survived:           survived,
+      eliminatedCount:    (game.eliminatedPlayers || []).length,
+      isDuel:             isDuel,
+      cameBackFrom4:      myPoints >= 4 && survived,
+      roomType:           sessionStats.roomType,
+      playerCount:        sessionStats.playerCount,
+      maxConsecRoundWins: sessionStats.maxConsecRoundWins,
+      wasLastPlace:       sessionStats.wasLastPlace,
     };
 
     var newAchievements = await achievementService.checkAndAward(
