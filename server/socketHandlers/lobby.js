@@ -54,19 +54,37 @@ module.exports = function handleLobbyEvents(io, socket) {
 
     var roomNo = roomId;
     var isNewPublicRoom = false;
+    var isReconnectToSameRoom = false;
 
-    // Public room: find an existing joinable room (O(1) via Redis SET)
-    if (roomType === "public") {
-      var publicRoom = await getPublicRooms();
-      roomNo = publicRoom && publicRoom.id;
-      console.debug('Socket: "join_room" public room found: ' + roomNo);
-      if (!roomNo) isNewPublicRoom = true;
+    // Reconnect fast-path: this device just had a grace-period timer running
+    // (see DISCONNECT_GRACE_MS above) — meaning it dropped out of a room very
+    // recently, most likely a mobile user backgrounding the tab. Send them
+    // straight back into that exact room instead of running it through public
+    // matchmaking / room creation, which could otherwise land them in a
+    // *different* public room than the one they (and their game state) left.
+    if (cancelledPending) {
+      var stillExists = await getRoomById(cancelledPending.roomId);
+      if (stillExists) {
+        roomNo = cancelledPending.roomId;
+        isReconnectToSameRoom = true;
+        console.log("Reconnect: returning deviceId " + deviceId + " to previous room " + roomNo);
+      }
     }
 
-    // No room found — create a new one
-    if (!roomNo) {
-      roomNo = Math.random().toString(36).substring(2, 8);
-      console.debug('Socket: "join_room" new room created: ' + roomNo);
+    if (!isReconnectToSameRoom) {
+      // Public room: find an existing joinable room (O(1) via Redis SET)
+      if (roomType === "public") {
+        var publicRoom = await getPublicRooms();
+        roomNo = publicRoom && publicRoom.id;
+        console.debug('Socket: "join_room" public room found: ' + roomNo);
+        if (!roomNo) isNewPublicRoom = true;
+      }
+
+      // No room found — create a new one
+      if (!roomNo) {
+        roomNo = Math.random().toString(36).substring(2, 8);
+        console.debug('Socket: "join_room" new room created: ' + roomNo);
+      }
     }
 
     // If the user cancelled a grace-period for a DIFFERENT room (e.g. they

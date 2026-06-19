@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useUser } from "./contexts/UserContext";
 import Login from "./components/Login";
 import LandingPage from "./components/LandingPage";
@@ -48,6 +48,18 @@ function AppInner() {
   const { resetGame } = useGame();
   const [error, setError] = useState({ isError: false, message: null });
 
+  // Reconnecting: true while the socket is mid-disconnect but we're giving the
+  // server's 60s grace period (see lobby.js DISCONNECT_GRACE_MS) a chance to
+  // work — e.g. a mobile user who backgrounds the tab to share the room link
+  // via WhatsApp. We deliberately do NOT clear game/user state the instant the
+  // socket drops; doing so used to kick the user straight back to the home
+  // screen before the browser even had a chance to reconnect.
+  const [reconnecting, setReconnecting] = useState(false);
+  const reconnectFallbackTimer = useRef(null);
+  // Mirrors the latest session info so the socket listeners below (registered
+  // once on mount) always see current values without having to re-subscribe.
+  const sessionRef = useRef({});
+
   // Landing page: shown to visitors who haven't started yet and aren't deep-linking into a room
   // Once they click "Play Now" we flip this flag and show Login.
   const [showLanding, setShowLanding] = useState(() => {
@@ -57,6 +69,12 @@ function AppInner() {
   const [showLeaderboard, setShowLeaderboard] = useState(() => {
     return window.location.pathname.replace("/", "").trim() === "leaderboard";
   });
+
+  // Keep sessionRef current so the listeners below (registered once) can read
+  // the latest room/user state without re-subscribing on every change.
+  useEffect(() => {
+    sessionRef.current = { roomId, user, roomType, deviceId, isWaitingRoom, isInGame };
+  }, [roomId, user, roomType, deviceId, isWaitingRoom, isInGame]);
 
   useEffect(() => {
     const path = window.location.pathname.replace("/", "").trim();
@@ -69,15 +87,50 @@ function AppInner() {
     socket.on("error_message", (err) => {
       if (err.message) setError({ isError: true, message: err.message });
     });
-    socket.on("disconnect", () => {
-      console.warn("⚠️ Socket disconnected");
-      resetGame();
-      resetUser();
+
+    socket.on("disconnect", (reason) => {
+      console.warn("⚠️ Socket disconnected:", reason);
+      const { isWaitingRoom: w, isInGame: g, roomId: r } = sessionRef.current;
+
+      // Mid-session drop (waiting room or active game): give the server's
+      // grace period a chance — socket.io will auto-reconnect on its own.
+      // Don't touch game/user state yet, just show a "reconnecting" banner.
+      if ((w || g) && r) {
+        setReconnecting(true);
+        reconnectFallbackTimer.current = setTimeout(() => {
+          console.warn("Reconnect window expired — returning to home");
+          setReconnecting(false);
+          resetGame();
+          resetUser();
+        }, 65000); // slightly longer than the server's 60s DISCONNECT_GRACE_MS
+      } else {
+        resetGame();
+        resetUser();
+      }
+    });
+
+    socket.on("connect", () => {
+      if (reconnectFallbackTimer.current) {
+        clearTimeout(reconnectFallbackTimer.current);
+        reconnectFallbackTimer.current = null;
+      }
+      setReconnecting((wasReconnecting) => {
+        if (wasReconnecting) {
+          const { roomId: r, user: u, roomType: rt, deviceId: d } = sessionRef.current;
+          if (r && u) {
+            console.log("Reconnected — rejoining room", r);
+            socket.emit("join_room", { roomId: r, user: u, roomType: rt, deviceId: d });
+          }
+        }
+        return false;
+      });
     });
 
     return () => {
       socket.off("error_message");
       socket.off("disconnect");
+      socket.off("connect");
+      if (reconnectFallbackTimer.current) clearTimeout(reconnectFallbackTimer.current);
     };
   }, []);
 
@@ -132,6 +185,15 @@ function AppInner() {
           message={error.message}
           onClose={() => setError({ isError: true, message: null })}
         />
+      )}
+
+      {reconnecting && (
+        <div
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-amber-200 border border-amber-400/30 shadow-lg animate-pulse"
+          style={{ background: "rgba(120,53,15,0.85)", backdropFilter: "blur(10px)" }}
+        >
+          <span className="animate-spin">🔄</span> Reconnecting…
+        </div>
       )}
 
       {/* Leaderboard page */}
