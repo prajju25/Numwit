@@ -5,27 +5,27 @@
  * gameRules.js. This file only coordinates the sequence of rule applications.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-var constants = require("../constants/constants");
-var NUMWIT_GAME_STATUS = constants.NUMWIT_GAME_STATUS;
+const constants = require("../constants/constants");
+const NUMWIT_GAME_STATUS = constants.NUMWIT_GAME_STATUS;
 
-var rules = require("./gameRules");
-var applyDuplicateRule = rules.applyDuplicateRule;
-var isRoundVoid = rules.isRoundVoid;
-var applyTwoPlayerCycle = rules.applyTwoPlayerCycle;
-var findWinners = rules.findWinners;
-var hasExactMatch = rules.hasExactMatch;
-var computePenalties = rules.computePenalties;
+const rules = require("./gameRules");
+const applyDuplicateRule = rules.applyDuplicateRule;
+const isRoundVoid = rules.isRoundVoid;
+const applyTwoPlayerCycle = rules.applyTwoPlayerCycle;
+const findWinners = rules.findWinners;
+const hasExactMatch = rules.hasExactMatch;
+const computePenalties = rules.computePenalties;
 
-var saveRoom = require("./roomManager").saveRoom;
+const saveRoom = require("./roomManager").saveRoom;
 
 function shuffleArray(arr) {
   return arr.slice().sort(function() { return Math.random() - 0.5; });
 }
 
 // ── Valid setting ranges ───────────────────────────────────────────────────────
-var VALID_TIMER_DURATIONS      = [20, 30, 60];
-var VALID_ELIM_THRESHOLDS      = [3, 5, 7];
-var VALID_TARGET_MULTIPLIERS   = [0.6, 0.8, 0.9];
+const VALID_TIMER_DURATIONS      = [20, 30, 60];
+const VALID_ELIM_THRESHOLDS      = [3, 5, 7];
+const VALID_TARGET_MULTIPLIERS   = [0.6, 0.8, 0.9];
 
 /**
  * Validate and clamp host-supplied settings. Unknown keys are ignored.
@@ -34,16 +34,16 @@ var VALID_TARGET_MULTIPLIERS   = [0.6, 0.8, 0.9];
 function sanitizeSettings(raw) {
   if (!raw || typeof raw !== "object") raw = {};
 
-  var timerDuration = VALID_TIMER_DURATIONS.includes(Number(raw.timerDuration))
+  const timerDuration = VALID_TIMER_DURATIONS.includes(Number(raw.timerDuration))
     ? Number(raw.timerDuration) : 30;
 
-  var eliminationThreshold = VALID_ELIM_THRESHOLDS.includes(Number(raw.eliminationThreshold))
+  const eliminationThreshold = VALID_ELIM_THRESHOLDS.includes(Number(raw.eliminationThreshold))
     ? Number(raw.eliminationThreshold) : 5;
 
-  var targetMultiplier = VALID_TARGET_MULTIPLIERS.includes(Number(raw.targetMultiplier))
+  const targetMultiplier = VALID_TARGET_MULTIPLIERS.includes(Number(raw.targetMultiplier))
     ? Number(raw.targetMultiplier) : 0.8;
 
-  var duplicateRuleEnabled = raw.duplicateRuleEnabled === false ? false : true;
+  const duplicateRuleEnabled = raw.duplicateRuleEnabled === false ? false : true;
 
   return { timerDuration, eliminationThreshold, targetMultiplier, duplicateRuleEnabled };
 }
@@ -54,10 +54,10 @@ async function createGameData(room, settings) {
   if (settings === undefined) settings = {};
 
   if (!room.game) {
-    var socketIds = room.users.map(function(u) { return u.socketId; });
-    var cleanSettings = sanitizeSettings(settings);
+    const socketIds = room.users.map(function(u) { return u.socketId; });
+    const cleanSettings = sanitizeSettings(settings);
 
-    var gameData = {
+    const gameData = {
       round: 1,
       numbers: {},
       points: {},
@@ -106,24 +106,24 @@ async function createGameData(room, settings) {
  */
 function evaluateRound(game, activePlayers) {
   // Read per-game settings (with defaults)
-  var gs = game.settings || {};
-  var targetMultiplier    = gs.targetMultiplier    != null ? gs.targetMultiplier    : rules.RULES.TARGET_MULTIPLIER;
-  var eliminationThreshold= gs.eliminationThreshold!= null ? gs.eliminationThreshold: null; // null = use RULES default
-  var duplicateRuleEnabled= gs.duplicateRuleEnabled!= null ? gs.duplicateRuleEnabled: true;
+  const gs = game.settings || {};
+  const targetMultiplier    = gs.targetMultiplier    != null ? gs.targetMultiplier    : rules.RULES.TARGET_MULTIPLIER;
+  const eliminationThreshold= gs.eliminationThreshold!= null ? gs.eliminationThreshold: null; // null = use RULES default
+  const duplicateRuleEnabled= gs.duplicateRuleEnabled!= null ? gs.duplicateRuleEnabled: true;
 
   // All submissions, including non-submitters (number === undefined)
-  var submissions = activePlayers.map(function(u) {
+  const submissions = activePlayers.map(function(u) {
     return { socketId: u.socketId, number: game.numbers[u.socketId] };
   });
 
-  var activePlayerCount = activePlayers.length;
-  var allPlayerIds = activePlayers.map(function(u) { return u.socketId; });
+  const activePlayerCount = activePlayers.length;
+  const allPlayerIds = activePlayers.map(function(u) { return u.socketId; });
 
   // ── Filter non-submitters ─────────────────────────────────────────────────
   // Players who ran out of time without picking get number=undefined.
   // Exclude them from average/target/winner logic but keep them in allPlayerIds
   // so computePenalties still awards them a penalty point.
-  var actualSubmissions = submissions.filter(function(s) {
+  const actualSubmissions = submissions.filter(function(s) {
     return typeof s.number === "number" && !isNaN(s.number);
   });
 
@@ -138,24 +138,24 @@ function evaluateRound(game, activePlayers) {
   }
 
   // ── Step 2: 2-player cycle rule ──────────────────────────────────────────
-  var cycleWinnerId = null;
+  let cycleWinnerId = null;
   if (activePlayerCount === 2 && actualSubmissions.length === 2) {
     cycleWinnerId = applyTwoPlayerCycle(actualSubmissions);
   }
 
   // ── Step 3: Duplicate filter (3+ players only, unless disabled) ──────────
   // Use only actualSubmissions so non-submitters don't distort duplicate counts
-  var filtered;
+  let filtered;
   if (duplicateRuleEnabled) {
     filtered = applyDuplicateRule(actualSubmissions, activePlayerCount);
   } else {
     filtered = { valid: actualSubmissions.slice(), invalid: [] };
   }
-  var validSubmissions = filtered.valid;
-  var invalidSubmissions = filtered.invalid;
+  const validSubmissions = filtered.valid;
+  const invalidSubmissions = filtered.invalid;
 
   // ── Step 4: Round void check ─────────────────────────────────────────────
-  var voidCheck = isRoundVoid(validSubmissions, actualSubmissions, activePlayerCount);
+  const voidCheck = isRoundVoid(validSubmissions, actualSubmissions, activePlayerCount);
   if (voidCheck.isVoid) {
     return {
       roundVoid: true,
@@ -167,13 +167,13 @@ function evaluateRound(game, activePlayers) {
 
   // ── Step 5: Average + target (uses per-game targetMultiplier) ────────────
   // Base is always from actual submitters only — non-submitters don't skew the average
-  var computeBase = (cycleWinnerId !== null) ? actualSubmissions : validSubmissions;
-  var sum = computeBase.reduce(function(acc, s) { return acc + s.number; }, 0);
-  var average = sum / computeBase.length;
-  var target = average * targetMultiplier;
+  const computeBase = (cycleWinnerId !== null) ? actualSubmissions : validSubmissions;
+  const sum = computeBase.reduce(function(acc, s) { return acc + s.number; }, 0);
+  const average = sum / computeBase.length;
+  const target = average * targetMultiplier;
 
   // ── Step 6: Find co-winners ───────────────────────────────────────────────
-  var winnerIds;
+  let winnerIds;
   if (cycleWinnerId !== null) {
     winnerIds = [cycleWinnerId];
   } else {
@@ -181,11 +181,11 @@ function evaluateRound(game, activePlayers) {
   }
 
   // ── Step 7: Exact match ───────────────────────────────────────────────────
-  var exactMatch = false;
+  let exactMatch = false;
   if (cycleWinnerId === null) {
     exactMatch = hasExactMatch(validSubmissions, target, winnerIds);
   }
-  var penaltyResult = computePenalties(
+  const penaltyResult = computePenalties(
     allPlayerIds,
     winnerIds,
     exactMatch,
@@ -195,10 +195,10 @@ function evaluateRound(game, activePlayers) {
   );
 
   // ── Build result ──────────────────────────────────────────────────────────
-  var twoPlayerCycle = cycleWinnerId !== null;
+  const twoPlayerCycle = cycleWinnerId !== null;
 
   // Backward-compat: winnerSocketId = first winner (for UI that expects single winner)
-  var winnerSocketId = winnerIds.length > 0 ? winnerIds[0] : null;
+  const winnerSocketId = winnerIds.length > 0 ? winnerIds[0] : null;
 
   return {
     roundVoid: false,

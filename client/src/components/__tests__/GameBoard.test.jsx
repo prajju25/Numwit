@@ -253,7 +253,9 @@ describe("GameBoard", () => {
     expect(screen.getByTestId("round-history")).toBeInTheDocument();
     expect(screen.getByTestId("voice-panel")).toBeInTheDocument();
     expect(screen.getByTestId("emote-bar")).toBeInTheDocument();
-    expect(screen.getByTestId("tutorial-overlay")).toBeInTheDocument();
+    // Rendered twice — a desktop variant (hidden on mobile) and a mobile
+    // variant (hidden on desktop) — so both copies exist in the DOM.
+    expect(screen.getAllByTestId("tutorial-overlay").length).toBe(2);
   });
 
   test("pauses the CountdownTimer while a round result or void overlay is showing", () => {

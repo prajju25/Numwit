@@ -20,18 +20,18 @@ const startGameForRoom = gameHandlers.startGameForRoom;
 // When a user disconnects (e.g. mobile switching apps) we wait 60 s before
 // actually removing them from the room. If they rejoin within that window the
 // timer is cancelled and the game continues as if nothing happened.
-var DISCONNECT_GRACE_MS = 60 * 1000;
-var pendingDisconnects = {};  // deviceId  → { timer, oldSocketId, roomId }
-var socketToDevice    = {};   // socketId  → deviceId
-var socketToRoom      = {};   // socketId  → roomId
+const DISCONNECT_GRACE_MS = 60 * 1000;
+const pendingDisconnects = {};  // deviceId  → { timer, oldSocketId, roomId }
+const socketToDevice    = {};   // socketId  → deviceId
+const socketToRoom      = {};   // socketId  → roomId
 
 module.exports = function handleLobbyEvents(io, socket) {
 
   socket.on("join_room", async function(data) {
-    var roomId   = data.roomId;
-    var user     = data.user;
-    var roomType = data.roomType;
-    var deviceId = data.deviceId || null;   // Phase 4: device identity
+    const roomId   = data.roomId;
+    const user     = data.user;
+    const roomType = data.roomType;
+    const deviceId = data.deviceId || null;   // Phase 4: device identity
 
     console.debug('Socket: "join_room" Room=' + roomId + ' User=' + (user && user.name) + ' Type=' + roomType);
 
@@ -44,7 +44,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     // Save it first — we may need to clean up the old room below if the user
     // is joining a *different* room (e.g. starting a brand-new solo game while
     // the grace timer is still counting down for a previous room).
-    var cancelledPending = null;
+    let cancelledPending = null;
     if (deviceId && pendingDisconnects[deviceId]) {
       cancelledPending = pendingDisconnects[deviceId];
       clearTimeout(cancelledPending.timer);
@@ -52,9 +52,9 @@ module.exports = function handleLobbyEvents(io, socket) {
       console.log("Reconnect: cancelled disconnect timer for deviceId " + deviceId);
     }
 
-    var roomNo = roomId;
-    var isNewPublicRoom = false;
-    var isReconnectToSameRoom = false;
+    let roomNo = roomId;
+    let isNewPublicRoom = false;
+    let isReconnectToSameRoom = false;
 
     // Reconnect fast-path: this device just had a grace-period timer running
     // (see DISCONNECT_GRACE_MS above) — meaning it dropped out of a room very
@@ -63,7 +63,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     // matchmaking / room creation, which could otherwise land them in a
     // *different* public room than the one they (and their game state) left.
     if (cancelledPending) {
-      var stillExists = await getRoomById(cancelledPending.roomId);
+      const stillExists = await getRoomById(cancelledPending.roomId);
       if (stillExists) {
         roomNo = cancelledPending.roomId;
         isReconnectToSameRoom = true;
@@ -74,7 +74,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     if (!isReconnectToSameRoom) {
       // Public room: find an existing joinable room (O(1) via Redis SET)
       if (roomType === "public") {
-        var publicRoom = await getPublicRooms();
+        const publicRoom = await getPublicRooms();
         roomNo = publicRoom && publicRoom.id;
         console.debug('Socket: "join_room" public room found: ' + roomNo);
         if (!roomNo) isNewPublicRoom = true;
@@ -93,7 +93,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     // ghost "disconnected" user entry forever and cleanupIfBotsOnly never fires.
     if (cancelledPending && cancelledPending.roomId !== roomNo) {
       console.log("Joining different room — cleaning up old room " + cancelledPending.roomId);
-      var abandonedRoom = await removeUserFromRoom(cancelledPending.oldSocketId);
+      const abandonedRoom = await removeUserFromRoom(cancelledPending.oldSocketId);
       if (abandonedRoom) {
         await handlePostRemove(io, abandonedRoom);
       }
@@ -107,14 +107,14 @@ module.exports = function handleLobbyEvents(io, socket) {
       // (e.g. a page refresh, which gets a brand-new socket.id) instead of
       // leaving a duplicate row behind.
       if (deviceId) user.deviceId = deviceId;
-      var room = await addUserToRoom(roomNo, user, roomType, !roomId);
+      const room = await addUserToRoom(roomNo, user, roomType, !roomId);
 
       // Track socket → device/room for grace-period reconnection
       if (deviceId) socketToDevice[socket.id] = deviceId;
       socketToRoom[socket.id] = roomNo;
 
       // Clear any stale disconnected flag left by a previous grace period
-      var rejoiningUser = room.users.find(function(u) { return u.socketId === socket.id; });
+      const rejoiningUser = room.users.find(function(u) { return u.socketId === socket.id; });
       if (rejoiningUser && rejoiningUser.disconnected) {
         rejoiningUser.disconnected = false;
         await saveRoom(room);
@@ -131,7 +131,7 @@ module.exports = function handleLobbyEvents(io, socket) {
       // with bots up to MIN_PLAYERS immediately (no countdown, no waiting
       // room) and start the game right away. See PLAY_VS_COMPUTER_PROPOSAL.md.
       if (roomType === "solo" && !room.game) {
-        var addedSoloBots = botService.fillRoomWithBots(room, MIN_PLAYERS);
+        const addedSoloBots = botService.fillRoomWithBots(room, MIN_PLAYERS);
         await saveRoom(room);
 
         io.to(roomNo).emit("room_update", room);
@@ -168,7 +168,7 @@ module.exports = function handleLobbyEvents(io, socket) {
         }
         await saveRoom(room);
 
-        var timeLeft = timerService.getTimeLeft(roomNo);
+        const timeLeft = timerService.getTimeLeft(roomNo);
         socket.emit("game_in_progress", {
           round:             room.game.round,
           points:            room.game.points,
@@ -189,7 +189,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     console.debug('Socket: "leave_room" ' + socket.id);
 
     // Intentional leave — cancel any pending grace timer and clean up maps
-    var dId = socketToDevice[socket.id];
+    const dId = socketToDevice[socket.id];
     if (dId && pendingDisconnects[dId]) {
       clearTimeout(pendingDisconnects[dId].timer);
       delete pendingDisconnects[dId];
@@ -197,7 +197,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     delete socketToDevice[socket.id];
     delete socketToRoom[socket.id];
 
-    var room = await removeUserFromRoom(socket.id);
+    const room = await removeUserFromRoom(socket.id);
     if (room) {
       socket.leave(room.id);
       roomCleanup.cancelPostGameDelete(room.id);
@@ -214,32 +214,32 @@ module.exports = function handleLobbyEvents(io, socket) {
 
     clearRateLimit(socket.id);
 
-    var deviceId = socketToDevice[socket.id];
-    var roomId   = socketToRoom[socket.id];
+    const deviceId = socketToDevice[socket.id];
+    const roomId   = socketToRoom[socket.id];
     delete socketToDevice[socket.id];
     delete socketToRoom[socket.id];
 
     // Grace period: if we know the device, hold the room slot for 60 s so a
     // mobile user switching apps (or a brief network drop) can come back.
     if (deviceId && roomId) {
-      var room = await getRoomById(roomId);
+      const room = await getRoomById(roomId);
       if (room) {
         // Mark user as temporarily disconnected so the client can show it
-        var disconnectedUser = room.users.find(function(u) { return u.socketId === socket.id; });
+        const disconnectedUser = room.users.find(function(u) { return u.socketId === socket.id; });
         if (disconnectedUser) {
           disconnectedUser.disconnected = true;
           await saveRoom(room);
           io.to(room.id).emit("room_update", room);
         }
 
-        var oldSocketId = socket.id;
+        const oldSocketId = socket.id;
         pendingDisconnects[deviceId] = {
           oldSocketId: oldSocketId,
           roomId: roomId,
           timer: setTimeout(async function() {
             delete pendingDisconnects[deviceId];
             console.log("Grace period expired for deviceId " + deviceId + " — removing from room");
-            var r = await removeUserFromRoom(oldSocketId);
+            const r = await removeUserFromRoom(oldSocketId);
             if (r) {
               await handlePostRemove(io, r);
             }
@@ -252,7 +252,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     }
 
     // No deviceId (anonymous) or room already gone — immediate cleanup
-    var r = await removeUserFromRoom(socket.id);
+    const r = await removeUserFromRoom(socket.id);
     if (r) {
       await handlePostRemove(io, r);
     }
@@ -266,12 +266,12 @@ module.exports = function handleLobbyEvents(io, socket) {
 // cleans up bot-only rooms.
 async function handlePostRemove(io, room) {
   if (room.game) {
-    var activePlayers = room.users.filter(function(u) {
+    const activePlayers = room.users.filter(function(u) {
       return room.game.eliminatedPlayers.indexOf(u.socketId) === -1
         && room.game.turnOrder.indexOf(u.socketId) !== -1;
     });
     if (activePlayers.length < MIN_PLAYERS) {
-      var lastPlayer = activePlayers[0];
+      const lastPlayer = activePlayers[0];
       io.to(room.id).emit("game_over", {
         winnerSocketId: lastPlayer ? lastPlayer.socketId : null,
         points: room.game.points,
@@ -304,7 +304,7 @@ async function cleanupIfBotsOnly(io, room) {
 // the room — if real players already brought it up to MIN_PLAYERS (or the
 // room/game state changed in the meantime), this is a no-op.
 async function fillRoomWithBotsAndStart(io, roomId) {
-  var room = await getRoomById(roomId);
+  const room = await getRoomById(roomId);
   if (!room) return; // room was deleted in the meantime
   if (room.game) return; // already started by someone else
 
@@ -318,7 +318,7 @@ async function fillRoomWithBotsAndStart(io, roomId) {
     return;
   }
 
-  var addedBots = botService.fillRoomWithBots(room, MIN_PLAYERS);
+  const addedBots = botService.fillRoomWithBots(room, MIN_PLAYERS);
   room.botFillAt = null;
   await saveRoom(room);
 

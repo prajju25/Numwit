@@ -279,10 +279,10 @@ describe("roomManager", () => {
     });
 
     test("aggregates totals, waiting vs in-progress, and per-type breakdowns", async () => {
-      var pub = await addUserToRoom("pub1", { socketId: "s1", name: "Alice" }, "public", true);
+      const pub = await addUserToRoom("pub1", { socketId: "s1", name: "Alice" }, "public", true);
       await addUserToRoom("pub1", { socketId: "s2", name: "Bob" }, "public", false);
 
-      var priv = await addUserToRoom("priv1", { socketId: "s3", name: "Carl" }, "private", true);
+      const priv = await addUserToRoom("priv1", { socketId: "s3", name: "Carl" }, "private", true);
       priv.game = { round: 1 };
       await saveRoom(priv);
 
@@ -314,7 +314,7 @@ describe("roomManager", () => {
       await addUserToRoom("pub1", { socketId: "s1", name: "Alice", avatar: "cat" }, "public", true);
       await addUserToRoom("pub1", { socketId: "s2", name: "Bob", avatar: "dog", isBot: true }, "public");
 
-      var priv = await addUserToRoom("priv1", { socketId: "s3", name: "Carl" }, "private", true);
+      const priv = await addUserToRoom("priv1", { socketId: "s3", name: "Carl" }, "private", true);
       priv.game = { round: 2 };
       await saveRoom(priv);
 
@@ -343,7 +343,7 @@ describe("roomManager", () => {
       await addUserToRoom("big", { socketId: "s2", name: "Bob" }, "public", true);
       await addUserToRoom("big", { socketId: "s3", name: "Carl" }, "public");
 
-      var gameRoom = await addUserToRoom("gameroom", { socketId: "s4", name: "Dee" }, "public", true);
+      const gameRoom = await addUserToRoom("gameroom", { socketId: "s4", name: "Dee" }, "public", true);
       gameRoom.game = { round: 1 };
       await saveRoom(gameRoom);
 

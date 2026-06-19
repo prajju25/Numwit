@@ -9,24 +9,16 @@ describe("NumberSlider", () => {
     expect(screen.getByRole("button", { name: /Lock In 50/ })).toBeInTheDocument();
   });
 
-  test("dragging the slider updates the pending value (snapped to 5)", () => {
+  test("dragging the slider updates the pending value", () => {
     render(<NumberSlider onSelect={() => {}} disabled={false} selectedNumber={null} />);
     const slider = screen.getByLabelText("Pick a number between 0 and 100");
     fireEvent.change(slider, { target: { value: "42" } });
-    // snap to nearest 5 -> 40
-    expect(screen.getByLabelText("Enter number directly")).toHaveValue(40);
-    expect(screen.getByRole("button", { name: /Lock In 40/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Enter number directly")).toHaveValue(42);
+    expect(screen.getByRole("button", { name: /Lock In 42/ })).toBeInTheDocument();
   });
 
-  test("toggling snap-to-5 off allows non-multiples of 5", () => {
+  test("the slider allows non-multiples of 5", () => {
     render(<NumberSlider onSelect={() => {}} disabled={false} selectedNumber={null} />);
-    expect(screen.getByText("Snap to 5")).toBeInTheDocument();
-    const toggle = screen.getByRole("button", { pressed: true });
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
-
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
-
     const slider = screen.getByLabelText("Pick a number between 0 and 100");
     fireEvent.change(slider, { target: { value: "43" } });
     expect(screen.getByLabelText("Enter number directly")).toHaveValue(43);
@@ -75,7 +67,6 @@ describe("NumberSlider", () => {
     expect(screen.getByLabelText("Enter number directly")).toHaveValue(65);
     expect(screen.queryByRole("button", { name: /Lock In/ })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Pick a number between 0 and 100")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Snap to 5" })).not.toBeInTheDocument();
   });
 
   test("renders the footer rule text", () => {

@@ -22,15 +22,15 @@
  * no DB schema changes needed.
  */
 
-var constants = require("../constants/constants");
-var BOT_NAMES = constants.BOT_NAMES;
-var BOT_AVATARS = constants.BOT_AVATARS;
+const constants = require("../constants/constants");
+const BOT_NAMES = constants.BOT_NAMES;
+const BOT_AVATARS = constants.BOT_AVATARS;
 
 // Pending one-shot "fill this room with bots" timers: Map<roomId, timeoutId>
-var fillTimers = new Map();
+const fillTimers = new Map();
 
 // Pending per-round bot submission timers: Map<roomId, [timeoutId]>
-var submissionTimers = new Map();
+const submissionTimers = new Map();
 
 /**
  * Generate a stable fake socketId for a bot.
@@ -61,12 +61,12 @@ function hasOnlyBots(room) {
  * Existing bot indices are skipped so a second fill doesn't collide socketIds.
  */
 function fillRoomWithBots(room, targetCount) {
-  var existingBotCount = room.users.filter(function(u) { return isBot(u.socketId); }).length;
-  var added = [];
-  var index = existingBotCount;
+  const existingBotCount = room.users.filter(function(u) { return isBot(u.socketId); }).length;
+  const added = [];
+  let index = existingBotCount;
 
   while (room.users.length < targetCount) {
-    var bot = {
+    const bot = {
       socketId: botId(room.id, index),
       name: BOT_NAMES[index % BOT_NAMES.length],
       avatar: BOT_AVATARS[index % BOT_AVATARS.length],
@@ -87,7 +87,7 @@ function fillRoomWithBots(room, targetCount) {
  */
 function scheduleBotFill(roomId, delayMs, onFire) {
   clearFillTimer(roomId);
-  var t = setTimeout(function() {
+  const t = setTimeout(function() {
     fillTimers.delete(roomId);
     onFire(roomId);
   }, delayMs);
@@ -98,7 +98,7 @@ function scheduleBotFill(roomId, delayMs, onFire) {
  * Cancel a pending bot-fill timer (e.g. room was deleted, or filled manually).
  */
 function clearFillTimer(roomId) {
-  var t = fillTimers.get(roomId);
+  const t = fillTimers.get(roomId);
   if (t) {
     clearTimeout(t);
     fillTimers.delete(roomId);
@@ -113,13 +113,13 @@ function clearFillTimer(roomId) {
  * target" the way TECHNICAL_IMPLEMENTATION_PLAN.md described for tutorial bots.
  */
 function getBotNumber(game) {
-  var target = game && typeof game.target === "number" ? game.target : null;
+  const target = game && typeof game.target === "number" ? game.target : null;
   if (target === null) {
     if (Math.random() < 0.7) return Math.round(30 + Math.random() * 40);
     return Math.round(Math.random() * 100);
   }
-  var spread = 15;
-  var n = target + (Math.random() * spread * 2 - spread);
+  const spread = 15;
+  const n = target + (Math.random() * spread * 2 - spread);
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
@@ -134,14 +134,14 @@ function scheduleBotSubmissions(roomId, game, submitFn) {
   clearSubmissionTimers(roomId);
   if (!game || !game.turnOrder) return;
 
-  var timers = [];
+  const timers = [];
   game.turnOrder.forEach(function(socketId) {
     if (!isBot(socketId)) return;
     if ((game.eliminatedPlayers || []).indexOf(socketId) !== -1) return;
     if (game.numbers && game.numbers[socketId] !== undefined) return;
 
-    var delay = 1000 + Math.random() * 3000; // 1-4s
-    var t = setTimeout(function() {
+    const delay = 1000 + Math.random() * 3000; // 1-4s
+    const t = setTimeout(function() {
       submitFn(socketId, getBotNumber(game));
     }, delay);
     timers.push(t);
@@ -154,7 +154,7 @@ function scheduleBotSubmissions(roomId, game, submitFn) {
  * early because every human already submitted, or the game was reset).
  */
 function clearSubmissionTimers(roomId) {
-  var timers = submissionTimers.get(roomId) || [];
+  const timers = submissionTimers.get(roomId) || [];
   timers.forEach(function(t) { clearTimeout(t); });
   submissionTimers.delete(roomId);
 }

@@ -53,7 +53,11 @@ export const UserProvider = ({ children }) => {
       } else {
         localStorage.removeItem("80Percentile-user");
       }
-    } catch (_) {}
+    } catch (err) {
+      // Storage full or unavailable — the session just won't persist across
+      // reloads; not worth interrupting the user with an error for this.
+      console.warn("Failed to persist user session:", err.message);
+    }
   }, [user]);
 
   const resetUser = useCallback(() => {

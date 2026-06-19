@@ -70,9 +70,14 @@ function createSpeakingDetector(stream, onSpeaking) {
 
     return () => {
       cancelAnimationFrame(rafId);
+      // Teardown can run after the AudioContext is already closed (e.g. the
+      // tab is backgrounded) — that's expected, not an error worth surfacing.
       try { source.disconnect(); ctx.close(); } catch (_) {}
     };
   } catch (_) {
+    // AudioContext/analyser setup can fail (no mic permissions, no Web Audio
+    // support, stream already ended) — speaking detection is a non-essential
+    // nicety, so just skip it rather than disrupting the call.
     return () => {};
   }
 }
@@ -140,6 +145,9 @@ export function VoiceProvider({ children, roomId }) {
     if (!pc || !pc.remoteDescription) return;
     const buffered = pendingIce.current[socketId] || [];
     for (const candidate of buffered) {
+      // A buffered candidate can fail to add if the connection was already
+      // closed/renegotiated in the meantime — benign and expected under
+      // normal WebRTC churn, not worth surfacing per-candidate.
       try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) {}
     }
     pendingIce.current[socketId] = [];

@@ -14,15 +14,15 @@
  * Imported by both game.js and lobby.js — no circular dependencies.
  */
 
-var timerService = require("./timerService");
-var botService   = require("./botService");
-var roomManager  = require("../utils/roomManager");
+const timerService = require("./timerService");
+const botService   = require("./botService");
+const roomManager  = require("../utils/roomManager");
 
-var POST_GAME_MS = 5 * 60 * 1000;  // 5 minutes after game_over
-var IDLE_MS      = 5 * 60 * 1000;  // 5 minutes for idle waiting rooms
+const POST_GAME_MS = 5 * 60 * 1000;  // 5 minutes after game_over
+const IDLE_MS      = 5 * 60 * 1000;  // 5 minutes for idle waiting rooms
 
-var pendingPostGame = {};  // roomId → timer handle
-var pendingIdle     = {};  // roomId → timer handle
+const pendingPostGame = {};  // roomId → timer handle
+const pendingIdle     = {};  // roomId → timer handle
 
 // ── shared teardown ───────────────────────────────────────────────────────────
 async function _deleteRoom(io, roomId, reason) {
@@ -59,7 +59,7 @@ function scheduleIdleDelete(io, roomId) {
   pendingIdle[roomId] = setTimeout(async function() {
     delete pendingIdle[roomId];
     // Guard: skip if a game already started while we were waiting
-    var room = await roomManager.getRoomById(roomId);
+    const room = await roomManager.getRoomById(roomId);
     if (!room || room.game) return;
     await _deleteRoom(io, roomId, "idle_no_game_started");
   }, IDLE_MS);

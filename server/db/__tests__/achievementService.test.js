@@ -11,8 +11,8 @@ describe("achievementService", () => {
   });
 
   describe("ACHIEVEMENTS catalogue", () => {
-    test("contains 10 achievements with unique ids", () => {
-      expect(ACHIEVEMENTS).toHaveLength(10);
+    test("contains 20 achievements with unique ids", () => {
+      expect(ACHIEVEMENTS).toHaveLength(20);
       const ids = ACHIEVEMENTS.map((a) => a.id);
       expect(new Set(ids).size).toBe(ids.length);
     });

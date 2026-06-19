@@ -72,7 +72,9 @@ if (process.env.REDIS_ADAPTER_URL || process.env.REDIS_URL) {
 }
 
 // -- Seed achievements on startup -----------------------------------------------
-achievementService.seedAchievements().catch(() => {});
+achievementService.seedAchievements().catch((err) => {
+  console.error("seedAchievements failed:", err.message);
+});
 
 // -- REST: GET /api/health --------------------------------------------------------
 app.get("/api/health", async (req, res) => {
@@ -81,6 +83,8 @@ app.get("/api/health", async (req, res) => {
     const redis = require("./redisClient");
     await redis.ping();
   } catch (_) {
+    // Redis down is expected/reportable, not exceptional — surfaced via the
+    // redisStatus field below rather than logged on every health check poll.
     redisStatus = "unavailable";
   }
   res.json({
@@ -107,6 +111,7 @@ app.get("/api/stats", async (req, res) => {
     }
     res.json({ activeRooms, activePlayers, gamesInProgress });
   } catch (err) {
+    console.error("GET /api/stats error:", err.message);
     res.status(500).json({ error: "stats unavailable" });
   }
 });
@@ -118,6 +123,7 @@ app.get("/api/leaderboard", async (req, res) => {
     const board = await statsService.getWeeklyLeaderboard(limit);
     res.json({ leaderboard: board || [] });
   } catch (err) {
+    console.error("GET /api/leaderboard error:", err.message);
     res.status(500).json({ error: "leaderboard unavailable", leaderboard: [] });
   }
 });
@@ -145,6 +151,7 @@ app.get("/api/player/:deviceId/stats", async (req, res) => {
     if (!stats) return res.status(404).json({ error: "Player not found" });
     res.json(stats);
   } catch (err) {
+    console.error(`GET /api/player/${req.params.deviceId}/stats error:`, err.message);
     res.status(500).json({ error: "unavailable" });
   }
 });

@@ -19,6 +19,7 @@ jest.mock("../../services/botService", () => ({
 jest.mock("../../db/userService", () => ({
   awardXp: jest.fn(() => Promise.resolve(null)),
   getProfile: jest.fn(() => Promise.resolve(null)),
+  updateConsecutiveGameWins: jest.fn(() => Promise.resolve(0)),
 }));
 jest.mock("../../db/statsService", () => ({
   writeSessionStat: jest.fn(() => Promise.resolve(null)),
@@ -309,6 +310,9 @@ describe("game socket handler", () => {
             points: { p1: 0, p2: 0, p3: 0 },
             winHistory: {},
             exactMatchHistory: {},
+            consecWinHistory: {},
+            maxConsecWinHistory: {},
+            wasLastPlaceSet: {},
           },
         }, overrides);
       }
@@ -652,6 +656,9 @@ describe("game socket handler", () => {
           points: { p1: 0, p2: 0, p3: 0 },
           winHistory: {},
           exactMatchHistory: {},
+          consecWinHistory: {},
+          maxConsecWinHistory: {},
+          wasLastPlaceSet: {},
         },
       };
       roomManager.getRoomById.mockResolvedValue(room);
@@ -709,6 +716,9 @@ describe("game socket handler", () => {
           points: { p1: 0, p2: 0, p3: 0 },
           winHistory: {},
           exactMatchHistory: {},
+          consecWinHistory: {},
+          maxConsecWinHistory: {},
+          wasLastPlaceSet: {},
         },
       }, overrides);
     }
@@ -870,6 +880,9 @@ describe("game socket handler", () => {
         points: {},
         winHistory: {},
         exactMatchHistory: {},
+        consecWinHistory: {},
+        maxConsecWinHistory: {},
+        wasLastPlaceSet: {},
       };
       roomManager.getRoomById.mockResolvedValue(room);
       gameManager.evaluateRound.mockReturnValue({
@@ -965,6 +978,9 @@ describe("game socket handler", () => {
         points: {},
         winHistory: {},
         exactMatchHistory: {},
+        consecWinHistory: {},
+        maxConsecWinHistory: {},
+        wasLastPlaceSet: {},
       };
       roomManager.getRoomById.mockResolvedValue(room);
       gameManager.evaluateRound.mockReturnValue({

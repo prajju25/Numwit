@@ -16,7 +16,6 @@ jest.mock("../../contexts/GameContext", () => ({
   useGame: jest.fn(),
 }));
 jest.mock("../SessionStats", () => () => <div data-testid="session-stats" />);
-jest.mock("../ShareResults", () => () => <div data-testid="share-results" />);
 jest.mock("../LevelBadge", () => (props) => <div data-testid="level-badge">{props.level}</div>);
 
 const players = [
@@ -131,11 +130,10 @@ describe("GameOverScreen", () => {
     expect(screen.getByText(/Waiting for host to start a new game/)).toBeInTheDocument();
   });
 
-  test("renders SessionStats and ShareResults", () => {
+  test("renders SessionStats", () => {
     useUser.mockReturnValue({ roomId: "room1", user: { socketId: "p0" } });
     render(<GameOverScreen data={{ winnerSocketId: "p0", points: {} }} players={players} />);
 
     expect(screen.getByTestId("session-stats")).toBeInTheDocument();
-    expect(screen.getByTestId("share-results")).toBeInTheDocument();
   });
 });

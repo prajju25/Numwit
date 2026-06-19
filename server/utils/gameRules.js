@@ -8,7 +8,7 @@
  */
 
 // ── Tuneable config ────────────────────────────────────────────────────────────
-var RULES = {
+const RULES = {
   TARGET_MULTIPLIER: 0.8,          // target = average * TARGET_MULTIPLIER
   MIN_NUMBER: 0,
   MAX_NUMBER: 100,
@@ -36,13 +36,13 @@ function applyDuplicateRule(submissions, activePlayerCount) {
   }
 
   // Count how many times each number was submitted
-  var freq = {};
+  const freq = {};
   submissions.forEach(function(s) {
     freq[s.number] = (freq[s.number] || 0) + 1;
   });
 
-  var valid = [];
-  var invalid = [];
+  const valid = [];
+  const invalid = [];
   submissions.forEach(function(s) {
     if (freq[s.number] === 1) {
       valid.push(s);
@@ -88,9 +88,9 @@ function isRoundVoid(validSubmissions, allSubmissions, activePlayerCount) {
 function applyTwoPlayerCycle(submissions) {
   if (submissions.length !== 2) return null;
 
-  var n0 = submissions[0].number;
-  var n1 = submissions[1].number;
-  var cycleNumbers = Object.keys(RULES.TWO_PLAYER_CYCLE).map(Number);
+  const n0 = submissions[0].number;
+  const n1 = submissions[1].number;
+  const cycleNumbers = Object.keys(RULES.TWO_PLAYER_CYCLE).map(Number);
 
   // Both must be in the cycle set
   if (cycleNumbers.indexOf(n0) === -1 || cycleNumbers.indexOf(n1) === -1) return null;
@@ -113,9 +113,9 @@ function applyTwoPlayerCycle(submissions) {
 function findWinners(validSubmissions, target) {
   if (validSubmissions.length === 0) return [];
 
-  var minDiff = Infinity;
+  let minDiff = Infinity;
   validSubmissions.forEach(function(s) {
-    var diff = Math.abs(s.number - target);
+    const diff = Math.abs(s.number - target);
     if (diff < minDiff) minDiff = diff;
   });
 
@@ -131,7 +131,7 @@ function findWinners(validSubmissions, target) {
  * Uses a small epsilon for floating-point safety.
  */
 function hasExactMatch(validSubmissions, target, winnerIds) {
-  var EPSILON = 0.0001;
+  const EPSILON = 0.0001;
   return validSubmissions.some(function(s) {
     return winnerIds.indexOf(s.socketId) !== -1 &&
            Math.abs(s.number - target) < EPSILON;
@@ -152,9 +152,9 @@ function hasExactMatch(validSubmissions, target, winnerIds) {
  */
 // eliminationThreshold: optional override (default: RULES.ELIMINATION_THRESHOLD)
 function computePenalties(allPlayerIds, winnerIds, exactMatch, currentPoints, eliminatedPlayers, eliminationThreshold) {
-  var threshold = (eliminationThreshold != null) ? eliminationThreshold : RULES.ELIMINATION_THRESHOLD;
-  var penalty = exactMatch ? RULES.EXACT_MATCH_PENALTY : RULES.NORMAL_PENALTY;
-  var updatedPoints = Object.assign({}, currentPoints);
+  const threshold = (eliminationThreshold != null) ? eliminationThreshold : RULES.ELIMINATION_THRESHOLD;
+  const penalty = exactMatch ? RULES.EXACT_MATCH_PENALTY : RULES.NORMAL_PENALTY;
+  const updatedPoints = Object.assign({}, currentPoints);
 
   allPlayerIds.forEach(function(id) {
     if (eliminatedPlayers.indexOf(id) !== -1) return; // skip already eliminated
@@ -162,8 +162,8 @@ function computePenalties(allPlayerIds, winnerIds, exactMatch, currentPoints, el
     updatedPoints[id] = (updatedPoints[id] || 0) + penalty;
   });
 
-  var newlyEliminated = [];
-  var newEliminatedList = eliminatedPlayers.slice();
+  const newlyEliminated = [];
+  const newEliminatedList = eliminatedPlayers.slice();
   allPlayerIds.forEach(function(id) {
     if (newEliminatedList.indexOf(id) !== -1) return;
     if ((updatedPoints[id] || 0) >= threshold) {

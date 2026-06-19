@@ -48,8 +48,8 @@ describe("GameSettingsPanel", () => {
   test("clicking a multiplier option calls onChange with updated multiplier", () => {
     const onChange = jest.fn();
     render(<GameSettingsPanel settings={baseSettings()} onChange={onChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "100%" }));
-    expect(onChange).toHaveBeenCalledWith({ ...baseSettings(), targetMultiplier: 1.0 });
+    fireEvent.click(screen.getByRole("button", { name: "90%" }));
+    expect(onChange).toHaveBeenCalledWith({ ...baseSettings(), targetMultiplier: 0.9 });
   });
 
   test("toggling the duplicate rule calls onChange with the new boolean", () => {

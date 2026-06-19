@@ -9,10 +9,10 @@
 // values on the instance returned from createClient().
 
 function createFakeClient() {
-  var store = new Map();
-  var sets = new Map();
+  const store = new Map();
+  const sets = new Map();
 
-  var client = {
+  const client = {
     connect: jest.fn().mockResolvedValue(undefined),
     quit: jest.fn().mockResolvedValue(undefined),
     disconnect: jest.fn().mockResolvedValue(undefined),
@@ -26,12 +26,12 @@ function createFakeClient() {
       return Promise.resolve("OK");
     }),
     del: jest.fn(function(key) {
-      var existed = store.delete(key);
+      const existed = store.delete(key);
       return Promise.resolve(existed ? 1 : 0);
     }),
     keys: jest.fn(function(pattern) {
-      var prefix = String(pattern || "").replace(/\*$/, "");
-      var matches = [];
+      const prefix = String(pattern || "").replace(/\*$/, "");
+      const matches = [];
       store.forEach(function(_v, k) {
         if (k.indexOf(prefix) === 0) matches.push(k);
       });

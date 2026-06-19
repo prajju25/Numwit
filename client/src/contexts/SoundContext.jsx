@@ -14,7 +14,13 @@ export const SoundProvider = ({ children }) => {
 
   useEffect(() => {
     soundManager.setMuted(muted);
-    try { localStorage.setItem(STORAGE_KEY, String(muted)); } catch (_) {}
+    try {
+      localStorage.setItem(STORAGE_KEY, String(muted));
+    } catch (err) {
+      // Storage full or unavailable (e.g. private browsing) — the mute
+      // preference just won't persist across reloads; not user-facing.
+      console.warn("Failed to persist sound preference:", err.message);
+    }
   }, [muted]);
 
   useEffect(() => {

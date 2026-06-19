@@ -51,7 +51,7 @@ async function addUserToRoom(roomId, user, roomType, isCreator) {
   // socket.id after a page refresh. If the stale entry was the host,
   // transfer host status to the new connection.
   room.users = room.users.filter(function(u) {
-    var isStale = u.socketId === user.socketId ||
+    const isStale = u.socketId === user.socketId ||
       (user.deviceId && u.deviceId === user.deviceId);
     if (isStale && room.hostSocketId === u.socketId) {
       room.hostSocketId = user.socketId;
@@ -79,12 +79,12 @@ async function addUserToRoom(roomId, user, roomType, isCreator) {
 async function removeUserFromRoom(socketId) {
   const keys = await redis.keys(ROOM_PREFIX + "*");
 
-  for (var i = 0; i < keys.length; i++) {
-    var key = keys[i];
-    var raw = await redis.get(key);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const raw = await redis.get(key);
     if (!raw) continue;
-    var room = JSON.parse(raw);
-    var updatedUsers = room.users.filter(function(u) { return u.socketId !== socketId; });
+    const room = JSON.parse(raw);
+    const updatedUsers = room.users.filter(function(u) { return u.socketId !== socketId; });
 
     if (updatedUsers.length === room.users.length) continue; // not in this room
 
@@ -119,14 +119,14 @@ async function removeUserFromRoom(socketId) {
 async function getPublicRooms() {
   const roomIds = await redis.sMembers(PUBLIC_ROOMS_SET);
 
-  for (var i = 0; i < roomIds.length; i++) {
-    var roomData = await redis.get(getRoomKey(roomIds[i]));
+  for (let i = 0; i < roomIds.length; i++) {
+    const roomData = await redis.get(getRoomKey(roomIds[i]));
     if (!roomData) {
       // Stale entry — clean up SET
       await redis.sRem(PUBLIC_ROOMS_SET, roomIds[i]);
       continue;
     }
-    var room = JSON.parse(roomData);
+    const room = JSON.parse(roomData);
     if (room.type === "public" && room.users.length < MAX_PLAYERS && !room.game) {
       return room;
     }
@@ -138,10 +138,10 @@ async function getPublicRooms() {
 async function getRoomsByType(roomType) {
   const keys = await redis.keys(ROOM_PREFIX + "*");
   const rooms = [];
-  for (var i = 0; i < keys.length; i++) {
-    var roomData = await redis.get(keys[i]);
+  for (let i = 0; i < keys.length; i++) {
+    const roomData = await redis.get(keys[i]);
     if (!roomData) continue;
-    var room = JSON.parse(roomData);
+    const room = JSON.parse(roomData);
     if (room.type === roomType) rooms.push(room);
   }
   return rooms;
@@ -165,12 +165,12 @@ async function getRoomCounts() {
     },
   };
 
-  for (var i = 0; i < keys.length; i++) {
-    var raw = await redis.get(keys[i]);
+  for (let i = 0; i < keys.length; i++) {
+    const raw = await redis.get(keys[i]);
     if (!raw) continue;
-    var room = JSON.parse(raw);
-    var type = room.type || "public";
-    var playerCount = (room.users || []).length;
+    const room = JSON.parse(raw);
+    const type = room.type || "public";
+    const playerCount = (room.users || []).length;
 
     counts.totalRooms++;
     counts.totalPlayers += playerCount;
@@ -193,11 +193,11 @@ async function getActiveRooms() {
   const keys = await redis.keys(ROOM_PREFIX + "*");
   const rooms = [];
 
-  for (var i = 0; i < keys.length; i++) {
-    var raw = await redis.get(keys[i]);
+  for (let i = 0; i < keys.length; i++) {
+    const raw = await redis.get(keys[i]);
     if (!raw) continue;
-    var room = JSON.parse(raw);
-    var users = room.users || [];
+    const room = JSON.parse(raw);
+    const users = room.users || [];
 
     rooms.push({
       id: room.id,
@@ -223,12 +223,12 @@ async function getActiveRooms() {
 
 // ── getRoom / getRoomById ──────────────────────────────────────────────────────
 async function getRoom(roomId) {
-  var roomData = await redis.get(getRoomKey(roomId));
+  const roomData = await redis.get(getRoomKey(roomId));
   return roomData ? JSON.parse(roomData) : null;
 }
 
 async function getRoomById(roomId) {
-  var roomData = await redis.get(getRoomKey(roomId));
+  const roomData = await redis.get(getRoomKey(roomId));
   return roomData ? JSON.parse(roomData) : null;
 }
 

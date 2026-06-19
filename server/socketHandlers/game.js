@@ -1,41 +1,41 @@
-var gameManager = require("../utils/gameManager");
-var createGameData = gameManager.createGameData;
-var evaluateRound = gameManager.evaluateRound;
-var sanitizeSettings = gameManager.sanitizeSettings;
-var roomManager = require("../utils/roomManager");
-var getRoomById = roomManager.getRoomById;
-var saveRoom = roomManager.saveRoom;
-var removeFromPublicSet = roomManager.removeFromPublicSet;
-var deleteRoom = roomManager.deleteRoom;
-var NUMWIT_GAME_STATUS = require("../constants/constants").NUMWIT_GAME_STATUS;
-var timerService = require("../services/timerService");
-var botService = require("../services/botService");
-var roomCleanup = require("../services/roomCleanup");
+const gameManager = require("../utils/gameManager");
+const createGameData = gameManager.createGameData;
+const evaluateRound = gameManager.evaluateRound;
+const sanitizeSettings = gameManager.sanitizeSettings;
+const roomManager = require("../utils/roomManager");
+const getRoomById = roomManager.getRoomById;
+const saveRoom = roomManager.saveRoom;
+const removeFromPublicSet = roomManager.removeFromPublicSet;
+const deleteRoom = roomManager.deleteRoom;
+const NUMWIT_GAME_STATUS = require("../constants/constants").NUMWIT_GAME_STATUS;
+const timerService = require("../services/timerService");
+const botService = require("../services/botService");
+const roomCleanup = require("../services/roomCleanup");
 
 // Phase 4: DB services (all wrapped with graceful fallback)
-var userService = require("../db/userService");
-var statsService = require("../db/statsService");
-var achievementService = require("../db/achievementService");
+const userService = require("../db/userService");
+const statsService = require("../db/statsService");
+const achievementService = require("../db/achievementService");
 
 // Pause after a round_result is broadcast, before the next round begins.
 // Gives players time to read the result overlay and see the "next round
 // starting in..." countdown (was 5000ms, then 7000ms).
-var ROUND_RESULT_DELAY_MS = 10000;
+const ROUND_RESULT_DELAY_MS = 10000;
 
 // Tracks the pending "advance to next round" setTimeout per room (keyed by
 // roomId), scheduled by scheduleRoundAdvance after a round_result is
 // broadcast. Lets skip_round_result and restart_game cancel/short-circuit it.
-var pendingRoundAdvance = {};
+const pendingRoundAdvance = {};
 
 module.exports = function handleGameEvents(io, socket) {
 
   // ── start_game ──────────────────────────────────────────────────────────────
   socket.on("start_game", async function(data) {
-    var roomId = data.roomId;
-    var settings = data.settings || {};
+    const roomId = data.roomId;
+    const settings = data.settings || {};
     console.debug('Socket: "start_game" Room=' + roomId);
 
-    var room = await getRoomById(roomId);
+    const room = await getRoomById(roomId);
     if (!room) return;
 
     if (room.hostSocketId && room.hostSocketId !== socket.id) {
@@ -47,30 +47,30 @@ module.exports = function handleGameEvents(io, socket) {
 
   // ── send_number ─────────────────────────────────────────────────────────────
   socket.on("send_number", async function(data) {
-    var roomId = data.roomId;
-    var user   = data.user;
-    var no     = data.no;
+    const roomId = data.roomId;
+    const user   = data.user;
+    const no     = data.no;
     console.debug('Socket: "send_number" Room=' + roomId + ' User=' + (user && user.name) + ' No=' + no);
 
-    var number = Math.max(0, Math.min(100, Math.round(Number(no))));
+    const number = Math.max(0, Math.min(100, Math.round(Number(no))));
     if (isNaN(number)) {
       return socket.emit("invalid_number", { message: "Number must be 0-100" });
     }
 
-    var room = await getRoomById(roomId);
+    const room = await getRoomById(roomId);
     if (!room) return socket.emit("not_in_room");
 
-    var game = room.game;
+    const game = room.game;
     if (!game) return socket.emit("not_in_room");
 
-    var isInRoom = room.users.some(function(u) { return u.socketId === socket.id; });
+    const isInRoom = room.users.some(function(u) { return u.socketId === socket.id; });
     if (!isInRoom) return socket.emit("not_in_room");
 
     // Mid-game joiners are in pendingJoiners, not yet in turnOrder — they cannot submit.
-    var isInTurnOrder = game.turnOrder.indexOf(socket.id) !== -1;
+    const isInTurnOrder = game.turnOrder.indexOf(socket.id) !== -1;
     if (!isInTurnOrder) return;
 
-    var isEliminated = game.eliminatedPlayers.indexOf(socket.id) !== -1;
+    const isEliminated = game.eliminatedPlayers.indexOf(socket.id) !== -1;
     if (isEliminated) return;
 
     if (game.numbers[socket.id] !== undefined) {
@@ -86,10 +86,10 @@ module.exports = function handleGameEvents(io, socket) {
 
   // ── restart_game ────────────────────────────────────────────────────────────
   socket.on("restart_game", async function(data) {
-    var roomId = data.roomId;
+    const roomId = data.roomId;
     console.debug('Socket: "restart_game" Room=' + roomId);
 
-    var room = await getRoomById(roomId);
+    const room = await getRoomById(roomId);
     if (!room) return;
 
     if (room.hostSocketId && room.hostSocketId !== socket.id) {
@@ -129,7 +129,7 @@ module.exports = function handleGameEvents(io, socket) {
   // Lets a player dismiss the round-result overlay early and start the next
   // round immediately, instead of waiting out the full ROUND_RESULT_DELAY_MS.
   socket.on("skip_round_result", async function(data) {
-    var roomId = data.roomId;
+    const roomId = data.roomId;
     console.debug('Socket: "skip_round_result" Room=' + roomId);
 
     // No-op if there's nothing pending (e.g. round already advanced, or this
@@ -148,7 +148,7 @@ module.exports = function handleGameEvents(io, socket) {
 // brand-new public room has been padded with bots and there's no human host
 // action to wait for). Behavior is identical either way.
 async function startGameForRoom(io, roomId, settings) {
-  var room = await getRoomById(roomId);
+  const room = await getRoomById(roomId);
   if (!room) return;
 
   // Game is starting — cancel any pending idle-delete timer
@@ -157,10 +157,10 @@ async function startGameForRoom(io, roomId, settings) {
   await removeFromPublicSet(roomId);
   io.to(roomId).emit("game_started");
 
-  var gameData = await createGameData(room, sanitizeSettings(settings));
+  const gameData = await createGameData(room, sanitizeSettings(settings));
   if (!gameData) return;
 
-  var timerDuration = (gameData.settings && gameData.settings.timerDuration) || 30;
+  const timerDuration = (gameData.settings && gameData.settings.timerDuration) || 30;
   // Small delay so client has time to mount NumwitRuleProvider before next_round arrives
   setTimeout(function() {
     io.to(roomId).emit("next_round", {
@@ -185,14 +185,14 @@ async function startGameForRoom(io, roomId, settings) {
 // the room/game exist, socketId is in turnOrder, not eliminated, hasn't
 // already submitted this round, and the round isn't already COMPLETED.
 async function submitNumber(io, room, socketId, number) {
-  var roomId = room.id;
-  var game = room.game;
+  const roomId = room.id;
+  const game = room.game;
   if (!game) return;
 
   game.numbers[socketId] = number;
   game.submittedCount = (game.submittedCount || 0) + 1;
 
-  var activePlayers = room.users.filter(function(u) {
+  const activePlayers = room.users.filter(function(u) {
     return game.eliminatedPlayers.indexOf(u.socketId) === -1
       && game.turnOrder.indexOf(u.socketId) !== -1;
   });
@@ -217,9 +217,9 @@ async function submitNumber(io, room, socketId, number) {
 // happened may be stale) and re-validates before submitting, mirroring the
 // guards in the send_number handler.
 async function submitBotNumber(io, roomId, botSocketId, number) {
-  var room = await getRoomById(roomId);
+  const room = await getRoomById(roomId);
   if (!room || !room.game) return;
-  var game = room.game;
+  const game = room.game;
 
   if (game.turnOrder.indexOf(botSocketId) === -1) return;
   if (game.eliminatedPlayers.indexOf(botSocketId) !== -1) return;
@@ -231,10 +231,10 @@ async function submitBotNumber(io, roomId, botSocketId, number) {
 
 // ── resolveRound ─────────────────────────────────────────────────────────────
 async function resolveRound(io, room, activePlayers) {
-  var roomId = room.id;
-  var game   = room.game;
+  const roomId = room.id;
+  const game   = room.game;
 
-  var result = evaluateRound(game, activePlayers);
+  const result = evaluateRound(game, activePlayers);
 
   if (result.roundVoid) {
     game.numbers      = {};
@@ -246,7 +246,7 @@ async function resolveRound(io, room, activePlayers) {
       reason:      result.reason,
       submissions: result.submissions,
     });
-    var voidTimer = (game.settings && game.settings.timerDuration) || 30;
+    const voidTimer = (game.settings && game.settings.timerDuration) || 30;
     timerService.startTimer(io, roomId, room, voidTimer, handleTimerExpiry);
     botService.scheduleBotSubmissions(roomId, game, function(botSocketId, number) {
       submitBotNumber(io, roomId, botSocketId, number);
@@ -284,7 +284,7 @@ async function resolveRound(io, room, activePlayers) {
 
   // Track last-place (player(s) with the highest penalty count this round)
   if (activePlayers.length > 1) {
-    var maxPenalty = Math.max.apply(null, activePlayers.map(function(u) {
+    const maxPenalty = Math.max.apply(null, activePlayers.map(function(u) {
       return result.points[u.socketId] || 0;
     }));
     activePlayers.forEach(function(u) {
@@ -316,13 +316,13 @@ async function resolveRound(io, room, activePlayers) {
     io.to(roomId).emit("player_eliminated", { socketId: socketId });
   });
 
-  var remainingPlayers = activePlayers.filter(function(u) {
+  const remainingPlayers = activePlayers.filter(function(u) {
     return result.updatedGame.eliminatedPlayers.indexOf(u.socketId) === -1;
   });
 
   if (remainingPlayers.length <= 1) {
-    var winnerPlayer = remainingPlayers[0] || null;
-    var gameOverData = {
+    const winnerPlayer = remainingPlayers[0] || null;
+    const gameOverData = {
       winnerSocketId: winnerPlayer ? winnerPlayer.socketId : null,
       points:         result.points,
       reason:         "elimination",
@@ -384,9 +384,9 @@ async function advanceToNextRound(io, roomId) {
 
   // Re-fetch from Redis to guard against restart_game firing in the meantime —
   // it nulls game on a freshly-fetched room object.
-  var room = await getRoomById(roomId);
+  const room = await getRoomById(roomId);
   if (!room || !room.game) return;
-  var game = room.game;
+  const game = room.game;
 
   game.round       += 1;
   game.numbers      = {};
@@ -398,7 +398,7 @@ async function advanceToNextRound(io, roomId) {
   game.winnerSocketId = null;
 
   // Promote any mid-game joiners into the active turn order for this round.
-  var pending = game.pendingJoiners || [];
+  const pending = game.pendingJoiners || [];
   pending.forEach(function(id) {
     if (game.turnOrder.indexOf(id) === -1) {
       game.turnOrder.push(id);
@@ -411,7 +411,7 @@ async function advanceToNextRound(io, roomId) {
 
   await saveRoom(room);
 
-  var nextTimer = (game.settings && game.settings.timerDuration) || 30;
+  const nextTimer = (game.settings && game.settings.timerDuration) || 30;
   io.to(roomId).emit("next_round", {
     round:             game.round,
     points:            game.points,
@@ -430,22 +430,22 @@ async function advanceToNextRound(io, roomId) {
 // ── persistGameOver ───────────────────────────────────────────────────────────
 // Writes session stats, awards XP, checks achievements, emits unlocked ones.
 async function persistGameOver(io, room, game, activePlayers, winnerPlayer, lastResult) {
-  var roomId = room.id;
+  const roomId = room.id;
   // isDuel = exactly 2 human (non-bot) players
-  var humanPlayers = activePlayers.filter(function(u) { return !u.isBot; });
-  var isDuel = humanPlayers.length === 2;
+  const humanPlayers = activePlayers.filter(function(u) { return !u.isBot; });
+  const isDuel = humanPlayers.length === 2;
 
   // Build per-player stats from game state
-  for (var i = 0; i < room.users.length; i++) {
-    var u = room.users[i];
-    var deviceId = u.deviceId;
+  for (let i = 0; i < room.users.length; i++) {
+    const u = room.users[i];
+    const deviceId = u.deviceId;
     if (!deviceId) continue;   // skip users without device identity (includes all bots)
 
-    var mySocketId = u.socketId;
-    var survived   = winnerPlayer && winnerPlayer.socketId === mySocketId;
-    var myPoints   = (game.points && game.points[mySocketId]) || 0;
+    const mySocketId = u.socketId;
+    const survived   = winnerPlayer && winnerPlayer.socketId === mySocketId;
+    const myPoints   = (game.points && game.points[mySocketId]) || 0;
 
-    var sessionStats = {
+    const sessionStats = {
       rounds:             game.round,
       wins:               (game.winHistory && game.winHistory[mySocketId]) || 0,
       penalties:          myPoints,
@@ -463,21 +463,21 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer, last
     statsService.writeSessionStat(deviceId, sessionStats).catch(() => {});
 
     // Update consecutive game-win streak (must await — we need the result for achievement check)
-    var newStreak = await userService.updateConsecutiveGameWins(deviceId, survived).catch(function() { return 0; });
+    const newStreak = await userService.updateConsecutiveGameWins(deviceId, survived).catch(function() { return 0; });
 
     // Award XP
-    var xpResult = await userService.awardXp(deviceId, sessionStats);
+    const xpResult = await userService.awardXp(deviceId, sessionStats);
 
     // Look up DB userId for achievements
-    var userRecord = await userService.getProfile(deviceId);
+    const userRecord = await userService.getProfile(deviceId);
     if (!userRecord) continue;
 
     // Fetch all-time stats (includes duelWins, soloWins from the new DB fields)
-    var allTimeStats = await statsService.getPlayerStats(deviceId).catch(function() { return null; });
+    const allTimeStats = await statsService.getPlayerStats(deviceId).catch(function() { return null; });
     // Override consecutiveGameWins with the freshly updated value
     if (allTimeStats) allTimeStats.consecutiveGameWins = newStreak;
 
-    var sessionDataForAchievements = {
+    const sessionDataForAchievements = {
       wins:               sessionStats.wins,
       exactMatches:       sessionStats.exactMatches,
       penalties:          sessionStats.penalties,
@@ -491,14 +491,14 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer, last
       wasLastPlace:       sessionStats.wasLastPlace,
     };
 
-    var newAchievements = await achievementService.checkAndAward(
+    const newAchievements = await achievementService.checkAndAward(
       userRecord.id,
       sessionDataForAchievements,
       allTimeStats
     );
 
     // Resolve the target socket once — used for both achievements and XP below
-    var targetSocket = io.sockets.sockets.get(mySocketId) || null;
+    const targetSocket = io.sockets.sockets.get(mySocketId) || null;
 
     // Emit achievement unlocks to the specific player
     newAchievements.forEach(function(ach) {
@@ -526,15 +526,15 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer, last
 
 // ── handleTimerExpiry ────────────────────────────────────────────────────────
 async function handleTimerExpiry(io, roomId) {
-  var room = await getRoomById(roomId);
+  const room = await getRoomById(roomId);
   if (!room || !room.game) return;
 
-  var game = room.game;
+  const game = room.game;
   if (game.status === NUMWIT_GAME_STATUS.COMPLETED) return;
 
   console.debug("Timer expired for room " + roomId + " round " + game.round);
   io.to(roomId).emit("timer_expired", { roomId: roomId, round: game.round });
-  var activePlayers = room.users.filter(function(u) {
+  const activePlayers = room.users.filter(function(u) {
     return game.eliminatedPlayers.indexOf(u.socketId) === -1
       && game.turnOrder.indexOf(u.socketId) !== -1;
   });

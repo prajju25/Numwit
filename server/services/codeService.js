@@ -3,17 +3,17 @@
 // Codes are created when a private room is created and expire with the room.
 // Storage: in-memory Map (good enough for single-node; swap for Redis in Phase 4).
 
-var CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
-var CODE_LENGTH = 6;
+const CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
+const CODE_LENGTH = 6;
 
 // code → roomId
-var codeToRoom = new Map();
+const codeToRoom = new Map();
 // roomId → code  (reverse lookup for deduplication)
-var roomToCode = new Map();
+const roomToCode = new Map();
 
 function generateCode() {
-  var code = "";
-  for (var i = 0; i < CODE_LENGTH; i++) {
+  let code = "";
+  for (let i = 0; i < CODE_LENGTH; i++) {
     code += CHARS[Math.floor(Math.random() * CHARS.length)];
   }
   return code;
@@ -29,7 +29,7 @@ function getOrCreateCode(roomId) {
     return roomToCode.get(roomId);
   }
 
-  var code;
+  let code;
   do { code = generateCode(); } while (codeToRoom.has(code));
 
   codeToRoom.set(code, roomId);
@@ -51,7 +51,7 @@ function resolveCode(code) {
  * @param {string} roomId
  */
 function removeRoom(roomId) {
-  var code = roomToCode.get(roomId);
+  const code = roomToCode.get(roomId);
   if (code) {
     codeToRoom.delete(code);
     roomToCode.delete(roomId);

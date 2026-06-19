@@ -26,6 +26,7 @@ router.get("/stats", async (req, res) => {
     ]);
     res.json({ rooms, feedback, users: { total: totalUsers } });
   } catch (err) {
+    console.error("GET /api/admin/stats error:", err.message);
     res.status(500).json({ error: "stats unavailable" });
   }
 });
@@ -38,6 +39,7 @@ router.get("/rooms", async (req, res) => {
     const rooms = await roomManager.getActiveRooms();
     res.json({ rooms });
   } catch (err) {
+    console.error("GET /api/admin/rooms error:", err.message);
     res.status(500).json({ error: "rooms unavailable" });
   }
 });
@@ -58,6 +60,7 @@ router.get("/feedback", async (req, res) => {
 
     res.json({ feedback: items });
   } catch (err) {
+    console.error("GET /api/admin/feedback error:", err.message);
     res.status(500).json({ error: "feedback unavailable" });
   }
 });
@@ -74,6 +77,7 @@ router.delete("/rooms/:id", async (req, res) => {
     await roomManager.deleteRoom(roomId);
     res.json({ ok: true, deleted: roomId });
   } catch (err) {
+    console.error(`DELETE /api/admin/rooms/${roomId} error:`, err.message);
     res.status(500).json({ error: "delete failed" });
   }
 });
@@ -86,6 +90,7 @@ router.get("/leaderboard", async (req, res) => {
     const board = await statsService.getWeeklyLeaderboard(limit);
     res.json({ leaderboard: board || [] });
   } catch (err) {
+    console.error("GET /api/admin/leaderboard error:", err.message);
     res.status(500).json({ error: "leaderboard unavailable", leaderboard: [] });
   }
 });
@@ -104,6 +109,7 @@ router.patch("/feedback/:id", async (req, res) => {
     if (!updated) return res.status(404).json({ error: "Feedback not found" });
     res.json(updated);
   } catch (err) {
+    console.error(`PATCH /api/admin/feedback/${req.params.id} error:`, err.message);
     res.status(500).json({ error: "update failed" });
   }
 });

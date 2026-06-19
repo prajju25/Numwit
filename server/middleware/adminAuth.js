@@ -13,6 +13,9 @@ function parseBasicAuth(header) {
   try {
     decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
   } catch (_) {
+    // Malformed base64 in the Authorization header — treat as unauthenticated,
+    // same as a missing/garbled header. Not logged: this fires on every
+    // malformed request attempt and carries no diagnostic value.
     return null;
   }
   const sepIndex = decoded.indexOf(":");

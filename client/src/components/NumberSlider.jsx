@@ -6,10 +6,10 @@ import { twMerge } from "tailwind-merge";
  * NumberSlider — mobile-optimised number picker.
  *
  * Interaction model:
- *   1. User drags the range input to choose a value (pendingValue).
- *   2. Snap-to-5 toggle snaps to the nearest multiple of 5 (default: on).
- *   3. User taps "Lock In" to confirm — only then is onSelect() called.
- *   4. After locking, the component enters a locked/disabled visual state.
+ *   1. User drags the range input to choose a value (pendingValue), or
+ *      types a value directly into the numeric input (clamped to 0-100).
+ *   2. User taps "Lock In" to confirm — only then is onSelect() called.
+ *   3. After locking, the component enters a locked/disabled visual state.
  *
  * Props mirror NumberGrid exactly so GameBoard needs no logic changes:
  *   onSelect(number)   — called once when user confirms their pick
