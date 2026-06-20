@@ -50,12 +50,12 @@ function startTimer(io, roomId, room, durationSeconds, onExpire) {
     round,
   });
 
-  console.debug('timerService: started ' + durationSeconds + 's timer for room ' + roomId + ' round ' + round);
+  console.debug(`timerService: started ${durationSeconds}s timer for room ${roomId} round ${round}`);
 }
 
 function clearTick(roomId) {
   const entry = timers.get(roomId);
-  if (entry && entry.tickId) clearInterval(entry.tickId);
+  if (entry?.tickId) clearInterval(entry.tickId);
 }
 
 /**
@@ -67,7 +67,7 @@ function clearTimer(roomId) {
     clearTimeout(entry.timerId);
     clearInterval(entry.tickId);
     timers.delete(roomId);
-    console.debug('timerService: cleared timer for room ' + roomId);
+    console.debug(`timerService: cleared timer for room ${roomId}`);
   }
 }
 

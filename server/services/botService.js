@@ -36,7 +36,7 @@ const submissionTimers = new Map();
  * Generate a stable fake socketId for a bot.
  */
 function botId(roomId, index) {
-  return "bot-" + roomId + "-" + index;
+  return `bot-${roomId}-${index}`;
 }
 
 /**
@@ -138,7 +138,7 @@ function scheduleBotSubmissions(roomId, game, submitFn) {
   game.turnOrder.forEach(function(socketId) {
     if (!isBot(socketId)) return;
     if ((game.eliminatedPlayers || []).indexOf(socketId) !== -1) return;
-    if (game.numbers && game.numbers[socketId] !== undefined) return;
+    if (game.numbers?.[socketId] !== undefined) return;
 
     const delay = 1000 + Math.random() * 3000; // 1-4s
     const t = setTimeout(function() {

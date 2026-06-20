@@ -36,7 +36,7 @@ export default function TutorialOverlay({ dismissed, onDismiss }) {
   // fall back to local state when used standalone (e.g. tests)
   const [localDismissed, setLocalDismissed] = useState({});
 
-  const round = gameData && gameData.round;
+  const round = gameData?.round;
   const tip = TIPS[round];
 
   const isDismissed = dismissed ? dismissed[round] : localDismissed[round];

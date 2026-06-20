@@ -78,7 +78,7 @@ function AppInner() {
 
   useEffect(() => {
     const path = window.location.pathname.replace("/", "").trim();
-    if (path && path.length >= 6) {
+    if (path?.length >= 6) {
       setRoomType("private");
       setRoomId(path);
       setShowLanding(false); // direct room link → skip landing

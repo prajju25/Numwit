@@ -14,8 +14,8 @@ module.exports = function handleChatEvents(io, socket) {
 
   // ── room_chat ───────────────────────────────────────────────────────────────
   socket.on("room_chat", async function(data) {
-    const roomId = data && data.roomId;
-    let message = data && data.message;
+    const roomId = data?.roomId;
+    let message = data?.message;
 
     if (!roomId || !message) return;
 
@@ -46,7 +46,7 @@ module.exports = function handleChatEvents(io, socket) {
 
   // ── typing_start ────────────────────────────────────────────────────────────
   socket.on("typing_start", function(data) {
-    const roomId = data && data.roomId;
+    const roomId = data?.roomId;
     if (!roomId) return;
 
     // Debounce: only broadcast if not already throttled for this socket
@@ -65,7 +65,7 @@ module.exports = function handleChatEvents(io, socket) {
 
   // ── typing_stop ─────────────────────────────────────────────────────────────
   socket.on("typing_stop", function(data) {
-    const roomId = data && data.roomId;
+    const roomId = data?.roomId;
     if (!roomId) return;
     _clearTyping(io, socket, roomId);
   });

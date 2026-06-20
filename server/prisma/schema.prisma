@@ -23,6 +23,7 @@ model User {
   xp                  Int      @default(0)
   level               Int      @default(1)
   consecutiveGameWins Int      @default(0)  // current win streak (reset to 0 on loss)
+  bestStreak          Int      @default(0)  // highest consecutiveGameWins ever reached
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

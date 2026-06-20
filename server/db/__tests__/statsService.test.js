@@ -221,7 +221,7 @@ describe("statsService", () => {
 
     test("returns formatted aggregate stats with defaults for missing sums", async () => {
       db
-        .mockResolvedValueOnce({ id: 1, consecutiveGameWins: 2 }) // findUnique
+        .mockResolvedValueOnce({ id: 1, consecutiveGameWins: 2, bestStreak: 4 }) // findUnique
         .mockResolvedValueOnce({
           _count: { id: 7 },
           _sum: { rounds: 21, wins: 9, penalties: 4, exactMatches: 2 },
@@ -241,12 +241,13 @@ describe("statsService", () => {
         duelWins: 1,
         soloWins: 0,
         consecutiveGameWins: 2,
+        bestStreak: 4,
       });
     });
 
     test("defaults all aggregate fields to 0 when _sum/_count values are missing", async () => {
       db
-        .mockResolvedValueOnce({ id: 1 }) // findUnique, no consecutiveGameWins
+        .mockResolvedValueOnce({ id: 1 }) // findUnique, no consecutiveGameWins/bestStreak
         .mockResolvedValueOnce({ _count: { id: 0 }, _sum: {} }) // aggregate
         .mockResolvedValueOnce({ _count: { id: 0 } }) // survivedAgg
         .mockResolvedValueOnce({ _count: { id: 0 } }) // duelWonAgg
@@ -263,6 +264,7 @@ describe("statsService", () => {
         duelWins: 0,
         soloWins: 0,
         consecutiveGameWins: 0,
+        bestStreak: 0,
       });
     });
   });

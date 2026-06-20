@@ -17,7 +17,7 @@ function makeRes() {
 }
 
 function basicAuthHeader(username, password) {
-  return "Basic " + Buffer.from(username + ":" + password).toString("base64");
+  return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 }
 
 describe("adminAuth middleware", () => {

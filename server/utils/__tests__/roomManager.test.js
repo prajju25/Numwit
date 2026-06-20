@@ -127,7 +127,7 @@ describe("roomManager", () => {
     test("throws 'Room is full' when MAX_PLAYERS already reached", async () => {
       let room;
       for (let i = 0; i < 8; i++) {
-        room = await addUserToRoom("fullroom", { socketId: "s" + i, name: "P" + i }, "public", i === 0);
+        room = await addUserToRoom("fullroom", { socketId: `s${i}`, name: `P${i}` }, "public", i === 0);
       }
       await expect(
         addUserToRoom("fullroom", { socketId: "s8", name: "P8" }, "public")
@@ -142,7 +142,7 @@ describe("roomManager", () => {
 
     test("removes a public room from the set once it becomes full", async () => {
       for (let i = 0; i < 8; i++) {
-        await addUserToRoom("pub2", { socketId: "s" + i, name: "P" + i }, "public", i === 0);
+        await addUserToRoom("pub2", { socketId: `s${i}`, name: `P${i}` }, "public", i === 0);
       }
       const members = await redisClient.sMembers(PUBLIC_ROOMS_SET);
       expect(members).not.toContain("pub2");
@@ -177,7 +177,7 @@ describe("roomManager", () => {
       await addUserToRoom("room1", { socketId: "s1", name: "Alice" }, "public", true);
       // fill to MAX_PLAYERS so it's removed from the set
       for (let i = 2; i <= 8; i++) {
-        await addUserToRoom("room1", { socketId: "s" + i, name: "P" + i }, "public");
+        await addUserToRoom("room1", { socketId: `s${i}`, name: `P${i}` }, "public");
       }
       let members = await redisClient.sMembers(PUBLIC_ROOMS_SET);
       expect(members).not.toContain("room1");
@@ -229,7 +229,7 @@ describe("roomManager", () => {
     test("skips rooms that are full or have a game in progress", async () => {
       // Full room
       for (let i = 0; i < 8; i++) {
-        await addUserToRoom("pubFull", { socketId: "f" + i, name: "P" + i }, "public", i === 0);
+        await addUserToRoom("pubFull", { socketId: `f${i}`, name: `P${i}` }, "public", i === 0);
       }
       // manually re-add to set to simulate edge case, then ensure getPublicRooms skips it
       await redisClient.sAdd(PUBLIC_ROOMS_SET, "pubFull");

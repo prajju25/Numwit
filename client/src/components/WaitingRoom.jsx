@@ -24,13 +24,13 @@ export default function WaitingRoom() {
 
   const mySocketId = user?.socketId ?? socket.id;
   const isHost = hostSocketId && mySocketId === hostSocketId;
-  const canStart = players && players.length >= MIN_PLAYERS;
-  const remaining = MIN_PLAYERS - ((players && players.length) || 0);
+  const canStart = players?.length >= MIN_PLAYERS;
+  const remaining = MIN_PLAYERS - (players?.length || 0);
 
   const startGame = () => socket.emit("start_game", { roomId, settings });
 
   const handleInvite = () => {
-    navigator.clipboard.writeText(window.location.origin + "/" + roomId).then(() => {
+    navigator.clipboard.writeText(`${window.location.origin}/${roomId}`).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -69,7 +69,7 @@ export default function WaitingRoom() {
         <div>
           <p className="section-heading">Players in Room</p>
           <ul className="space-y-2">
-            {players && players.map((player) => {
+            {players?.map((player) => {
               const isPlayerHost = player.socketId === hostSocketId;
               return (
                 <li

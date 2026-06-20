@@ -8,6 +8,7 @@ const {
   awardXp,
   getProfile,
   getTotalUsers,
+  updateConsecutiveGameWins,
   xpToLevel,
   xpForNextLevel,
   XP_THRESHOLDS,
@@ -196,6 +197,70 @@ describe("userService", () => {
 
       const result = await getTotalUsers();
       expect(result).toBe(0);
+    });
+  });
+
+  describe("updateConsecutiveGameWins", () => {
+    test("returns 0 when the user cannot be resolved", async () => {
+      db.mockResolvedValueOnce(null); // findUnique -> null
+      const result = await updateConsecutiveGameWins("dev1", true);
+      expect(result).toBe(0);
+    });
+
+    test("increments the streak and raises bestStreak when survived=true and it's a new high", async () => {
+      const updateMock = jest.fn().mockResolvedValue({});
+      db
+        .mockResolvedValueOnce({ consecutiveGameWins: 4, bestStreak: 4 }) // findUnique
+        .mockImplementationOnce(async (fn) => fn({ user: { update: updateMock } }));
+
+      const result = await updateConsecutiveGameWins("dev1", true);
+      expect(result).toBe(5);
+      expect(updateMock).toHaveBeenCalledWith({
+        where: { deviceId: "dev1" },
+        data: { consecutiveGameWins: 5, bestStreak: 5 },
+      });
+    });
+
+    test("does not lower bestStreak when the current streak is below the existing best", async () => {
+      const updateMock = jest.fn().mockResolvedValue({});
+      db
+        .mockResolvedValueOnce({ consecutiveGameWins: 2, bestStreak: 7 }) // findUnique
+        .mockImplementationOnce(async (fn) => fn({ user: { update: updateMock } }));
+
+      const result = await updateConsecutiveGameWins("dev1", true);
+      expect(result).toBe(3);
+      expect(updateMock).toHaveBeenCalledWith({
+        where: { deviceId: "dev1" },
+        data: { consecutiveGameWins: 3, bestStreak: 7 },
+      });
+    });
+
+    test("resets the current streak to 0 on a loss without touching bestStreak", async () => {
+      const updateMock = jest.fn().mockResolvedValue({});
+      db
+        .mockResolvedValueOnce({ consecutiveGameWins: 6, bestStreak: 6 }) // findUnique
+        .mockImplementationOnce(async (fn) => fn({ user: { update: updateMock } }));
+
+      const result = await updateConsecutiveGameWins("dev1", false);
+      expect(result).toBe(0);
+      expect(updateMock).toHaveBeenCalledWith({
+        where: { deviceId: "dev1" },
+        data: { consecutiveGameWins: 0, bestStreak: 6 },
+      });
+    });
+
+    test("defaults missing consecutiveGameWins/bestStreak to 0", async () => {
+      const updateMock = jest.fn().mockResolvedValue({});
+      db
+        .mockResolvedValueOnce({}) // findUnique, no fields
+        .mockImplementationOnce(async (fn) => fn({ user: { update: updateMock } }));
+
+      const result = await updateConsecutiveGameWins("dev1", true);
+      expect(result).toBe(1);
+      expect(updateMock).toHaveBeenCalledWith({
+        where: { deviceId: "dev1" },
+        data: { consecutiveGameWins: 1, bestStreak: 1 },
+      });
     });
   });
 });

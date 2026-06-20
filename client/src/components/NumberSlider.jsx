@@ -75,7 +75,7 @@ export default function NumberSlider({ onSelect, disabled, selectedNumber }) {
             <div className="relative w-full h-2 rounded-full bg-gray-200 overflow-hidden">
               <div
                 className="absolute h-full bg-indigo-500 rounded-full transition-all duration-75"
-                style={{ width: pct + "%" }}
+                style={{ width: `${pct}%` }}
               />
             </div>
           </div>

@@ -3,7 +3,7 @@ jest.mock("../prismaClient", () => ({
 }));
 
 const { db } = require("../prismaClient");
-const { ACHIEVEMENTS, seedAchievements, checkAndAward } = require("../achievementService");
+const { ACHIEVEMENTS, seedAchievements, checkAndAward, getUnlocked } = require("../achievementService");
 
 describe("achievementService", () => {
   afterEach(() => {
@@ -24,6 +24,32 @@ describe("achievementService", () => {
         expect(a).toHaveProperty("icon");
         expect(a).toHaveProperty("description");
       });
+    });
+  });
+
+  describe("getUnlocked", () => {
+    test("returns a Set of unlocked achievement ids for a user", async () => {
+      db.mockImplementation(async (fn) => fn({
+        userAchievement: {
+          findMany: jest.fn().mockResolvedValue([
+            { achievementId: "first_win" },
+            { achievementId: "survivor" },
+          ]),
+        },
+      }));
+
+      const result = await getUnlocked("user1");
+      expect(result).toBeInstanceOf(Set);
+      expect(result.has("first_win")).toBe(true);
+      expect(result.has("survivor")).toBe(true);
+      expect(result.size).toBe(2);
+    });
+
+    test("returns an empty Set when db is unavailable", async () => {
+      db.mockResolvedValueOnce(null);
+      const result = await getUnlocked("user1");
+      expect(result).toBeInstanceOf(Set);
+      expect(result.size).toBe(0);
     });
   });
 

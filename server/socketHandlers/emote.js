@@ -10,8 +10,8 @@ const EMOTE_RATE_WINDOW_MS = 4000;
 
 module.exports = function handleEmoteEvents(io, socket) {
   socket.on("send_emote", async function(data) {
-    const roomId = data && data.roomId;
-    const emote = data && data.emote;
+    const roomId = data?.roomId;
+    const emote = data?.emote;
 
     if (!roomId || !emote) return;
     if (!VALID_EMOTES.includes(emote)) return; // whitelist only

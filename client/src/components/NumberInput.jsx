@@ -30,7 +30,7 @@ function useIsDesktop() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const mq = window.matchMedia("(min-width: " + DESKTOP_BREAKPOINT + "px)");
+    const mq = window.matchMedia(`(min-width: ${DESKTOP_BREAKPOINT}px)`);
 
     // Sync immediately in case state is stale after mount
     setIsDesktop(mq.matches);

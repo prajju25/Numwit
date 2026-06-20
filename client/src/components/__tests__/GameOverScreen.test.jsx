@@ -17,6 +17,11 @@ jest.mock("../../contexts/GameContext", () => ({
 }));
 jest.mock("../SessionStats", () => () => <div data-testid="session-stats" />);
 jest.mock("../LevelBadge", () => (props) => <div data-testid="level-badge">{props.level}</div>);
+jest.mock("../ShareCardModal", () => (props) => (
+  <div data-testid="share-card-modal" data-variant={props.variant}>
+    <button onClick={props.onClose}>close-share</button>
+  </div>
+));
 
 const players = [
   { socketId: "p0", name: "Alice", avatar: "🐱" },
@@ -135,5 +140,67 @@ describe("GameOverScreen", () => {
     render(<GameOverScreen data={{ winnerSocketId: "p0", points: {} }} players={players} />);
 
     expect(screen.getByTestId("session-stats")).toBeInTheDocument();
+  });
+
+  describe("Share Your Win", () => {
+    afterEach(() => {
+      delete global.fetch;
+    });
+
+    test("shows the share button when the user won", () => {
+      useUser.mockReturnValue({ roomId: "room1", user: { socketId: "p0" }, deviceId: "dev1" });
+      render(<GameOverScreen data={{ winnerSocketId: "p0", points: {} }} players={players} />);
+
+      expect(screen.getByText("📤 Share Your Win")).toBeInTheDocument();
+    });
+
+    test("does not show the share button when the user lost", () => {
+      useUser.mockReturnValue({ roomId: "room1", user: { socketId: "p1" }, deviceId: "dev1" });
+      render(<GameOverScreen data={{ winnerSocketId: "p0", points: {} }} players={players} />);
+
+      expect(screen.queryByText("📤 Share Your Win")).not.toBeInTheDocument();
+    });
+
+    test("clicking the share button fetches the player card and opens the share modal", async () => {
+      useUser.mockReturnValue({ roomId: "room1", user: { socketId: "p0" }, deviceId: "dev1" });
+      global.fetch = jest.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ name: "Alice", avatar: "🐱", level: 3, gamesWon: 4 }),
+        })
+      );
+
+      render(<GameOverScreen data={{ winnerSocketId: "p0", points: {} }} players={players} />);
+      fireEvent.click(screen.getByText("📤 Share Your Win"));
+
+      await screen.findByTestId("share-card-modal");
+      expect(global.fetch).toHaveBeenCalledWith("/api/player/dev1/card");
+      expect(screen.getByTestId("share-card-modal")).toHaveAttribute("data-variant", "victory");
+    });
+
+    test("does nothing when deviceId is missing", () => {
+      useUser.mockReturnValue({ roomId: "room1", user: { socketId: "p0" }, deviceId: null });
+      global.fetch = jest.fn();
+
+      render(<GameOverScreen data={{ winnerSocketId: "p0", points: {} }} players={players} />);
+      fireEvent.click(screen.getByText("📤 Share Your Win"));
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("share-card-modal")).not.toBeInTheDocument();
+    });
+
+    test("closing the modal clears the share state", async () => {
+      useUser.mockReturnValue({ roomId: "room1", user: { socketId: "p0" }, deviceId: "dev1" });
+      global.fetch = jest.fn(() =>
+        Promise.resolve({ ok: true, json: () => Promise.resolve({ name: "Alice" }) })
+      );
+
+      render(<GameOverScreen data={{ winnerSocketId: "p0", points: {} }} players={players} />);
+      fireEvent.click(screen.getByText("📤 Share Your Win"));
+      await screen.findByTestId("share-card-modal");
+
+      fireEvent.click(screen.getByText("close-share"));
+      expect(screen.queryByTestId("share-card-modal")).not.toBeInTheDocument();
+    });
   });
 });

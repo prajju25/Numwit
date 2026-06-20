@@ -100,7 +100,7 @@ describe("feedbackService", () => {
         },
       }));
 
-      const longMessage = "  " + "x".repeat(2010) + "  ";
+      const longMessage = `  ${"x".repeat(2010)}  `;
       await createFeedback({ message: longMessage });
       expect(capturedArgs.data.message.length).toBe(2000);
       expect(capturedArgs.data.message.startsWith(" ")).toBe(false);

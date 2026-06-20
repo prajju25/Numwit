@@ -82,14 +82,14 @@ export default function CountdownTimer({ timerDuration, paused }) {
           <div className="flex items-center justify-between text-[10px]">
             <span className="label-muted">Time Remaining</span>
             <span className={twMerge("font-bold", textColor)}>
-              {isExpired ? "Time's up!" : timeLeft + "s"}
+              {isExpired ? "Time's up!" : `${timeLeft}s`}
             </span>
           </div>
           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
-                width: pct + "%",
+                width: `${pct}%`,
                 background: ringColor,
                 boxShadow: isDanger ? `0 0 8px ${ringColor}` : "none",
               }}

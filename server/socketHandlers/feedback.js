@@ -26,7 +26,7 @@ module.exports = function handleFeedbackEvents(io, socket) {
       return;
     }
 
-    const userAgent = (socket.handshake && socket.handshake.headers && socket.handshake.headers["user-agent"]) || null;
+    const userAgent = socket.handshake?.headers?.["user-agent"] || null;
 
     try {
       const result = await feedbackService.createFeedback({
@@ -45,7 +45,7 @@ module.exports = function handleFeedbackEvents(io, socket) {
 
       if (callback) callback({ status: "ok", id: result.id });
     } catch (err) {
-      console.error('submit_feedback error: ' + err.message);
+      console.error(`submit_feedback error: ${err.message}`);
       if (callback) callback({ status: "error", message: "Failed to submit feedback" });
     }
   });

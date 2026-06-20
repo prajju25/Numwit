@@ -144,4 +144,4 @@ async function checkAndAward(userId, sessionData, allTimeStats) {
   return newlyUnlocked;
 }
 
-module.exports = { ACHIEVEMENTS, seedAchievements, checkAndAward };
+module.exports = { ACHIEVEMENTS, seedAchievements, checkAndAward, getUnlocked };

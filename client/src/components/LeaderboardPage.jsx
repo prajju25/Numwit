@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { useUser } from "../contexts/UserContext";
+import ShareCardModal from "./ShareCardModal";
 
 const PER_PAGE = 10;
 
@@ -35,8 +36,10 @@ function WeekRange() {
 
 export default function LeaderboardPage({ onBack }) {
   const { board, loading, error } = useLB();
-  const { user }                  = useUser();
+  const { user, deviceId }        = useUser();
   const [page, setPage]           = useState(1);
+  const [shareData, setShareData] = useState(null);
+  const [shareLoading, setShareLoading] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(board.length / PER_PAGE));
   const offset     = (page - 1) * PER_PAGE;
@@ -44,6 +47,33 @@ export default function LeaderboardPage({ onBack }) {
 
   const isMe = (entry) =>
     user && entry.name === user.name && entry.avatar === user.avatar;
+
+  // board is fetched with limit=50 — if we got fewer rows than that, this IS
+  // the full weekly field, so "#rank of N this week" is accurate. If the
+  // field is larger than 50, we don't know the true total, so omit it
+  // rather than show a number we can't back up.
+  const exactWeeklyTotal = board.length < 50 ? board.length : null;
+
+  const handleShare = async (rank) => {
+    if (!deviceId || shareLoading) return;
+    setShareLoading(true);
+    try {
+      const res = await fetch(`/api/player/${deviceId}/card`);
+      const data = await res.json();
+      if (res.ok) {
+        setShareData({
+          player: { name: data.name, avatar: data.avatar, level: data.level, stats: data },
+          rank,
+          totalPlayers: exactWeeklyTotal,
+        });
+      }
+    } catch (_) {
+      // Best-effort — no toast wiring here yet; the share button just stays
+      // clickable and the user can try again.
+    } finally {
+      setShareLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center px-4 py-10 sm:py-16 animate-fadeIn">
@@ -157,6 +187,15 @@ export default function LeaderboardPage({ onBack }) {
                               You
                             </span>
                           )}
+                          {me && (
+                            <button
+                              onClick={() => handleShare(rank)}
+                              disabled={shareLoading}
+                              className="text-[10px] bg-white/8 text-white/60 border border-white/15 rounded-full px-2 py-0.5 font-bold hover:bg-white/15 hover:text-white transition-all disabled:opacity-40"
+                            >
+                              {shareLoading ? "…" : "Share"}
+                            </button>
+                          )}
                         </div>
                       </td>
 
@@ -228,6 +267,16 @@ export default function LeaderboardPage({ onBack }) {
         </button>
         <p className="text-xs text-white/25">Rankings reset every 7 days</p>
       </div>
+
+      {shareData && (
+        <ShareCardModal
+          player={shareData.player}
+          rank={shareData.rank}
+          totalPlayers={shareData.totalPlayers}
+          variant="leaderboard"
+          onClose={() => setShareData(null)}
+        />
+      )}
     </div>
   );
 }

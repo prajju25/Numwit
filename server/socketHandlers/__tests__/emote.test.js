@@ -20,7 +20,7 @@ function makeSocket(id) {
 
 function getHandler(socket, event) {
   const call = socket.on.mock.calls.find((c) => c[0] === event);
-  return call && call[1];
+  return call?.[1];
 }
 
 describe("emote socket handler", () => {

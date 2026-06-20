@@ -22,7 +22,7 @@ async function addUserToRoom(roomId, user, roomType, isCreator) {
   if (roomType === undefined) roomType = "public";
   if (isCreator === undefined) isCreator = false;
 
-  if (user && user.name) {
+  if (user?.name) {
     user.name = user.name.replace(/<[^>]*>/g, "").trim().slice(0, 20);
   }
   if (!user || !user.name) throw new Error("Invalid user name");
@@ -77,7 +77,7 @@ async function addUserToRoom(roomId, user, roomType, isCreator) {
 
 // ── removeUserFromRoom ─────────────────────────────────────────────────────────
 async function removeUserFromRoom(socketId) {
-  const keys = await redis.keys(ROOM_PREFIX + "*");
+  const keys = await redis.keys(`${ROOM_PREFIX}*`);
 
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
@@ -136,7 +136,7 @@ async function getPublicRooms() {
 
 // ── getRoomsByType (for future display) ───────────────────────────────────────
 async function getRoomsByType(roomType) {
-  const keys = await redis.keys(ROOM_PREFIX + "*");
+  const keys = await redis.keys(`${ROOM_PREFIX}*`);
   const rooms = [];
   for (let i = 0; i < keys.length; i++) {
     const roomData = await redis.get(keys[i]);
@@ -151,7 +151,7 @@ async function getRoomsByType(roomType) {
 // Aggregate live counts across all rooms: totals plus a breakdown by room
 // type (public / private / solo) and waiting-vs-in-progress.
 async function getRoomCounts() {
-  const keys = await redis.keys(ROOM_PREFIX + "*");
+  const keys = await redis.keys(`${ROOM_PREFIX}*`);
 
   const counts = {
     totalRooms: 0,
@@ -190,7 +190,7 @@ async function getRoomCounts() {
 // id, type, player count/names, and whether a game is currently in progress.
 // In-progress rooms are sorted first, then by player count (descending).
 async function getActiveRooms() {
-  const keys = await redis.keys(ROOM_PREFIX + "*");
+  const keys = await redis.keys(`${ROOM_PREFIX}*`);
   const rooms = [];
 
   for (let i = 0; i < keys.length; i++) {

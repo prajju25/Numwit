@@ -25,6 +25,11 @@ jest.mock("../db/statsService", () => ({
 }));
 jest.mock("../db/achievementService", () => ({
   seedAchievements: jest.fn(() => Promise.resolve()),
+  getUnlocked: jest.fn(() => Promise.resolve(new Set())),
+  ACHIEVEMENTS: new Array(20).fill({}),
+}));
+jest.mock("../db/userService", () => ({
+  getProfile: jest.fn(),
 }));
 jest.mock("../redisClient", () => ({
   ping: jest.fn().mockResolvedValue("PONG"),
@@ -47,6 +52,8 @@ describe("server.js", () => {
   let ioConstructorArgs;
   let codeService;
   let statsService;
+  let achievementService;
+  let userService;
   let redisClient;
   let handleLobbyEvents;
   let handleGameEvents;
@@ -65,11 +72,11 @@ describe("server.js", () => {
     io = serverModule.io;
 
     const connectionCall = mockIoOn.mock.calls.find((c) => c[0] === "connection");
-    connectionHandler = connectionCall && connectionCall[1];
+    connectionHandler = connectionCall?.[1];
 
     ioConstructorArgs = mockServerConstructor.mock.calls[0];
 
-    const achievementService = require("../db/achievementService");
+    achievementService = require("../db/achievementService");
     seedAchievementsCalledAtLoad = achievementService.seedAchievements.mock.calls.length > 0;
 
     serverListenCalledWithPort = listenSpy.mock.calls.some(
@@ -78,6 +85,7 @@ describe("server.js", () => {
 
     codeService = require("../services/codeService");
     statsService = require("../db/statsService");
+    userService = require("../db/userService");
     redisClient = require("../redisClient");
     handleLobbyEvents = require("../socketHandlers/lobby");
     handleGameEvents = require("../socketHandlers/game");
@@ -89,7 +97,7 @@ describe("server.js", () => {
 
   afterAll((done) => {
     const realServer = require("../server").server;
-    if (realServer && realServer.listening) {
+    if (realServer?.listening) {
       realServer.close(done);
     } else {
       done();
@@ -301,6 +309,76 @@ describe("server.js", () => {
       expect(res.body).toEqual({ error: "unavailable" });
     });
   });
+
+  describe("GET /api/player/:deviceId/card", () => {
+    test("returns a combined share-card snapshot", async () => {
+      userService.getProfile.mockResolvedValueOnce({ id: "u1", name: "Alice", avatar: "🐱", level: 3 });
+      statsService.getPlayerStats.mockResolvedValueOnce({
+        gamesPlayed: 10, survived: 4, totalWins: 25, consecutiveGameWins: 2, bestStreak: 5,
+      });
+      achievementService.getUnlocked.mockResolvedValueOnce(new Set(["first_win", "survivor", "veteran"]));
+
+      const res = await supertest(app).get("/api/player/dev1/card");
+
+      expect(userService.getProfile).toHaveBeenCalledWith("dev1");
+      expect(achievementService.getUnlocked).toHaveBeenCalledWith("u1");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        name: "Alice",
+        avatar: "🐱",
+        level: 3,
+        gamesPlayed: 10,
+        gamesWon: 4,
+        roundWins: 25,
+        winRate: 40,
+        currentStreak: 2,
+        bestStreak: 5,
+        achievementsUnlocked: 3,
+        achievementsTotal: 20,
+      });
+    });
+
+    test("returns 404 when the player is not found", async () => {
+      userService.getProfile.mockResolvedValueOnce(null);
+
+      const res = await supertest(app).get("/api/player/unknown/card");
+
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: "Player not found" });
+    });
+
+    test("defaults winRate/gamesPlayed to 0 when stats are unavailable", async () => {
+      userService.getProfile.mockResolvedValueOnce({ id: "u1", name: "Bob", avatar: "🐶", level: 1 });
+      statsService.getPlayerStats.mockResolvedValueOnce(null);
+      achievementService.getUnlocked.mockResolvedValueOnce(new Set());
+
+      const res = await supertest(app).get("/api/player/dev2/card");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        name: "Bob",
+        avatar: "🐶",
+        level: 1,
+        gamesPlayed: 0,
+        gamesWon: 0,
+        roundWins: 0,
+        winRate: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        achievementsUnlocked: 0,
+        achievementsTotal: 20,
+      });
+    });
+
+    test("returns 500 when the profile lookup throws", async () => {
+      userService.getProfile.mockRejectedValueOnce(new Error("db down"));
+
+      const res = await supertest(app).get("/api/player/dev1/card");
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: "unavailable" });
+    });
+  });
 });
 
 describe("server.js redis adapter setup", () => {
@@ -325,7 +403,7 @@ describe("server.js redis adapter setup", () => {
 
     expect(mockIoAdapter).toHaveBeenCalled();
     consoleLogSpy.mockRestore();
-    if (mod.server && mod.server.listening) {
+    if (mod.server?.listening) {
       await new Promise((r) => mod.server.close(r));
     }
   });
@@ -348,7 +426,7 @@ describe("server.js redis adapter setup", () => {
       expect.any(String)
     );
     consoleWarnSpy.mockRestore();
-    if (mod.server && mod.server.listening) {
+    if (mod.server?.listening) {
       await new Promise((r) => mod.server.close(r));
     }
   });
@@ -379,7 +457,7 @@ describe("server.js redis adapter setup", () => {
       expect.any(String)
     );
     consoleWarnSpy.mockRestore();
-    if (mod.server && mod.server.listening) {
+    if (mod.server?.listening) {
       await new Promise((r) => mod.server.close(r));
     }
   });

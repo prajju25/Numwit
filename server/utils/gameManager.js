@@ -43,7 +43,7 @@ function sanitizeSettings(raw) {
   const targetMultiplier = VALID_TARGET_MULTIPLIERS.includes(Number(raw.targetMultiplier))
     ? Number(raw.targetMultiplier) : 0.8;
 
-  const duplicateRuleEnabled = raw.duplicateRuleEnabled === false ? false : true;
+  const duplicateRuleEnabled = raw.duplicateRuleEnabled !== false;
 
   return { timerDuration, eliminationThreshold, targetMultiplier, duplicateRuleEnabled };
 }

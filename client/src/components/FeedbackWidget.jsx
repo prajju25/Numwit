@@ -46,7 +46,7 @@ export default function FeedbackWidget() {
       message: trimmed,
       context: roomId || window.location.pathname,
     }, (res) => {
-      if (res && res.status === "ok") {
+      if (res?.status === "ok") {
         setStatus("sent");
         setMessage("");
       } else {

@@ -33,10 +33,10 @@ module.exports = function handleLobbyEvents(io, socket) {
     const roomType = data.roomType;
     const deviceId = data.deviceId || null;   // Phase 4: device identity
 
-    console.debug('Socket: "join_room" Room=' + roomId + ' User=' + (user && user.name) + ' Type=' + roomType);
+    console.debug(`Socket: "join_room" Room=${roomId} User=${user?.name} Type=${roomType}`);
 
     // Persist / update user record in DB (fire-and-forget, non-blocking)
-    if (deviceId && user && user.name) {
+    if (deviceId && user?.name) {
       upsertUser(deviceId, user.name, user.avatar || "😎").catch(() => {});
     }
 
@@ -49,7 +49,7 @@ module.exports = function handleLobbyEvents(io, socket) {
       cancelledPending = pendingDisconnects[deviceId];
       clearTimeout(cancelledPending.timer);
       delete pendingDisconnects[deviceId];
-      console.log("Reconnect: cancelled disconnect timer for deviceId " + deviceId);
+      console.log(`Reconnect: cancelled disconnect timer for deviceId ${deviceId}`);
     }
 
     let roomNo = roomId;
@@ -67,7 +67,7 @@ module.exports = function handleLobbyEvents(io, socket) {
       if (stillExists) {
         roomNo = cancelledPending.roomId;
         isReconnectToSameRoom = true;
-        console.log("Reconnect: returning deviceId " + deviceId + " to previous room " + roomNo);
+        console.log(`Reconnect: returning deviceId ${deviceId} to previous room ${roomNo}`);
       }
     }
 
@@ -75,15 +75,15 @@ module.exports = function handleLobbyEvents(io, socket) {
       // Public room: find an existing joinable room (O(1) via Redis SET)
       if (roomType === "public") {
         const publicRoom = await getPublicRooms();
-        roomNo = publicRoom && publicRoom.id;
-        console.debug('Socket: "join_room" public room found: ' + roomNo);
+        roomNo = publicRoom?.id;
+        console.debug(`Socket: "join_room" public room found: ${roomNo}`);
         if (!roomNo) isNewPublicRoom = true;
       }
 
       // No room found — create a new one
       if (!roomNo) {
         roomNo = Math.random().toString(36).substring(2, 8);
-        console.debug('Socket: "join_room" new room created: ' + roomNo);
+        console.debug(`Socket: "join_room" new room created: ${roomNo}`);
       }
     }
 
@@ -92,7 +92,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     // them from the old room immediately.  Without this the old room keeps a
     // ghost "disconnected" user entry forever and cleanupIfBotsOnly never fires.
     if (cancelledPending && cancelledPending.roomId !== roomNo) {
-      console.log("Joining different room — cleaning up old room " + cancelledPending.roomId);
+      console.log(`Joining different room — cleaning up old room ${cancelledPending.roomId}`);
       const abandonedRoom = await removeUserFromRoom(cancelledPending.oldSocketId);
       if (abandonedRoom) {
         await handlePostRemove(io, abandonedRoom);
@@ -115,7 +115,7 @@ module.exports = function handleLobbyEvents(io, socket) {
 
       // Clear any stale disconnected flag left by a previous grace period
       const rejoiningUser = room.users.find(function(u) { return u.socketId === socket.id; });
-      if (rejoiningUser && rejoiningUser.disconnected) {
+      if (rejoiningUser?.disconnected) {
         rejoiningUser.disconnected = false;
         await saveRoom(room);
       }
@@ -180,13 +180,13 @@ module.exports = function handleLobbyEvents(io, socket) {
         });
       }
     } catch (err) {
-      console.error('join_room error: ' + err.message);
+      console.error(`join_room error: ${err.message}`);
       socket.emit("error_message", { message: err.message });
     }
   });
 
   socket.on("leave_room", async function(callback) {
-    console.debug('Socket: "leave_room" ' + socket.id);
+    console.debug(`Socket: "leave_room" ${socket.id}`);
 
     // Intentional leave — cancel any pending grace timer and clean up maps
     const dId = socketToDevice[socket.id];
@@ -210,7 +210,7 @@ module.exports = function handleLobbyEvents(io, socket) {
   });
 
   socket.on("disconnect", async function() {
-    console.log('Socket: "disconnect" ' + socket.id);
+    console.log(`Socket: "disconnect" ${socket.id}`);
 
     clearRateLimit(socket.id);
 
@@ -238,7 +238,7 @@ module.exports = function handleLobbyEvents(io, socket) {
           roomId: roomId,
           timer: setTimeout(async function() {
             delete pendingDisconnects[deviceId];
-            console.log("Grace period expired for deviceId " + deviceId + " — removing from room");
+            console.log(`Grace period expired for deviceId ${deviceId} — removing from room`);
             const r = await removeUserFromRoom(oldSocketId);
             if (r) {
               await handlePostRemove(io, r);
@@ -246,7 +246,7 @@ module.exports = function handleLobbyEvents(io, socket) {
           }, DISCONNECT_GRACE_MS),
         };
 
-        console.log("Disconnect grace period started for deviceId " + deviceId + " (60s)");
+        console.log(`Disconnect grace period started for deviceId ${deviceId} (60s)`);
         return;
       }
     }

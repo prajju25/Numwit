@@ -1,7 +1,7 @@
 const express = require("express");
-const http    = require("http");
-const path    = require("path");
-const helmet  = require("helmet");
+const http = require("http");
+const path = require("path");
+const helmet = require("helmet");
 const { Server } = require("socket.io");
 // Always load server/.env regardless of the process's current working
 // directory (e.g. `npm run server` from the repo root runs with cwd at the
@@ -9,20 +9,21 @@ const { Server } = require("socket.io");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const handleLobbyEvents = require("./socketHandlers/lobby");
-const handleGameEvents  = require("./socketHandlers/game");
-const handleChatEvents  = require("./socketHandlers/chat");
+const handleGameEvents = require("./socketHandlers/game");
+const handleChatEvents = require("./socketHandlers/chat");
 const handleEmoteEvents = require("./socketHandlers/emote");
 const handleVoiceEvents = require("./socketHandlers/voice");
 const handleFeedbackEvents = require("./socketHandlers/feedback");
 
-const roomManager      = require("./utils/roomManager");
-const codeService      = require("./services/codeService");
-const statsService     = require("./db/statsService");
+const roomManager = require("./utils/roomManager");
+const codeService = require("./services/codeService");
+const statsService = require("./db/statsService");
 const achievementService = require("./db/achievementService");
-const adminAuth        = require("./middleware/adminAuth");
-const adminRoutes      = require("./routes/admin");
+const userService = require("./db/userService");
+const adminAuth = require("./middleware/adminAuth");
+const adminRoutes = require("./routes/admin");
 
-const app    = express();
+const app = express();
 const server = http.createServer(app);
 
 // Security headers on every response. CSP is disabled for now since it needs
@@ -37,14 +38,14 @@ app.use(express.json());
 // exist (e.g. local dev where the client runs via webpack-dev-server instead).
 app.use(express.static(path.join(__dirname, "../client/dist")));
 
-const CORS_ORIGIN          = process.env.CORS_ORIGIN || "*";
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 const SOCKET_PING_INTERVAL = Number(process.env.SOCKET_PING_INTERVAL) || 5000;
-const SOCKET_PING_TIMEOUT  = Number(process.env.SOCKET_PING_TIMEOUT) || 3000;
+const SOCKET_PING_TIMEOUT = Number(process.env.SOCKET_PING_TIMEOUT) || 3000;
 
 const io = new Server(server, {
   cors: { origin: CORS_ORIGIN },
   pingInterval: SOCKET_PING_INTERVAL,
-  pingTimeout:  SOCKET_PING_TIMEOUT,
+  pingTimeout: SOCKET_PING_TIMEOUT,
 });
 
 // -- @socket.io/redis-adapter (horizontal scaling) -----------------------------
@@ -52,7 +53,7 @@ const io = new Server(server, {
 if (process.env.REDIS_ADAPTER_URL || process.env.REDIS_URL) {
   try {
     const { createAdapter } = require("@socket.io/redis-adapter");
-    const { createClient }  = require("redis");
+    const { createClient } = require("redis");
     const adapterUrl = process.env.REDIS_ADAPTER_URL || process.env.REDIS_URL;
 
     const pubClient = createClient({ url: adapterUrl });
@@ -64,7 +65,10 @@ if (process.env.REDIS_ADAPTER_URL || process.env.REDIS_URL) {
         console.log("Socket.IO redis-adapter active");
       })
       .catch((err) => {
-        console.warn("redis-adapter unavailable, running single-node:", err.message);
+        console.warn(
+          "redis-adapter unavailable, running single-node:",
+          err.message,
+        );
       });
   } catch (err) {
     console.warn("redis-adapter module missing:", err.message);
@@ -82,7 +86,8 @@ app.get("/api/health", async (req, res) => {
   try {
     const redis = require("./redisClient");
     await redis.ping();
-  } catch (_) {
+  } catch (e) {
+    console.error("Redis down is expected/reportable, not exceptional", e);
     // Redis down is expected/reportable, not exceptional — surfaced via the
     // redisStatus field below rather than logged on every health check poll.
     redisStatus = "unavailable";
@@ -100,7 +105,9 @@ app.get("/api/stats", async (req, res) => {
   try {
     const redis = require("./redisClient");
     const keys = await redis.keys("room:*");
-    let activeRooms = 0, activePlayers = 0, gamesInProgress = 0;
+    let activeRooms = 0,
+      activePlayers = 0,
+      gamesInProgress = 0;
     for (const key of keys) {
       const raw = await redis.get(key);
       if (!raw) continue;
@@ -130,9 +137,10 @@ app.get("/api/leaderboard", async (req, res) => {
 
 // -- REST: GET /api/room/:code -------------------------------------------------------
 app.get("/api/room/:code", (req, res) => {
-  const code   = String(req.params.code).toLowerCase().trim();
+  const code = String(req.params.code).toLowerCase().trim();
   const roomId = codeService.resolveCode(code);
-  if (!roomId) return res.status(404).json({ error: "Room not found or expired" });
+  if (!roomId)
+    return res.status(404).json({ error: "Room not found or expired" });
   res.json({ roomId });
 });
 
@@ -151,7 +159,47 @@ app.get("/api/player/:deviceId/stats", async (req, res) => {
     if (!stats) return res.status(404).json({ error: "Player not found" });
     res.json(stats);
   } catch (err) {
-    console.error(`GET /api/player/${req.params.deviceId}/stats error:`, err.message);
+    console.error(
+      `GET /api/player/${req.params.deviceId}/stats error:`,
+      err.message,
+    );
+    res.status(500).json({ error: "unavailable" });
+  }
+});
+
+// -- REST: GET /api/player/:deviceId/card --------------------------------------------
+// Combined, share-card-ready snapshot: profile + all-time stats + achievement
+// count in one response, used by the client's "Share" buttons (leaderboard +
+// post-game victory screen) so they only need a single round trip.
+app.get("/api/player/:deviceId/card", async (req, res) => {
+  try {
+    const profile = await userService.getProfile(req.params.deviceId);
+    if (!profile) return res.status(404).json({ error: "Player not found" });
+
+    const stats = await statsService.getPlayerStats(req.params.deviceId);
+    const unlocked = await achievementService.getUnlocked(profile.id);
+
+    const gamesPlayed = stats?.gamesPlayed || 0;
+    const gamesWon = stats?.survived || 0;
+
+    res.json({
+      name: profile.name,
+      avatar: profile.avatar,
+      level: profile.level,
+      gamesPlayed,
+      gamesWon,
+      roundWins: stats?.totalWins || 0,
+      winRate: gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0,
+      currentStreak: stats?.consecutiveGameWins || 0,
+      bestStreak: stats?.bestStreak || 0,
+      achievementsUnlocked: unlocked.size,
+      achievementsTotal: achievementService.ACHIEVEMENTS.length,
+    });
+  } catch (err) {
+    console.error(
+      `GET /api/player/${req.params.deviceId}/card error:`,
+      err.message,
+    );
     res.status(500).json({ error: "unavailable" });
   }
 });

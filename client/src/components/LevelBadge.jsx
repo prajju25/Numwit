@@ -35,7 +35,7 @@ export default function LevelBadge({ level, className }) {
         colors[tier],
         className
       )}
-      title={"Level " + level}
+      title={`Level ${level}`}
     >
       {tier === "gold" ? "★" : "Lv"}{level}
     </span>

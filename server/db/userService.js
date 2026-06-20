@@ -101,21 +101,23 @@ async function getTotalUsers() {
 
 /**
  * Update the consecutive game-win streak for a player.
- * If survived=true, increments; if survived=false, resets to 0.
+ * If survived=true, increments (and raises bestStreak if this is a new high);
+ * if survived=false, resets the current streak to 0 (bestStreak is untouched).
  * Returns the new consecutiveGameWins value (or 0 on failure).
  */
 async function updateConsecutiveGameWins(deviceId, survived) {
   const user = await db((p) =>
-    p.user.findUnique({ where: { deviceId }, select: { consecutiveGameWins: true } })
+    p.user.findUnique({ where: { deviceId }, select: { consecutiveGameWins: true, bestStreak: true } })
   );
   if (!user) return 0;
 
   const newStreak = survived ? (user.consecutiveGameWins || 0) + 1 : 0;
+  const newBest = Math.max(user.bestStreak || 0, newStreak);
 
   await db((p) =>
     p.user.update({
       where: { deviceId },
-      data: { consecutiveGameWins: newStreak },
+      data: { consecutiveGameWins: newStreak, bestStreak: newBest },
     })
   );
 

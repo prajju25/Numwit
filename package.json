@@ -2,7 +2,7 @@
   "name": "numwit",
   "scripts": {
     "client": "npm start --prefix client",
-    "server": "node server/server.js",
+    "server": "cd server && npx prisma migrate deploy && node server.js",
     "dev": "concurrently \"npm run server\" \"npm run client\""
   },
   "devDependencies": {

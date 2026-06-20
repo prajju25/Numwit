@@ -7,12 +7,13 @@ import { twMerge } from "tailwind-merge";
 import SessionStats from "./SessionStats";
 import RoundHistory from "./RoundHistory";
 import LevelBadge from "./LevelBadge";
+import ShareCardModal from "./ShareCardModal";
 import { useGame } from "../contexts/GameContext";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 export default function GameOverScreen({ data, players }) {
-  const { roomId, user } = useUser();
+  const { roomId, user, deviceId } = useUser();
   const { history, xpData, myLevel } = useNumwit();
   const { hostSocketId } = useGame();
   const winner = players?.find((p) => p.socketId === data?.winnerSocketId);
@@ -21,6 +22,29 @@ export default function GameOverScreen({ data, players }) {
   const isHost = mySocketId === hostSocketId;
   const disconnectReason = data?.reason === "opponent_disconnected";
   const [showHistory, setShowHistory] = useState(false);
+  const [shareData, setShareData] = useState(null);
+  const [shareLoading, setShareLoading] = useState(false);
+
+  const handleShare = async () => {
+    if (!deviceId || shareLoading) return;
+    setShareLoading(true);
+    try {
+      const res = await fetch(`/api/player/${deviceId}/card`);
+      const cardData = await res.json();
+      if (res.ok) {
+        setShareData({
+          name: cardData.name,
+          avatar: cardData.avatar,
+          level: cardData.level,
+          stats: cardData,
+        });
+      }
+    } catch (_) {
+      // Best-effort — share button just stays available to retry.
+    } finally {
+      setShareLoading(false);
+    }
+  };
 
   const handleRestart = () => socket.emit("restart_game", { roomId });
 
@@ -44,6 +68,18 @@ export default function GameOverScreen({ data, players }) {
             <p className="text-sm text-white/40 mt-1">A player disconnected — game ended early.</p>
           )}
         </div>
+
+        {/* Share Your Win — only shown to the winner */}
+        {iWon && (
+          <button
+            onClick={handleShare}
+            disabled={shareLoading}
+            className="w-full py-3 rounded-xl text-sm font-bold border border-violet-500/40 text-violet-300 hover:bg-violet-500/20 transition-all disabled:opacity-50"
+            style={{ background: "rgba(124,58,237,0.12)" }}
+          >
+            {shareLoading ? "Loading your stats…" : "📤 Share Your Win"}
+          </button>
+        )}
 
         {/* XP banner */}
         {xpData && (
@@ -102,7 +138,7 @@ export default function GameOverScreen({ data, players }) {
         <SessionStats history={history} mySocketId={mySocketId} />
 
         {/* Round History */}
-        {history && history.length > 0 && (
+        {history?.length > 0 && (
           <div className="w-full">
             <button
               onClick={() => setShowHistory((v) => !v)}
@@ -136,6 +172,14 @@ export default function GameOverScreen({ data, players }) {
           </div>
         )}
       </div>
+
+      {shareData && (
+        <ShareCardModal
+          player={shareData}
+          variant="victory"
+          onClose={() => setShareData(null)}
+        />
+      )}
     </div>
   );
 }

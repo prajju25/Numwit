@@ -25,7 +25,7 @@ function makeSocket(id) {
 
 function getHandler(socket, event) {
   const call = socket.on.mock.calls.find((c) => c[0] === event);
-  return call && call[1];
+  return call?.[1];
 }
 
 describe("chat socket handler", () => {
@@ -58,7 +58,7 @@ describe("chat socket handler", () => {
       handleChatEvents(io, socket);
       const handler = getHandler(socket, "room_chat");
 
-      const longMsg = "<b>" + "a".repeat(300) + "</b>  ";
+      const longMsg = `<b>${"a".repeat(300)}</b>  `;
       await handler({ roomId: "room1", message: longMsg });
 
       expect(io._emit).toHaveBeenCalledWith("chat_message", expect.objectContaining({
@@ -177,7 +177,7 @@ describe("chat socket handler", () => {
       handler({ roomId: "room1" });
       handler({ roomId: "room1" });
 
-      const trueCalls = toEmit.mock.calls.filter((c) => c[1].isTyping === true);
+      const trueCalls = toEmit.mock.calls.filter((c) => c[1].isTyping);
       expect(trueCalls).toHaveLength(1);
     });
   });

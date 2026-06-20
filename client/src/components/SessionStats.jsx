@@ -22,14 +22,14 @@ export default function SessionStats({ history, mySocketId }) {
 
   history.forEach((r) => {
     roundsPlayed++;
-    const iWon = r.winnerIds && r.winnerIds.includes(mySocketId);
+    const iWon = r.winnerIds?.includes(mySocketId);
     if (iWon) wins++;
     else totalPenalty += r.exactMatch ? 2 : 1;
 
     if (r.exactMatch && iWon) exactMatches++;
 
-    const mySubmission = r.submissions && r.submissions.find((s) => s.socketId === mySocketId);
-    const isInvalid = r.invalidSubmissions && r.invalidSubmissions.some((s) => s.socketId === mySocketId);
+    const mySubmission = r.submissions?.find((s) => s.socketId === mySocketId);
+    const isInvalid = r.invalidSubmissions?.some((s) => s.socketId === mySocketId);
     if (mySubmission && !isInvalid && r.target != null) {
       const diff = Math.abs(mySubmission.number - r.target);
       if (diff < closestDiff) closestDiff = diff;
@@ -41,7 +41,7 @@ export default function SessionStats({ history, mySocketId }) {
   const stats = [
     { label: "Rounds", value: roundsPlayed },
     { label: "Wins", value: wins, color: wins > 0 ? "text-green-600" : "text-gray-700" },
-    { label: "Win Rate", value: winRate + "%", color: winRate >= 50 ? "text-green-600" : "text-gray-700" },
+    { label: "Win Rate", value: `${winRate}%`, color: winRate >= 50 ? "text-green-600" : "text-gray-700" },
     { label: "Penalties", value: totalPenalty, color: totalPenalty > 0 ? "text-red-500" : "text-gray-700" },
     { label: "Closest", value: closestDiff === Infinity ? "—" : closestDiff.toFixed(2) },
     ...(exactMatches > 0 ? [{ label: "Exact!", value: exactMatches, color: "text-yellow-600" }] : []),
@@ -55,7 +55,7 @@ export default function SessionStats({ history, mySocketId }) {
       <div className="grid grid-cols-3 gap-2">
         {stats.map((s) => (
           <div key={s.label} className="bg-gray-50 rounded-xl p-2 text-center">
-            <p className={"text-lg font-bold " + (s.color || "text-gray-800")}>{s.value}</p>
+            <p className={`text-lg font-bold ${s.color || "text-gray-800"}`}>{s.value}</p>
             <p className="text-xs text-gray-400">{s.label}</p>
           </div>
         ))}

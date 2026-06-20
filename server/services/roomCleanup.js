@@ -33,7 +33,7 @@ async function _deleteRoom(io, roomId, reason) {
   io.to(roomId).emit("game_reset");
   io.to(roomId).emit("room_deleted", { reason: reason });
   await roomManager.deleteRoom(roomId);
-  console.log("Room " + roomId + " auto-deleted: " + reason);
+  console.log(`Room ${roomId} auto-deleted: ${reason}`);
 }
 
 // ── post-game timer ───────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ function schedulePostGameDelete(io, roomId) {
     delete pendingPostGame[roomId];
     await _deleteRoom(io, roomId, "no_restart_after_game_over");
   }, POST_GAME_MS);
-  console.log("Post-game delete scheduled for room " + roomId + " (5 min)");
+  console.log(`Post-game delete scheduled for room ${roomId} (5 min)`);
 }
 
 function cancelPostGameDelete(roomId) {
@@ -63,7 +63,7 @@ function scheduleIdleDelete(io, roomId) {
     if (!room || room.game) return;
     await _deleteRoom(io, roomId, "idle_no_game_started");
   }, IDLE_MS);
-  console.log("Idle delete scheduled for room " + roomId + " (5 min)");
+  console.log(`Idle delete scheduled for room ${roomId} (5 min)`);
 }
 
 function cancelIdleDelete(roomId) {

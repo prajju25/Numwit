@@ -140,7 +140,7 @@ async function getWeeklyLeaderboard(limit = 10) {
 async function getPlayerStats(deviceId) {
   const user = await db((p) => p.user.findUnique({
     where: { deviceId },
-    select: { id: true, consecutiveGameWins: true },
+    select: { id: true, consecutiveGameWins: true, bestStreak: true },
   }));
   if (!user) return null;
 
@@ -183,10 +183,11 @@ async function getPlayerStats(deviceId) {
     totalWins:            agg._sum.wins                                  || 0,
     totalPenalties:       agg._sum.penalties                             || 0,
     exactMatches:         agg._sum.exactMatches                          || 0,
-    survived:             (survivedAgg && survivedAgg._count.id)         || 0,
-    duelWins:             (duelWonAgg  && duelWonAgg._count.id)          || 0,
-    soloWins:             (soloWonAgg  && soloWonAgg._count.id)          || 0,
+    survived:             survivedAgg?._count.id                        || 0,
+    duelWins:             duelWonAgg?._count.id                          || 0,
+    soloWins:             soloWonAgg?._count.id                          || 0,
     consecutiveGameWins:  user.consecutiveGameWins                       || 0,
+    bestStreak:           user.bestStreak                                || 0,
   };
 }
 
