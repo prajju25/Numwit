@@ -117,7 +117,7 @@ export default function LeaderboardPage({ onBack }) {
   );
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center px-4 pt-4 sm:pt-10 pb-0 animate-fadeIn">
+    <div className="min-h-screen w-full flex flex-col items-center px-4 pt-20 sm:pt-24 pb-0 animate-fadeIn">
       <div className="w-full max-w-3xl flex flex-col">
 
         {/* ── Header ────────────────────────────────────────────────────── */}

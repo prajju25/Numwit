@@ -43,6 +43,7 @@ describe("redisClient", () => {
     jest.doMock("redis", () => ({
       createClient: jest.fn(() => ({
         connect: jest.fn().mockRejectedValue(connectError),
+        on: jest.fn(),
         ping: jest.fn(),
       })),
     }));
@@ -53,6 +54,25 @@ describe("redisClient", () => {
     await new Promise((r) => setImmediate(r));
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(connectError);
+    consoleErrorSpy.mockRestore();
+    jest.dontMock("redis");
+  });
+});
+
+describe("redisClient error handling", () => {
+  beforeEach(() => jest.resetModules());
+
+  test("registers an error listener so dropped connections don't crash the process", () => {
+    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    jest.doMock("redis", () => ({
+      createClient: jest.fn(() => ({ connect: jest.fn().mockResolvedValue(), on: jest.fn() })),
+    }));
+    const redisClient = require("../redisClient");
+
+    const call = redisClient.on.mock.calls.find((c) => c[0] === "error");
+    expect(call).toBeDefined();
+    call[1](new Error("Socket closed unexpectedly"));
+    expect(consoleErrorSpy).toHaveBeenCalledWith("Redis client error:", "Socket closed unexpectedly");
     consoleErrorSpy.mockRestore();
     jest.dontMock("redis");
   });

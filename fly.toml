@@ -1,0 +1,46 @@
+# Fly.io config for Numwit — see docs/FLY_DEPLOYMENT.md
+#
+# Numwit keeps round timers, bot timers, reconnect grace periods and rate
+# limits in process memory, so it must run as exactly ONE always-on Machine:
+#   - min_machines_running = 1 and auto_stop_machines = "off" (never scale to zero)
+#   - after the first deploy: `fly scale count 1` (fly launch defaults to 2)
+
+app = "numwit"            # must be globally unique on Fly — change if taken
+primary_region = "iad"    # pick the Fly region closest to your Neon database (see guide)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  # Applies Prisma migrations before each new version goes live.
+  release_command = "sh scripts/release.sh"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "5000"
+  CORS_ORIGIN = "https://numwit.prajvex.com"
+  BOT_FILL_ENABLED = "true"
+
+[http_service]
+  internal_port = 5000
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Socket.IO keeps one long-lived connection per player.
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 400
+    hard_limit = 600
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
