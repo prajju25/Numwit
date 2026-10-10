@@ -22,6 +22,7 @@ jest.mock("../../services/botService", () => ({
   scheduleBotFill: jest.fn(),
   hasOnlyBots: jest.fn(),
   removeRoom: jest.fn(),
+  clearSubmissionTimers: jest.fn(),
 }));
 jest.mock("../game", () => ({
   startGameForRoom: jest.fn(() => Promise.resolve()),

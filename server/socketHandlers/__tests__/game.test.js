@@ -15,6 +15,7 @@ jest.mock("../../services/timerService", () => ({
 jest.mock("../../services/botService", () => ({
   scheduleBotSubmissions: jest.fn(),
   clearSubmissionTimers: jest.fn(),
+  removeRoom: jest.fn(),
 }));
 jest.mock("../../db/userService", () => ({
   awardXp: jest.fn(() => Promise.resolve(null)),
