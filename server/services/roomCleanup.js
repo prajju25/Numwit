@@ -43,6 +43,9 @@ function schedulePostGameDelete(io, roomId) {
     delete pendingPostGame[roomId];
     await _deleteRoom(io, roomId, "no_restart_after_game_over");
   }, POST_GAME_MS);
+  // Don't let a pending cleanup alone keep the process alive (the HTTP server
+  // does that in production); otherwise test runs hang for the full 5 minutes.
+  pendingPostGame[roomId].unref?.();
   console.log(`Post-game delete scheduled for room ${roomId} (5 min)`);
 }
 
@@ -63,6 +66,7 @@ function scheduleIdleDelete(io, roomId) {
     if (!room || room.game) return;
     await _deleteRoom(io, roomId, "idle_no_game_started");
   }, IDLE_MS);
+  pendingIdle[roomId].unref?.();
   console.log(`Idle delete scheduled for room ${roomId} (5 min)`);
 }
 
