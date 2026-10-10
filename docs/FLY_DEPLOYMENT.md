@@ -244,10 +244,11 @@ with a budget cap or move Redis onto Fly.
 ## 12. Deploying changes (GitHub Actions)
 
 `.github/workflows/ci-deploy.yml` runs both test suites automatically on every
-push to `main` and every pull request. **Deploying is a button**, so you pick a
-quiet moment (each deploy restarts the server and ends games in progress):
+pull request (merging to `main` triggers nothing). **Deploying is a button**,
+so you pick a quiet moment (each deploy restarts the server and ends games in
+progress):
 
-1. Merge your PR into `main` and wait for the tests to go green.
+1. Merge your PR into `main` once its tests are green.
 2. GitHub → **Actions** → **CI / Deploy** → **Run workflow** → branch `main` → **Run workflow**.
 3. The run re-runs both test suites and deploys only if they pass. Progress and
    history appear under the repo's **Environments → production**.
@@ -261,7 +262,8 @@ fly tokens create deploy -x 999999h
 Add it in GitHub → Settings → Secrets and variables → Actions → **New repository
 secret**, name `FLY_API_TOKEN`.
 
-To switch to fully automatic deploys later, change the deploy job's `if:` to
+To switch to fully automatic deploys later, add `push: branches: [main]` to
+`on:` and change the deploy job's `if:` to
 `github.event_name == 'push' && github.ref == 'refs/heads/main'`.
 
 Manual deploys from your machine still work (`fly deploy`), but they build

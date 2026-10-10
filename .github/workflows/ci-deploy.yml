@@ -1,15 +1,14 @@
-# Tests run automatically on every push to main and on every pull request.
-# Deploying to Fly.io is manual: Actions tab → "CI / Deploy" → Run workflow
-# (branch: main). Each deploy restarts the server and ends games in progress,
-# so pick a quiet moment. The deploy only runs if both test suites pass.
+# - Pull requests: tests only.
+# - Merging to main: nothing runs (the manual deploy re-tests anyway).
+# - Deploy: Actions tab → "CI / Deploy" → Run workflow (branch: main) →
+#   tests, then deploy to Fly.io only if both suites pass. Each deploy
+#   restarts the server and ends games in progress, so pick a quiet moment.
 #
 # Requires the repository secret FLY_API_TOKEN (`fly tokens create deploy`).
 
 name: CI / Deploy
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
