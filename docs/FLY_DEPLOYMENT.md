@@ -241,34 +241,32 @@ Check usage at <https://fly.io/dashboard> → *Billing*, and in the Upstash and
 Neon consoles. If Upstash usage approaches the free limit, either add a card
 with a budget cap or move Redis onto Fly.
 
-## 12. Optional: deploy automatically from GitHub
+## 12. Deploying changes (GitHub Actions)
 
-1. `fly tokens create deploy -x 999999h` → add it as repository secret
-   `FLY_API_TOKEN` (GitHub → Settings → Secrets and variables → Actions).
-2. Add `.github/workflows/fly-deploy.yml`:
+`.github/workflows/ci-deploy.yml` runs both test suites automatically on every
+push to `main` and every pull request. **Deploying is a button**, so you pick a
+quiet moment (each deploy restarts the server and ends games in progress):
 
-   ```yaml
-   name: Deploy to Fly.io
-   on:
-     push:
-       branches: [main]
-   jobs:
-     test-and-deploy:
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v4
-         - uses: actions/setup-node@v4
-           with:
-             node-version: 20
-         - run: npm ci --prefix server && npm test --prefix server
-         - run: npm ci --prefix client && npm test --prefix client
-         - uses: superfly/flyctl-actions/setup-flyctl@master
-         - run: flyctl deploy --remote-only
-           env:
-             FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-   ```
+1. Merge your PR into `main` and wait for the tests to go green.
+2. GitHub → **Actions** → **CI / Deploy** → **Run workflow** → branch `main` → **Run workflow**.
+3. The run re-runs both test suites and deploys only if they pass. Progress and
+   history appear under the repo's **Environments → production**.
 
-Every push to `main` then runs both test suites and deploys only if they pass.
+One-time setup — a deploy token scoped to this app:
+
+```bash
+fly tokens create deploy -x 999999h
+```
+
+Add it in GitHub → Settings → Secrets and variables → Actions → **New repository
+secret**, name `FLY_API_TOKEN`.
+
+To switch to fully automatic deploys later, change the deploy job's `if:` to
+`github.event_name == 'push' && github.ref == 'refs/heads/main'`.
+
+Manual deploys from your machine still work (`fly deploy`), but they build
+from your **local folder** — be on an up-to-date `main` with no uncommitted
+changes first.
 
 ## Troubleshooting
 
