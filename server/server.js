@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const helmet = require("helmet");
+const compression = require("compression");
 const { Server } = require("socket.io");
 // Always load server/.env regardless of the process's current working
 // directory (e.g. `npm run server` from the repo root runs with cwd at the
@@ -31,6 +32,10 @@ const server = http.createServer(app);
 // revisit once the production origin is finalized.
 app.use(helmet({ contentSecurityPolicy: false }));
 
+// gzip responses (mainly the ~535 KB client bundle) — cuts egress, which is
+// billed per GB on the host. Socket.IO traffic is unaffected.
+app.use(compression());
+
 app.use(express.json());
 
 // Serve the built React client (see Dockerfile, which builds client/ into
@@ -49,12 +54,15 @@ const io = new Server(server, {
 });
 
 // -- @socket.io/redis-adapter (horizontal scaling) -----------------------------
-// Only active when REDIS_ADAPTER_URL is set (same Redis or separate instance).
-if (process.env.REDIS_ADAPTER_URL || process.env.REDIS_URL) {
+// Only active when REDIS_ADAPTER_URL is set explicitly. A single instance gains
+// nothing from it, and on a per-command-billed Redis (e.g. Upstash) its pub/sub
+// traffic on every broadcast is pure cost. Set it (usually to REDIS_URL) only
+// when running 2+ instances.
+if (process.env.REDIS_ADAPTER_URL) {
   try {
     const { createAdapter } = require("@socket.io/redis-adapter");
     const { createClient } = require("redis");
-    const adapterUrl = process.env.REDIS_ADAPTER_URL || process.env.REDIS_URL;
+    const adapterUrl = process.env.REDIS_ADAPTER_URL;
 
     const pubClient = createClient({ url: adapterUrl });
     const subClient = pubClient.duplicate();
@@ -101,7 +109,16 @@ app.get("/api/health", async (req, res) => {
 });
 
 // -- REST: GET /api/stats -----------------------------------------------------------
+// The landing page polls this every 10s per visitor, and each computation is a
+// KEYS scan plus a GET per room — so successful results are cached briefly and
+// shared across all pollers.
+const STATS_CACHE_MS = Number(process.env.STATS_CACHE_MS ?? 10000);
+let statsCache = { at: 0, body: null };
+
 app.get("/api/stats", async (req, res) => {
+  if (statsCache.body && Date.now() - statsCache.at < STATS_CACHE_MS) {
+    return res.json(statsCache.body);
+  }
   try {
     const redis = require("./redisClient");
     const keys = await redis.keys("room:*");
@@ -116,7 +133,8 @@ app.get("/api/stats", async (req, res) => {
       activePlayers += (room.users || []).length;
       if (room.game) gamesInProgress++;
     }
-    res.json({ activeRooms, activePlayers, gamesInProgress });
+    statsCache = { at: Date.now(), body: { activeRooms, activePlayers, gamesInProgress } };
+    res.json(statsCache.body);
   } catch (err) {
     console.error("GET /api/stats error:", err.message);
     res.status(500).json({ error: "stats unavailable" });

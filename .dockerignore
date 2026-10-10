@@ -2,3 +2,16 @@ node_modules
 client/node_modules
 server/node_modules
 dist
+client/dist
+**/coverage
+**/__tests__
+**/__mocks__
+.git
+.github
+.claude
+docs
+load-tests
+server/.env
+**/.env
+*.log
+fly.toml

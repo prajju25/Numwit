@@ -65,6 +65,7 @@ describe("server.js", () => {
 
   beforeAll(() => {
     process.env.PORT = "0";
+    process.env.STATS_CACHE_MS = "0"; // each test sees fresh stats; caching has its own test below
     delete process.env.REDIS_URL;
     delete process.env.REDIS_ADAPTER_URL;
 
@@ -398,8 +399,8 @@ describe("server.js redis adapter setup", () => {
     jest.dontMock("redis");
   });
 
-  test("activates the redis adapter when REDIS_URL is set and clients connect", async () => {
-    process.env.REDIS_URL = "redis://adapter-host:6379";
+  test("activates the redis adapter when REDIS_ADAPTER_URL is set and clients connect", async () => {
+    process.env.REDIS_ADAPTER_URL = "redis://adapter-host:6379";
     const consoleLogSpy = jest.spyOn(console, "log").mockImplementation(() => {});
 
     let mod;
@@ -418,7 +419,7 @@ describe("server.js redis adapter setup", () => {
   });
 
   test("warns when the redis-adapter package cannot be loaded", async () => {
-    process.env.REDIS_URL = "redis://adapter-host:6379";
+    process.env.REDIS_ADAPTER_URL = "redis://adapter-host:6379";
     const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
 
     jest.doMock("@socket.io/redis-adapter", () => {
@@ -441,7 +442,7 @@ describe("server.js redis adapter setup", () => {
   });
 
   test("warns when the redis-adapter clients fail to connect", async () => {
-    process.env.REDIS_URL = "redis://adapter-host:6379";
+    process.env.REDIS_ADAPTER_URL = "redis://adapter-host:6379";
     const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
 
     jest.doMock("redis", () => ({
@@ -466,6 +467,54 @@ describe("server.js redis adapter setup", () => {
       expect.any(String)
     );
     consoleWarnSpy.mockRestore();
+    if (mod.server?.listening) {
+      await new Promise((r) => mod.server.close(r));
+    }
+  });
+
+  // Keep last in this block: afterEach's jest.dontMock("redis") would otherwise
+  // swap the auto-mocked redis for the real client in the tests that follow.
+  test("does not activate the redis adapter from REDIS_URL alone (single instance)", async () => {
+    process.env.REDIS_URL = "redis://adapter-host:6379";
+    mockIoAdapter.mockClear();
+
+    let mod;
+    jest.isolateModules(() => {
+      mod = require("../server");
+    });
+
+    await flush();
+    await flush();
+
+    expect(mockIoAdapter).not.toHaveBeenCalled();
+    if (mod.server?.listening) {
+      await new Promise((r) => mod.server.close(r));
+    }
+  });
+});
+
+describe("server.js /api/stats cache", () => {
+  afterEach(() => {
+    process.env.STATS_CACHE_MS = "0";
+  });
+
+  test("serves repeat polls from cache instead of re-scanning Redis", async () => {
+    process.env.STATS_CACHE_MS = "60000";
+    let mod;
+    let redis;
+    jest.isolateModules(() => {
+      mod = require("../server");
+      redis = require("../redisClient");
+    });
+    redis.keys.mockResolvedValue(["room:1"]);
+    redis.get.mockResolvedValue(JSON.stringify({ users: [{ socketId: "a" }], game: null }));
+
+    const first = await supertest(mod.app).get("/api/stats");
+    const second = await supertest(mod.app).get("/api/stats");
+
+    expect(first.body).toEqual({ activeRooms: 1, activePlayers: 1, gamesInProgress: 0 });
+    expect(second.body).toEqual(first.body);
+    expect(redis.keys).toHaveBeenCalledTimes(1);
     if (mod.server?.listening) {
       await new Promise((r) => mod.server.close(r));
     }
