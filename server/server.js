@@ -145,7 +145,10 @@ app.get("/api/stats", async (req, res) => {
 app.get("/api/leaderboard", async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 10, 50);
-    const board = await statsService.getWeeklyLeaderboard(limit);
+    // ?period=all ranks every player ever recorded; default is the last 7 days.
+    const board = req.query.period === "all"
+      ? await statsService.getAllTimeLeaderboard(limit)
+      : await statsService.getWeeklyLeaderboard(limit);
     res.json({ leaderboard: board || [] });
   } catch (err) {
     console.error("GET /api/leaderboard error:", err.message);

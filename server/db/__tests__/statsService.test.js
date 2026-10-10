@@ -3,7 +3,7 @@ jest.mock("../prismaClient", () => ({
 }));
 
 const { db } = require("../prismaClient");
-const { writeSessionStat, getWeeklyLeaderboard, getPlayerStats } = require("../statsService");
+const { writeSessionStat, getWeeklyLeaderboard, getAllTimeLeaderboard, getPlayerStats } = require("../statsService");
 
 describe("statsService", () => {
   afterEach(() => {
@@ -267,5 +267,59 @@ describe("statsService", () => {
         bestStreak: 0,
       });
     });
+  });
+});
+
+// getAllTimeLeaderboard issues, in order: allTimeRows (groupBy, ranked),
+// allTimeWonRows, weekRows, weekWonRows (all groupBy), then users (findMany).
+describe("getAllTimeLeaderboard", () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test("returns [] when there are no sessions at all", async () => {
+    db.mockResolvedValueOnce([]);
+    expect(await getAllTimeLeaderboard()).toEqual([]);
+    db.mockResolvedValueOnce(null);
+    expect(await getAllTimeLeaderboard()).toEqual([]);
+  });
+
+  test("includes players with no games this week, ranked by all-time round wins", async () => {
+    db
+      .mockResolvedValueOnce([
+        { userId: 1, _sum: { wins: 40 }, _count: { id: 12 } },
+        { userId: 2, _sum: { wins: 25 }, _count: { id: 9 } },
+        { userId: 3, _sum: { wins: 5 }, _count: { id: 2 } }, // no user row -> filtered
+      ]) // allTimeRows
+      .mockResolvedValueOnce([{ userId: 1, _count: { id: 6 } }]) // allTimeWonRows
+      .mockResolvedValueOnce([{ userId: 2, _sum: { wins: 3 }, _count: { id: 1 } }]) // weekRows
+      .mockResolvedValueOnce([{ userId: 2, _count: { id: 1 } }]) // weekWonRows
+      .mockResolvedValueOnce([
+        { id: 1, name: "Jon", avatar: "😎", level: 5 },
+        { id: 2, name: "Prajju", avatar: "😎", level: 4 },
+      ]); // users
+
+    const result = await getAllTimeLeaderboard(50);
+
+    expect(result).toEqual([
+      {
+        id: 1, name: "Jon", avatar: "😎", level: 5,
+        weekGamesPlayed: 0, weekGamesWon: 0, weekRoundWins: 0,
+        allTimeGamesPlayed: 12, allTimeGamesWon: 6, allTimeRoundWins: 40,
+      },
+      {
+        id: 2, name: "Prajju", avatar: "😎", level: 4,
+        weekGamesPlayed: 1, weekGamesWon: 1, weekRoundWins: 3,
+        allTimeGamesPlayed: 9, allTimeGamesWon: 0, allTimeRoundWins: 25,
+      },
+    ]);
+  });
+
+  test("returns [] when the user lookup fails", async () => {
+    db
+      .mockResolvedValueOnce([{ userId: 1, _sum: {}, _count: {} }])
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    expect(await getAllTimeLeaderboard()).toEqual([]);
   });
 });

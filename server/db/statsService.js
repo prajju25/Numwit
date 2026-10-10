@@ -1,7 +1,7 @@
 /**
  * db/statsService.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Session stats persistence + weekly leaderboard.
+ * Session stats persistence + weekly and all-time leaderboards.
  */
 
 const { db } = require("./prismaClient");
@@ -134,6 +134,90 @@ async function getWeeklyLeaderboard(limit = 10) {
 }
 
 /**
+ * All-time leaderboard — top N players by round wins across every game ever
+ * recorded (not just players active this week). Same row shape as
+ * getWeeklyLeaderboard, so the client can render either.
+ * @param {number} limit  How many rows to return (default 10, max 100)
+ */
+async function getAllTimeLeaderboard(limit = 10) {
+  const take = Math.min(Math.max(1, Number(limit) || 10), 100);
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  // All-time: round wins + games played, ranked
+  const allTimeRows = await db((p) =>
+    p.sessionStat.groupBy({
+      by: ["userId"],
+      _sum:   { wins: true },
+      _count: { id: true },
+      orderBy: { _sum: { wins: "desc" } },
+      take,
+    })
+  );
+  if (!allTimeRows || allTimeRows.length === 0) return [];
+
+  const userIds = allTimeRows.map((r) => r.userId);
+  const countMap = (rows) => {
+    const map = {};
+    (rows || []).forEach((r) => { map[r.userId] = r._count.id; });
+    return map;
+  };
+
+  // All-time games won (survived=true)
+  const allTimeWonMap = countMap(await db((p) =>
+    p.sessionStat.groupBy({
+      by: ["userId"],
+      where: { userId: { in: userIds }, survived: true },
+      _count: { id: true },
+    })
+  ));
+
+  // This week's numbers for the same players
+  const weekRows = await db((p) =>
+    p.sessionStat.groupBy({
+      by: ["userId"],
+      where: { userId: { in: userIds }, playedAt: { gte: since } },
+      _sum:   { wins: true },
+      _count: { id: true },
+    })
+  );
+  const weekMap = {};
+  (weekRows || []).forEach((r) => {
+    weekMap[r.userId] = { gamesPlayed: r._count.id || 0, roundWins: r._sum.wins || 0 };
+  });
+
+  const weekWonMap = countMap(await db((p) =>
+    p.sessionStat.groupBy({
+      by: ["userId"],
+      where: { userId: { in: userIds }, playedAt: { gte: since }, survived: true },
+      _count: { id: true },
+    })
+  ));
+
+  const users = await db((p) =>
+    p.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, avatar: true, level: true },
+    })
+  );
+  if (!users) return [];
+
+  const userMap = {};
+  users.forEach((u) => { userMap[u.id] = u; });
+
+  return allTimeRows.map((r) => ({
+    ...(userMap[r.userId] || {}),
+    // 7-day
+    weekGamesPlayed: (weekMap[r.userId] || {}).gamesPlayed || 0,
+    weekGamesWon:    weekWonMap[r.userId]                  || 0,
+    weekRoundWins:   (weekMap[r.userId] || {}).roundWins   || 0,
+    // all-time
+    allTimeGamesPlayed: r._count.id          || 0,
+    allTimeGamesWon:    allTimeWonMap[r.userId] || 0,
+    allTimeRoundWins:   r._sum.wins          || 0,
+  })).filter((r) => r.name);
+}
+
+/**
  * Get all-time stats for a device.
  * Includes duelWins and soloWins for achievement checks.
  */
@@ -191,4 +275,4 @@ async function getPlayerStats(deviceId) {
   };
 }
 
-module.exports = { writeSessionStat, getWeeklyLeaderboard, getPlayerStats };
+module.exports = { writeSessionStat, getWeeklyLeaderboard, getAllTimeLeaderboard, getPlayerStats };
