@@ -215,3 +215,63 @@ describe("RoundResultOverlay", () => {
     });
   });
 });
+
+describe("RoundResultOverlay reveal choreography", () => {
+  const result = {
+    round: 4,
+    average: 41.6,
+    target: 33.28,
+    winnerIds: ["me"],
+    submissions: [
+      { socketId: "me", number: 34 },
+      { socketId: "bob", number: 52 },
+      { socketId: "carl", number: 18 },
+    ],
+    invalidSubmissions: [],
+    newlyEliminated: ["bob"],
+  };
+
+  beforeEach(() => { jest.useFakeTimers(); });
+  afterEach(() => { jest.useRealTimers(); delete window.matchMedia; });
+
+  const stage = (container) => container.querySelector(".nw-rv-banner").parentElement;
+
+  test("steps through phase flags p1…p5 and counts the average and target up", () => {
+    const { container } = render(<RoundResultOverlay result={result} voidData={null} players={players} onDismiss={() => {}} />);
+    expect(stage(container).className).not.toMatch(/\bp1\b/);
+    expect(screen.getByText("avg 0.0")).toBeInTheDocument();
+
+    act(() => { jest.advanceTimersByTime(300); });
+    expect(stage(container).className).toMatch(/\bp1\b/);
+
+    act(() => { jest.advanceTimersByTime(2100); }); // average tween done, sweep starting
+    expect(screen.getByText("avg 41.6")).toBeInTheDocument();
+
+    act(() => { jest.advanceTimersByTime(2200); });
+    expect(stage(container).className).toMatch(/\bp5\b/);
+    expect(screen.getByText("target 33.28")).toBeInTheDocument();
+  });
+
+  test("rows are sorted by distance with WIN / OUT / +1 chips and Δ values", () => {
+    __mockSocket.id = "me"; // no UserContext in this test — falls back to socket.id
+    render(<RoundResultOverlay result={result} voidData={null} players={players} onDismiss={() => {}} />);
+    const chips = screen.getAllByText(/^(WIN|OUT|\+1)$/).map((n) => n.textContent);
+    expect(chips).toEqual(["WIN", "+1", "OUT"]); // 34 (Δ0.72), 18 (Δ15.28), 52 (Δ18.72)
+    expect(screen.getByText("Δ 0.72")).toBeInTheDocument();
+    expect(screen.getByText("You read the room.")).toBeInTheDocument();
+    expect(screen.getByText("×0.8")).toBeInTheDocument();
+    __mockSocket.id = "mock-socket-id";
+  });
+
+  test("exact matches show +2 penalties", () => {
+    render(<RoundResultOverlay result={{ ...result, exactMatch: true, newlyEliminated: [] }} voidData={null} players={players} onDismiss={() => {}} />);
+    expect(screen.getAllByText("+2")).toHaveLength(2);
+  });
+
+  test("reduced motion jumps straight to the final frame", () => {
+    window.matchMedia = jest.fn().mockReturnValue({ matches: true });
+    const { container } = render(<RoundResultOverlay result={result} voidData={null} players={players} onDismiss={() => {}} />);
+    expect(stage(container).className).toMatch(/\bp5\b/);
+    expect(screen.getByText("avg 41.6")).toBeInTheDocument();
+  });
+});

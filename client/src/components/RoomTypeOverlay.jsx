@@ -15,25 +15,25 @@ export default function RoomTypeOverlay({ onClose }) {
   };
 
   const overlayContent = (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4">
-      <div className="glass-card w-full max-w-sm p-8 animate-fadeIn space-y-6 text-center">
+    <div className="fixed inset-0 z-50 bg-[#05060D]/75 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0 nw-fade">
+      <div className="glass-card rounded-3xl w-full max-w-sm p-6 sm:p-8 nw-rise space-y-6 text-center">
         <div>
           <div className="text-4xl mb-3">🏠</div>
-          <h2 className="text-2xl font-extrabold text-white">Choose Room Type</h2>
+          <h2 className="font-display text-2xl font-bold text-white">Choose Room Type</h2>
           <p className="text-white/50 text-sm mt-1">Start a new game session</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => handleRoomSelection("public")}
-            className="flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all duration-200 active:scale-95 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20"
+            className="flex-1 h-12 px-4 rounded-xl font-bold text-sm transition-all duration-200 active:scale-95 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/20"
             style={{ background: "rgba(16,185,129,0.12)" }}
           >
             🌍 Public Room
           </button>
           <button
             onClick={() => handleRoomSelection("private")}
-            className="flex-1 py-3 px-4 rounded-xl font-bold text-sm btn-primary"
+            className="flex-1 h-12 px-4 rounded-xl font-bold text-sm btn-primary"
           >
             🔒 Private Room
           </button>
@@ -41,13 +41,13 @@ export default function RoomTypeOverlay({ onClose }) {
 
         <button
           onClick={() => handleRoomSelection("solo")}
-          className="w-full py-3 px-4 rounded-xl font-bold text-sm transition-all duration-200 active:scale-95 border border-sky-500/40 text-sky-300 hover:bg-sky-500/20"
+          className="w-full h-12 px-4 rounded-xl font-bold text-sm transition-all duration-200 active:scale-95 border border-sky-500/40 text-sky-300 hover:bg-sky-500/20"
           style={{ background: "rgba(14,165,233,0.12)" }}
         >
           🤖 Play vs Computer
         </button>
 
-        <button onClick={onClose} className="text-xs text-white/30 hover:text-white/60 transition">
+        <button onClick={onClose} className="min-h-[44px] px-4 text-sm text-white/40 hover:text-white/70 transition">
           Cancel
         </button>
       </div>

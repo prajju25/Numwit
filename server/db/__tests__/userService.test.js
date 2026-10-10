@@ -11,6 +11,7 @@ const {
   updateConsecutiveGameWins,
   xpToLevel,
   xpForNextLevel,
+  levelProgress,
   XP_THRESHOLDS,
 } = require("../userService");
 
@@ -50,6 +51,25 @@ describe("userService", () => {
 
     test("returns null at max level", () => {
       expect(xpForNextLevel(10)).toBeNull();
+    });
+  });
+
+  describe("levelProgress", () => {
+    test("reports progress through the current level", () => {
+      expect(levelProgress(375)).toEqual({ xp: 375, level: 3, xpLevelStart: 250, xpNextLevel: 500, progress: 0.5 });
+    });
+
+    test("starts a level at 0 progress", () => {
+      expect(levelProgress(100)).toMatchObject({ level: 2, progress: 0 });
+    });
+
+    test("treats missing or negative xp as 0", () => {
+      expect(levelProgress(undefined)).toMatchObject({ xp: 0, level: 1, xpLevelStart: 0, xpNextLevel: 100, progress: 0 });
+      expect(levelProgress(-50)).toMatchObject({ xp: 0, progress: 0 });
+    });
+
+    test("is full at max level with no next threshold", () => {
+      expect(levelProgress(9999)).toMatchObject({ level: 10, xpNextLevel: null, progress: 1 });
     });
   });
 

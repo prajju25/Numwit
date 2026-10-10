@@ -1,10 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
+import PropTypes from "prop-types";
+import { twMerge } from "tailwind-merge";
 import { useChat } from "../contexts/ChatContext";
 import { useUser } from "../contexts/UserContext";
 import { useGame } from "../contexts/GameContext";
 import socket from "../socket";
 
-export default function RoomChat() {
+/**
+ * RoomChat — room-wide text chat.
+ *   embedded=false (default): standalone glass card (WaitingRoom).
+ *   embedded=true: no card chrome or header; fills its parent's height
+ *   (in-game chat sheet on mobile, side panel on desktop).
+ */
+export default function RoomChat({ embedded = false, className }) {
   const { roomId, user } = useUser();
   const { players } = useGame();
   const { messages, rateLimited, sendMessage } = useChat();
@@ -15,7 +23,7 @@ export default function RoomChat() {
   const isTypingRef = useRef(false);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
   }, [messages]);
 
   useEffect(() => {
@@ -79,32 +87,37 @@ export default function RoomChat() {
     : null;
 
   return (
-    <div className="glass-card overflow-hidden">
+    <div
+      data-room-chat
+      className={twMerge(
+        embedded ? "flex flex-col min-h-0" : "glass-card rounded-[18px] overflow-hidden flex flex-col",
+        className
+      )}
+    >
       {/* Header */}
-      <div className="px-4 py-2.5 border-b border-white/10 label-muted"
-        style={{ background: "rgba(255,255,255,0.05)" }}>
-        💬 Room Chat
-      </div>
+      {!embedded && (
+        <div className="px-4 pt-3.5 pb-1 font-display text-base font-bold">
+          💬 Room Chat
+        </div>
+      )}
 
       {/* Messages */}
-      <div className="overflow-y-auto max-h-40 p-3 space-y-2">
+      <div className={twMerge("overflow-y-auto px-3.5 py-2 flex flex-col gap-2", embedded ? "flex-1 min-h-0" : "max-h-48")}>
         {messages.length === 0 && (
-          <p className="text-xs text-white/30 text-center py-4">No messages yet — say hi! 👋</p>
+          <p className="text-xs text-[#8F95B8] text-center py-4 m-0">No messages yet — say hi! 👋</p>
         )}
         {messages.map((msg, i) => {
           const isMe = msg.socketId === mySocketId;
           return (
-            <div key={i} className={`flex items-start gap-2 ${isMe ? "flex-row-reverse" : ""}`}>
-              <span className="text-lg shrink-0">{msg.avatar}</span>
-              <div className={`max-w-[75%] flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                {!isMe && <span className="text-[10px] text-white/35 mb-0.5">{msg.name}</span>}
-                <span className={`text-sm px-3 py-1.5 rounded-2xl break-words ${
-                  isMe
-                    ? "bg-violet-600 text-white rounded-tr-sm"
-                    : "bg-white/10 border border-white/10 text-white/80 rounded-tl-sm"
-                }`}>
-                  {msg.message}
-                </span>
+            <div key={i} className={`nw-msg flex items-end gap-2 ${isMe ? "flex-row-reverse" : ""}`}>
+              <span className="text-lg shrink-0 leading-none">{msg.avatar}</span>
+              <div className={`max-w-[78%] px-3 py-1.5 text-sm leading-snug break-words ${
+                isMe
+                  ? "bg-violet-600/80 text-white rounded-[14px_14px_4px_14px]"
+                  : "bg-white/[0.07] text-white/90 rounded-[14px_14px_14px_4px]"
+              }`}>
+                {!isMe && <span className="block text-[10px] font-bold text-[#A3A8C7]">{msg.name}</span>}
+                <span>{msg.message}</span>
               </div>
             </div>
           );
@@ -114,35 +127,35 @@ export default function RoomChat() {
 
       {/* Typing */}
       {typingLabel && (
-        <div className="px-4 py-1 text-[10px] text-white/35 italic border-t border-white/5">
+        <div className="px-4 py-1 flex items-center gap-2 text-[11px] text-[#8F95B8]">
+          <span className="nw-typing" aria-hidden="true"><span /><span /><span /></span>
           {typingLabel}
         </div>
       )}
 
       {/* Rate limit */}
       {rateLimited && (
-        <div className="px-4 py-1 text-xs text-amber-400 border-t border-amber-500/20"
-          style={{ background: "rgba(245,158,11,0.08)" }}>
+        <div className="mx-3.5 mt-1 px-3 py-1.5 rounded-lg text-xs text-amber-300 border border-amber-500/25 bg-amber-500/10">
           ⚠️ {rateLimited}
         </div>
       )}
 
       {/* Input */}
-      <div className="flex items-center gap-2 p-3 border-t border-white/10"
-        style={{ background: "rgba(255,255,255,0.03)" }}>
+      <div className="flex items-center gap-2 m-3 h-12 pl-3.5 pr-1.5 rounded-xl bg-black/30 border border-white/10 focus-within:border-violet-400/60 transition-colors">
         <input
           type="text"
           value={draft}
           onChange={handleChange}
           onKeyDown={handleKey}
           maxLength={200}
+          aria-label="Chat message"
           placeholder="Type a message…"
-          className="flex-1 text-sm px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-white placeholder:text-white/30 focus:outline-none focus:border-violet-400 transition-colors"
+          className="flex-1 min-w-0 bg-transparent border-0 outline-none text-[15px] text-white placeholder:text-white/30"
         />
         <button
           onClick={handleSend}
           disabled={!draft.trim()}
-          className="text-sm px-4 py-2 rounded-lg bg-violet-600 text-white font-bold disabled:opacity-30 hover:bg-violet-500 transition"
+          className="h-9 px-3.5 rounded-[10px] bg-violet-600 text-white text-sm font-bold disabled:opacity-30 hover:bg-violet-500 transition active:scale-95"
         >
           Send
         </button>
@@ -150,3 +163,8 @@ export default function RoomChat() {
     </div>
   );
 }
+
+RoomChat.propTypes = {
+  embedded: PropTypes.bool,
+  className: PropTypes.string,
+};

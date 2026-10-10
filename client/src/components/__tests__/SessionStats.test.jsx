@@ -68,3 +68,22 @@ describe("SessionStats", () => {
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 });
+
+describe("SessionStats target trend", () => {
+  test("draws the target line with a dot per round once there are 2+ rounds", () => {
+    const history = [
+      { round: 1, target: 38.1, winnerIds: ["me"], submissions: [{ socketId: "me", number: 40 }] },
+      { round: 2, target: 31.4, winnerIds: ["x"], submissions: [{ socketId: "me", number: 50 }] },
+      { round: 3, target: 28.4, winnerIds: ["me"], submissions: [] },
+    ];
+    const { container } = render(<SessionStats history={history} mySocketId="me" />);
+    expect(screen.getByRole("img", { name: /Target moved from 38.1 in round 1 to 28.4 in round 3/ })).toBeInTheDocument();
+    expect(container.querySelectorAll("circle")).toHaveLength(2); // no pick in round 3
+    expect(container.querySelector("circle[fill='#FBBF24']")).toBeInTheDocument(); // won round 1
+  });
+
+  test("skips the chart for a single round", () => {
+    render(<SessionStats history={[{ round: 1, target: 30, winnerIds: [], submissions: [] }]} mySocketId="me" />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+});

@@ -54,21 +54,24 @@ export default function AchievementToast() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-6 right-4 z-50 flex flex-col gap-2 items-end pointer-events-none">
+    <div className="fixed top-16 sm:top-auto sm:bottom-6 left-3 right-3 sm:left-auto sm:right-4 z-[55] flex flex-col gap-2 items-stretch sm:items-end pointer-events-none">
       {toasts.map((t) => (
         <div
           key={t.id}
           className={[
-            "flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl max-w-xs animate-fadeIn pointer-events-auto",
+            "nw-pop flex items-start gap-3 px-4 py-3 rounded-2xl sm:max-w-xs pointer-events-auto border backdrop-blur-md shadow-[0_14px_34px_-12px_rgba(0,0,0,0.7)]",
             t.type === "levelup"
-              ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
-              : "bg-gradient-to-r from-amber-500 to-yellow-400 text-white",
+              ? "bg-violet-950/90 border-violet-400/50 text-white"
+              : "bg-[#1f1a0a]/90 border-amber-400/50 text-white",
           ].join(" ")}
         >
-          <span className="text-2xl shrink-0">{t.icon}</span>
+          <span className={[
+            "w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-lg",
+            t.type === "levelup" ? "bg-gradient-to-br from-violet-600 to-violet-400" : "bg-gradient-to-br from-amber-500 to-amber-300",
+          ].join(" ")}>{t.icon}</span>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide opacity-80">{t.title}</p>
-            <p className="text-sm font-semibold leading-tight">{t.body}</p>
+            <p className={`text-[11px] font-extrabold uppercase tracking-wider m-0 ${t.type === "levelup" ? "text-violet-300" : "text-amber-300"}`}>{t.title}</p>
+            <p className="text-sm font-semibold leading-tight m-0 mt-0.5">{t.body}</p>
           </div>
         </div>
       ))}

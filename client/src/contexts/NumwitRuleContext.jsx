@@ -24,6 +24,10 @@ export const NumwitRuleProvider = ({ children }) => {
   // on next_round AND on round_void (server restarts same-round timer).
   // Used as part of CountdownTimer's key to force a clean remount.
   const [timerKey,          setTimerKey]          = useState(0);
+  // Post-game rewards: xp_update and achievement_unlocked arrive just after
+  // game_over and are shown on GameOverScreen.
+  const [xpData,            setXpData]            = useState(null);
+  const [newAchievements,   setNewAchievements]   = useState([]);
 
   // If this provider mounted because the user rejoined mid-game, GameContext
   // will have stored a snapshot in spectatorSnapshot before the mount happened.
@@ -52,8 +56,8 @@ export const NumwitRuleProvider = ({ children }) => {
       if (data.hostSocketId)      setHostSocketId(data.hostSocketId);
     };
 
-    const onWaitingForPlayers = ({ submitted: s, total }) => {
-      setWaitingCount({ submitted: s, total });
+    const onWaitingForPlayers = ({ submitted: s, total, submittedIds }) => {
+      setWaitingCount({ submitted: s, total, submittedIds: submittedIds || [] });
     };
 
     const onRoundVoid = (data) => {
@@ -82,6 +86,10 @@ export const NumwitRuleProvider = ({ children }) => {
     };
 
     const onGameOver        = (data)          => setGameOver(data);
+    const onXpUpdate        = (data)          => setXpData(data);
+    const onAchievement     = (ach)           => setNewAchievements((prev) =>
+      prev.some((a) => a.id === ach.id) ? prev : [...prev, ach]
+    );
     const onTimerExpired    = ()              => setTimerExpired(true);
 
     const onGameReset = () => {
@@ -95,6 +103,8 @@ export const NumwitRuleProvider = ({ children }) => {
       setAlert(null);
       setHistory([]);
       setTimerExpired(false);
+      setXpData(null);
+      setNewAchievements([]);
     };
 
     const onInvalidNumber = ({ message }) => {
@@ -123,6 +133,8 @@ export const NumwitRuleProvider = ({ children }) => {
     socket.on("duplicate_submission",    onDuplicateSubmission);
     socket.on("round_already_completed", onRoundAlreadyCompleted);
     socket.on("timer_expired",           onTimerExpired);
+    socket.on("xp_update",               onXpUpdate);
+    socket.on("achievement_unlocked",    onAchievement);
 
     return () => {
       socket.off("next_round",              onNextRound);
@@ -137,6 +149,8 @@ export const NumwitRuleProvider = ({ children }) => {
       socket.off("duplicate_submission",    onDuplicateSubmission);
       socket.off("round_already_completed", onRoundAlreadyCompleted);
       socket.off("timer_expired",           onTimerExpired);
+      socket.off("xp_update",               onXpUpdate);
+      socket.off("achievement_unlocked",    onAchievement);
     };
   }, []);
 
@@ -158,11 +172,14 @@ export const NumwitRuleProvider = ({ children }) => {
       hostSocketId,
       timerExpired,
       timerKey,
+      xpData,
+      myLevel: xpData?.level ?? null,
+      newAchievements,
     }),
     [
       gameData, roundResult, roundVoid, submitted, selectedNumber,
       waitingCount, gameOver, eliminatedPlayers, alert, history,
-      hostSocketId, timerExpired, timerKey,
+      hostSocketId, timerExpired, timerKey, xpData, newAchievements,
     ]
   );
 

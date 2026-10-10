@@ -104,6 +104,14 @@ describe("ShareCardModal", () => {
     await waitFor(() => expect(toPng).toHaveBeenCalled());
     await waitFor(() => expect(clickSpy).toHaveBeenCalled());
 
+    // Exports at 1080px wide and leaves the animated sheen out
+    const opts = toPng.mock.calls[0][1];
+    expect(opts.pixelRatio).toBe(1080 / 360);
+    const sheen = realCreateElement("div");
+    sheen.className = "nw-sheen";
+    expect(opts.filter(sheen)).toBe(false);
+    expect(opts.filter(realCreateElement("div"))).toBe(true);
+
     document.createElement.mockRestore();
   });
 

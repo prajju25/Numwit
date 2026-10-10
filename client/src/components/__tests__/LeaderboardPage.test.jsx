@@ -208,3 +208,47 @@ describe("LeaderboardPage", () => {
     expect(onBack).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("LeaderboardPage period tabs and your-rank bar", () => {
+  beforeEach(() => {
+    useUser.mockReturnValue({ user: { name: "Alice", avatar: "🐱" }, deviceId: "dev1" });
+  });
+  afterEach(() => { delete global.fetch; });
+
+  test("switching to All time shows all-time numbers", async () => {
+    global.fetch = jest.fn(() => Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(5) }) }));
+    render(<LeaderboardPage onBack={jest.fn()} />);
+    await act(async () => {});
+
+    expect(screen.getAllByText("3 games", { exact: false }).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "All time" }));
+    expect(screen.getByRole("tab", { name: "All time" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByText("10 games", { exact: false }).length).toBeGreaterThan(0);
+  });
+
+  test("shows a sticky your-rank bar with Share card when your row is on another page", async () => {
+    const board = boardOf(15).map((e, i) => (i === 0 ? { ...e, name: "Zed", avatar: "👻" } : e));
+    board[11] = { ...board[11], name: "Alice", avatar: "🐱" };
+    global.fetch = jest.fn((url) => {
+      if (url.startsWith("/api/leaderboard")) {
+        return Promise.resolve({ json: () => Promise.resolve({ leaderboard: board }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: "Alice" }) });
+    });
+
+    render(<LeaderboardPage onBack={jest.fn()} />);
+    await act(async () => {});
+
+    expect(screen.getByText("#12")).toBeInTheDocument();
+    expect(screen.getByText("Alice (you)")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Share card"));
+    await act(async () => {});
+    expect(screen.getByTestId("share-rank")).toHaveTextContent("12");
+
+    // On page 2 the row itself carries the Share button and the bar goes away
+    fireEvent.click(screen.getByText("close-share"));
+    fireEvent.click(screen.getByText("Next ›"));
+    expect(screen.queryByText("Alice (you)")).not.toBeInTheDocument();
+    expect(screen.getByText("Share")).toBeInTheDocument();
+  });
+});

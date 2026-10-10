@@ -21,8 +21,11 @@ describe("LandingPage", () => {
     await act(async () => {});
 
     expect(screen.getByText("Numwit")).toBeInTheDocument();
-    expect(screen.getAllByText(/Play Now|Enter the game/).length).toBeGreaterThan(0);
-    expect(screen.getByText("Pick a number")).toBeInTheDocument();
+    expect(screen.getAllByText(/Play now|Enter the game/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Pick in secret")).toBeInTheDocument();
+    expect(screen.getByText("Target = 80% of the average")).toBeInTheDocument();
+    expect(screen.getByText("Advanced rules")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Demo: five players pick/)).toBeInTheDocument();
     expect(screen.getByText("Last one standing")).toBeInTheDocument();
     expect(screen.getByText("No account needed. Ever.")).toBeInTheDocument();
   });
@@ -36,8 +39,21 @@ describe("LandingPage", () => {
     await act(async () => {});
 
     const { fireEvent } = require("@testing-library/react");
-    fireEvent.click(screen.getByText("Play Now — Free"));
+    fireEvent.click(screen.getAllByRole("button", { name: /Play now/ })[0]);
     expect(onPlay).toHaveBeenCalled();
+  });
+
+  test("calls onLeaderboard from the top bar", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ json: () => Promise.resolve({ activePlayers: 0, gamesPlayedToday: 0, activeRooms: 0 }) })
+    );
+    const onLeaderboard = jest.fn();
+    render(<LandingPage onPlay={jest.fn()} onLeaderboard={onLeaderboard} />);
+    await act(async () => {});
+
+    const { fireEvent } = require("@testing-library/react");
+    fireEvent.click(screen.getByRole("button", { name: "Leaderboard" }));
+    expect(onLeaderboard).toHaveBeenCalled();
   });
 
   test("shows live stats when the stats endpoint returns non-zero values", async () => {
@@ -49,8 +65,9 @@ describe("LandingPage", () => {
     await act(async () => {});
 
     expect(await screen.findByText(/5 online/)).toBeInTheDocument();
-    expect(screen.getByText(/12 games today/)).toBeInTheDocument();
-    expect(screen.getByText(/2 rooms active/)).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.getByText("games today")).toBeInTheDocument();
+    expect(screen.getByText("rooms active")).toBeInTheDocument();
   });
 
   test("hides the stats pill when fetch fails", async () => {

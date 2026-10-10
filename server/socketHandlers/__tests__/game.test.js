@@ -20,6 +20,7 @@ jest.mock("../../db/userService", () => ({
   awardXp: jest.fn(() => Promise.resolve(null)),
   getProfile: jest.fn(() => Promise.resolve(null)),
   updateConsecutiveGameWins: jest.fn(() => Promise.resolve(0)),
+  levelProgress: jest.requireActual("../../db/userService").levelProgress,
 }));
 jest.mock("../../db/statsService", () => ({
   writeSessionStat: jest.fn(() => Promise.resolve(null)),
@@ -275,7 +276,7 @@ describe("game socket handler", () => {
       expect(socket.emit).toHaveBeenCalledWith("number_received", { no: 50 });
       expect(room.game.numbers.p1).toBe(50);
       expect(roomManager.saveRoom).toHaveBeenCalledWith(room);
-      expect(io._emit).toHaveBeenCalledWith("waiting_for_players", { submitted: 1, total: 3 });
+      expect(io._emit).toHaveBeenCalledWith("waiting_for_players", { submitted: 1, total: 3, submittedIds: ["p1"] });
     });
 
     test("clamps and rounds the submitted number to the 0-100 range", async () => {
@@ -547,7 +548,7 @@ describe("game socket handler", () => {
         expect(userService.awardXp).toHaveBeenCalledWith("dev1", expect.any(Object));
         expect(achievementService.checkAndAward).toHaveBeenCalled();
         expect(targetSocket.emit).toHaveBeenCalledWith("achievement_unlocked", expect.objectContaining({ id: "first_win" }));
-        expect(targetSocket.emit).toHaveBeenCalledWith("xp_update", expect.objectContaining({ xp: 120, level: 2 }));
+        expect(targetSocket.emit).toHaveBeenCalledWith("xp_update", expect.objectContaining({ xp: 120, level: 2, xpLevelStart: 100, xpNextLevel: 250, progress: 0.0 + 20 / 150 }));
       });
 
       test("when game_over fires with no winner, winnerSocketId is null", async () => {

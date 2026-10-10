@@ -99,7 +99,40 @@ describe("NumwitRuleContext", () => {
       __mockSocket.__trigger("waiting_for_players", { submitted: 2, total: 5 });
     });
 
-    expect(result.current.waitingCount).toEqual({ submitted: 2, total: 5 });
+    expect(result.current.waitingCount).toEqual({ submitted: 2, total: 5, submittedIds: [] });
+  });
+
+  test("waiting_for_players keeps the ids of players who have locked in", () => {
+    mockGameContext();
+    const { result } = renderHook(() => useNumwit(), { wrapper });
+
+    act(() => {
+      __mockSocket.__trigger("waiting_for_players", { submitted: 1, total: 3, submittedIds: ["p1"] });
+    });
+
+    expect(result.current.waitingCount.submittedIds).toEqual(["p1"]);
+  });
+
+  test("xp_update and achievement_unlocked are collected until game_reset", () => {
+    mockGameContext();
+    const { result } = renderHook(() => useNumwit(), { wrapper });
+    expect(result.current.xpData).toBeNull();
+    expect(result.current.myLevel).toBeNull();
+
+    act(() => {
+      __mockSocket.__trigger("xp_update", { xp: 375, level: 3, xpGained: 50, levelUp: true, progress: 0.5 });
+      __mockSocket.__trigger("achievement_unlocked", { id: "hat_trick", name: "Hat Trick" });
+      __mockSocket.__trigger("achievement_unlocked", { id: "hat_trick", name: "Hat Trick" });
+    });
+
+    expect(result.current.xpData).toMatchObject({ xp: 375, level: 3 });
+    expect(result.current.myLevel).toBe(3);
+    expect(result.current.newAchievements).toEqual([{ id: "hat_trick", name: "Hat Trick" }]);
+
+    act(() => { __mockSocket.__trigger("game_reset"); });
+
+    expect(result.current.xpData).toBeNull();
+    expect(result.current.newAchievements).toEqual([]);
   });
 
   test("round_void sets roundVoid, resets submission state, and bumps timerKey", () => {

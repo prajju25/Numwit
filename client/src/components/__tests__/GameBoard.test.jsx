@@ -21,6 +21,7 @@ jest.mock("../NumberInput", () => (props) => (
     data-testid="number-input"
     disabled={props.disabled}
     onClick={() => props.onSelect(42)}
+    data-last-target={props.lastTarget}
   >
     NumberInput-{props.selectedNumber}
   </button>
@@ -50,6 +51,7 @@ jest.mock("../../modals/FloatingAlert", () => (props) => (
   </div>
 ));
 jest.mock("../VoicePanel", () => () => <div data-testid="voice-panel" />);
+jest.mock("../GameChat", () => (props) => <div data-testid={`game-chat-${props.variant}`} />);
 
 const players = [
   { socketId: "p0", name: "Alice", avatar: "🐱" },
@@ -253,9 +255,55 @@ describe("GameBoard", () => {
     expect(screen.getByTestId("round-history")).toBeInTheDocument();
     expect(screen.getByTestId("voice-panel")).toBeInTheDocument();
     expect(screen.getByTestId("emote-bar")).toBeInTheDocument();
-    // Rendered twice — a desktop variant (hidden on mobile) and a mobile
-    // variant (hidden on desktop) — so both copies exist in the DOM.
-    expect(screen.getAllByTestId("tutorial-overlay").length).toBe(2);
+    // One layout is mounted at a time, so the tip renders exactly once.
+    expect(screen.getAllByTestId("tutorial-overlay").length).toBe(1);
+  });
+
+  describe("responsive layout", () => {
+    const setWidth = (w) => {
+      Object.defineProperty(window, "innerWidth", { value: w, configurable: true });
+      window.matchMedia = jest.fn().mockReturnValue({
+        matches: w >= 1024, addEventListener: jest.fn(), removeEventListener: jest.fn(),
+      });
+    };
+    afterEach(() => { setWidth(1024); delete window.matchMedia; });
+
+    test("desktop shows the chat as a side panel", () => {
+      setWidth(1440);
+      render(<GameBoard />);
+      expect(screen.getByTestId("game-chat-panel")).toBeInTheDocument();
+      expect(screen.queryByTestId("game-chat-dock")).not.toBeInTheDocument();
+    });
+
+    test("mobile shows the chat button in the bottom dock", () => {
+      setWidth(390);
+      render(<GameBoard />);
+      expect(screen.getByTestId("game-chat-dock")).toBeInTheDocument();
+      expect(screen.queryByTestId("game-chat-panel")).not.toBeInTheDocument();
+      expect(screen.getByTestId("emote-bar")).toBeInTheDocument();
+    });
+  });
+
+  test("ticks the avatars of players who have locked in", () => {
+    useNumwit.mockReturnValue({
+      ...baseNumwit(),
+      waitingCount: { submitted: 1, total: 3, submittedIds: ["p1"] },
+    });
+    render(<GameBoard />);
+    expect(screen.getByTitle("Bob — locked in")).toBeInTheDocument();
+    expect(screen.getByTitle("Alice")).toBeInTheDocument();
+  });
+
+  test("counts my own pick as locked once submitted", () => {
+    useNumwit.mockReturnValue({ ...baseNumwit(), submitted: true, selectedNumber: 12 });
+    render(<GameBoard />);
+    expect(screen.getByTitle("Alice — locked in")).toBeInTheDocument();
+  });
+
+  test("passes the previous round's target to the number input", () => {
+    useNumwit.mockReturnValue({ ...baseNumwit(), history: [{ round: 2, target: 28.4 }] });
+    render(<GameBoard />);
+    expect(screen.getByTestId("number-input")).toHaveAttribute("data-last-target", "28.4");
   });
 
   test("pauses the CountdownTimer while a round result or void overlay is showing", () => {

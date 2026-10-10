@@ -15,6 +15,8 @@ const DEFAULT_SETTINGS = {
   duplicateRuleEnabled: true,
 };
 
+const MAX_SEATS = 8;
+
 export default function WaitingRoom() {
   const { roomType, roomId, user } = useUser();
   const { players, hostSocketId, botFillAt } = useGame();
@@ -24,16 +26,25 @@ export default function WaitingRoom() {
 
   const mySocketId = user?.socketId ?? socket.id;
   const isHost = hostSocketId && mySocketId === hostSocketId;
-  const canStart = players?.length >= MIN_PLAYERS;
-  const remaining = MIN_PLAYERS - (players?.length || 0);
+  const count = players?.length || 0;
+  const canStart = count >= MIN_PLAYERS;
+  const remaining = MIN_PLAYERS - count;
+  const emptySeats = Math.max(0, MAX_SEATS - count);
+  const inviteUrl = `${window.location.origin}/${roomId}`;
+  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   const startGame = () => socket.emit("start_game", { roomId, settings });
 
   const handleInvite = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/${roomId}`).then(() => {
+    navigator.clipboard.writeText(inviteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const handleNativeShare = () => {
+    navigator.share({ title: "Numwit", text: "Join my Numwit room — can you outguess us?", url: inviteUrl })
+      .catch(() => {}); // AbortError = user closed the sheet
   };
 
   // Live countdown for public-room auto bot-fill (botFillAt is an epoch ms
@@ -53,107 +64,166 @@ export default function WaitingRoom() {
   }, [botFillAt]);
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-4 animate-fadeIn">
-      {/* Card */}
-      <div className="glass-card p-6 space-y-5">
+    <div className="w-full max-w-md mx-auto flex flex-col gap-3.5 animate-fadeIn">
 
-        {/* Header */}
-        <div className="text-center space-y-1">
-          <h2 className="text-2xl font-extrabold text-white">Waiting for Players…</h2>
-          <p className="text-white/50 text-sm">
-            {(players?.length || 0)}/{MIN_PLAYERS} minimum · {players?.length || 0} joined
-          </p>
+      {/* ── Room hero ─────────────────────────────────────────────────────── */}
+      <section className="glass-card rounded-[22px] p-4 sm:p-5 flex flex-col gap-3.5">
+        <div className="flex items-center justify-between">
+          <span className={twMerge(
+            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-[0.08em] border",
+            roomType === "private"
+              ? "bg-violet-500/15 border-violet-500/35 text-violet-300"
+              : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+          )}>
+            {roomType === "private" ? "Private room" : "Public room"}
+          </span>
+          <span className="text-xs text-[#8F95B8]">
+            {count}/{MIN_PLAYERS} minimum · {count} joined
+          </span>
         </div>
 
-        {/* Players list */}
-        <div>
-          <p className="section-heading">Players in Room</p>
-          <ul className="space-y-2">
-            {players?.map((player) => {
-              const isPlayerHost = player.socketId === hostSocketId;
-              return (
-                <li
-                  key={player.socketId}
-                  className={twMerge(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-200",
-                    isPlayerHost
-                      ? "border-amber-500/40 bg-amber-500/10"
-                      : "border-white/10 bg-white/5"
-                  )}
-                >
-                  <span className="text-2xl">{player.avatar}</span>
-                  <span className="font-semibold text-white flex-1 text-sm">{player.name}</span>
-                  {player.isBot && (
-                    <span className="text-xs bg-sky-500/20 text-sky-300 border border-sky-500/30 font-semibold px-2.5 py-1 rounded-full">
-                      🤖 Bot
-                    </span>
-                  )}
-                  {isPlayerHost && (
-                    <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold px-2.5 py-1 rounded-full">
-                      👑 Host
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        {/* Invite link */}
         {roomType === "private" && (
-          <button
-            onClick={handleInvite}
-            className={twMerge(
-              "w-full py-2.5 px-4 rounded-xl text-sm font-semibold border transition-all duration-200",
-              copied
-                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
-                : "bg-white/5 text-white/80 border-white/15 hover:bg-white/10 hover:border-white/25"
-            )}
-          >
-            {copied ? "✅ Link Copied!" : "🔗 Copy Invite Link"}
-          </button>
+          <>
+            <div>
+              <div className="text-xs text-[#8F95B8] mb-1">Room code</div>
+              <div className="nums text-[30px] sm:text-[34px] font-bold tracking-[0.18em] text-white break-all">{roomId}</div>
+            </div>
+            <div className={twMerge("grid gap-2", canNativeShare ? "grid-cols-2" : "grid-cols-1")}>
+              <button
+                onClick={handleInvite}
+                className={twMerge(
+                  "h-[46px] rounded-xl text-sm font-bold border flex items-center justify-center gap-2 transition-all duration-200 active:scale-95",
+                  copied
+                    ? "bg-emerald-500/15 text-emerald-200 border-emerald-400/45"
+                    : "bg-white/5 text-white border-white/15 hover:bg-white/10"
+                )}
+              >
+                {copied ? "Link copied" : "Copy invite link"}
+              </button>
+              {canNativeShare && (
+                <button
+                  onClick={handleNativeShare}
+                  className="h-[46px] rounded-xl text-sm font-bold border bg-white/5 text-white border-white/15 hover:bg-white/10 flex items-center justify-center gap-2 transition active:scale-95"
+                >
+                  <ShareIcon />
+                  Share invite
+                </button>
+              )}
+            </div>
+          </>
         )}
 
         {/* Public room: server will auto-fill with bots if no one else joins */}
         {roomType === "public" && !canStart && fillCountdown !== null && (
-          <div className="w-full py-2.5 px-4 rounded-xl text-sm text-center text-sky-300 border border-sky-500/20 bg-sky-500/10">
-            Looking for players… adding bots in {fillCountdown}s
+          <div className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm text-cyan-200 border border-cyan-400/25 bg-cyan-400/10">
+            <span className="nw-typing shrink-0" aria-hidden="true"><span /><span /><span /></span>
+            Looking for players… adding bots in <span className="nums font-bold">{fillCountdown}s</span>
           </div>
         )}
+      </section>
 
-        {/* Settings — host only */}
-        {isHost && (
-          <GameSettingsPanel settings={settings} onChange={setSettings} />
-        )}
+      {/* ── Seats ─────────────────────────────────────────────────────────── */}
+      <section className="flex flex-col gap-2.5">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-display text-lg font-bold m-0">Players</h2>
+          <span className={twMerge("text-xs font-semibold", canStart ? "text-emerald-300" : "text-[#8F95B8]")}>
+            {canStart ? `Ready — ${count} in` : `Need ${remaining} more to start`}
+          </span>
+        </div>
+        <div className="h-1.5 rounded-full bg-white/[0.07] overflow-hidden" aria-hidden="true">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500"
+            style={{ width: `${Math.min(100, (count / MAX_SEATS) * 100)}%` }}
+          />
+        </div>
+        <ul className="grid grid-cols-4 gap-2 list-none m-0 p-0">
+          {players?.map((player, i) => {
+            const isPlayerHost = player.socketId === hostSocketId;
+            const isMe = player.socketId === mySocketId;
+            return (
+              <li
+                key={player.socketId}
+                className={twMerge(
+                  "nw-seat-in relative flex flex-col items-center gap-1.5 pt-3 pb-2.5 px-1 rounded-2xl border",
+                  isPlayerHost ? "bg-amber-400/[0.08] border-amber-400/35" : "bg-white/[0.04] border-white/10"
+                )}
+                style={{ animationDelay: `${i * 0.06}s` }}
+              >
+                {isPlayerHost && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 flex items-center gap-0.5 px-1.5 h-5 rounded-full bg-amber-400 text-[#1A1206] text-[10px] font-extrabold">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5L3 7z" /></svg>
+                    Host
+                  </span>
+                )}
+                <span className={twMerge(
+                  "w-11 h-11 rounded-full bg-[#1A1E38] border-2 flex items-center justify-center text-[22px]",
+                  isMe ? "border-violet-400" : "border-white/15"
+                )}>
+                  {player.avatar}
+                </span>
+                <span className="text-xs font-semibold max-w-full truncate px-1">{player.name}</span>
+                {player.isBot && (
+                  <span className="text-[10px] font-bold text-sky-300 bg-sky-500/15 border border-sky-500/30 rounded-full px-1.5">Bot</span>
+                )}
+              </li>
+            );
+          })}
+          {Array.from({ length: emptySeats }, (_, i) => (
+            <li
+              key={`empty-${i}`}
+              className="nw-breathe flex items-center justify-center min-h-[92px] rounded-2xl border-[1.5px] border-dashed border-white/15 text-[11px] text-[#6E749A]"
+              style={{ animationDelay: `${i * 0.3}s` }}
+            >
+              Open
+            </li>
+          ))}
+        </ul>
+      </section>
 
-        {/* Start button / status */}
+      {/* ── Voice ─────────────────────────────────────────────────────────── */}
+      <VoicePanel />
+
+      {/* ── Settings — host only ──────────────────────────────────────────── */}
+      {isHost && (
+        <GameSettingsPanel settings={settings} onChange={setSettings} />
+      )}
+
+      {/* ── Chat ──────────────────────────────────────────────────────────── */}
+      <RoomChat />
+
+      {/* ── Start / status (sticky on phones) ─────────────────────────────── */}
+      <div className="sticky bottom-0 -mx-4 px-4 pt-3 pb-4 sm:static sm:m-0 sm:p-0"
+        style={{ background: "linear-gradient(180deg, rgba(11,14,28,0), rgba(11,14,28,.92) 35%)" }}>
         {isHost ? (
           <button
             disabled={!canStart}
             onClick={startGame}
             className={twMerge(
-              "w-full py-3 px-4 rounded-xl text-sm font-bold transition-all duration-200",
+              "w-full h-[56px] rounded-2xl text-base font-extrabold transition-all duration-200",
               canStart
                 ? "btn-success"
-                : "bg-white/5 text-white/25 border border-white/10 cursor-not-allowed"
+                : "bg-white/5 text-white/30 border border-white/10 cursor-not-allowed"
             )}
           >
             {canStart
-              ? "▶ Start Game"
+              ? `▶ Start game · ${count} players`
               : `Waiting for ${remaining} more player${remaining !== 1 ? "s" : ""}…`}
           </button>
         ) : (
-          <div className="w-full py-3 px-4 rounded-xl text-sm text-white/40 border border-white/10 bg-white/5 text-center">
+          <div className="w-full h-[56px] rounded-2xl text-sm text-[#A3A8C7] border border-white/10 bg-white/[0.04] flex items-center justify-center gap-2.5">
+            <span className="nw-typing" aria-hidden="true"><span /><span /><span /></span>
             Waiting for host to start…
           </div>
         )}
       </div>
-
-      {/* Voice Chat */}
-      <VoicePanel />
-
-      {/* Room Chat */}
-      <RoomChat />
     </div>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" /><path d="M16 6l-4-4-4 4M12 2v13" />
+    </svg>
   );
 }

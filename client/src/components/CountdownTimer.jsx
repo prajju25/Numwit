@@ -26,8 +26,8 @@ export default function CountdownTimer({ timerDuration, paused }) {
   const isDanger  = timeLeft <= 5  && !isExpired;
 
   // SVG ring
-  const size   = 64;
-  const stroke = 4;
+  const size   = 56;
+  const stroke = 5;
   const r      = (size - stroke) / 2;
   const circ   = 2 * Math.PI * r;
   const dash   = circ * (pct / 100);
@@ -35,16 +35,16 @@ export default function CountdownTimer({ timerDuration, paused }) {
   const ringColor = isExpired ? "#4B5563"
     : isDanger    ? "#EF4444"
     : isWarning   ? "#F59E0B"
-    :               "#8B5CF6";
+    :               "#A78BFA";
 
   const textColor = isExpired ? "text-white/30"
     : isDanger    ? "text-red-400"
     : isWarning   ? "text-amber-400"
-    :               "text-violet-400";
+    :               "text-violet-300";
 
   return (
-    <div className="w-full space-y-2">
-      <div className="flex items-center gap-4">
+    <div className="w-full" role="timer" aria-label={isExpired ? "Time's up" : `${timeLeft} seconds left`}>
+      <div className="flex items-center gap-3.5">
         {/* Ring */}
         <div className={twMerge(
           "shrink-0 relative",
@@ -54,7 +54,7 @@ export default function CountdownTimer({ timerDuration, paused }) {
             {/* Track */}
             <circle
               cx={size / 2} cy={size / 2} r={r}
-              fill="none"
+              fill="rgba(0,0,0,0.3)"
               stroke="rgba(255,255,255,0.08)"
               strokeWidth={stroke}
             />
@@ -66,12 +66,12 @@ export default function CountdownTimer({ timerDuration, paused }) {
               strokeWidth={stroke}
               strokeLinecap="round"
               strokeDasharray={`${dash} ${circ}`}
-              style={{ transition: "stroke-dasharray 0.3s ease, stroke 0.3s ease" }}
+              style={{ transition: "stroke-dasharray 1s linear, stroke 0.3s ease" }}
             />
           </svg>
           {/* Center text */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className={twMerge("text-sm font-extrabold font-mono", textColor)}>
+            <span className={twMerge("nums text-lg font-extrabold", textColor)}>
               {isExpired ? "✕" : timeLeft}
             </span>
           </div>
@@ -81,13 +81,13 @@ export default function CountdownTimer({ timerDuration, paused }) {
         <div className="flex-1 space-y-1">
           <div className="flex items-center justify-between text-[10px]">
             <span className="label-muted">Time Remaining</span>
-            <span className={twMerge("font-bold", textColor)}>
+            <span className={twMerge("nums font-bold text-xs", textColor)}>
               {isExpired ? "Time's up!" : `${timeLeft}s`}
             </span>
           </div>
-          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-white/[0.08] rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full transition-all duration-300"
+              className="h-full rounded-full transition-all duration-1000 ease-linear"
               style={{
                 width: `${pct}%`,
                 background: ringColor,

@@ -30,6 +30,7 @@ jest.mock("../db/achievementService", () => ({
 }));
 jest.mock("../db/userService", () => ({
   getProfile: jest.fn(),
+  levelProgress: jest.requireActual("../db/userService").levelProgress,
 }));
 jest.mock("../redisClient", () => ({
   ping: jest.fn().mockResolvedValue("PONG"),
@@ -312,7 +313,7 @@ describe("server.js", () => {
 
   describe("GET /api/player/:deviceId/card", () => {
     test("returns a combined share-card snapshot", async () => {
-      userService.getProfile.mockResolvedValueOnce({ id: "u1", name: "Alice", avatar: "🐱", level: 3 });
+      userService.getProfile.mockResolvedValueOnce({ id: "u1", name: "Alice", avatar: "🐱", level: 3, xp: 375 });
       statsService.getPlayerStats.mockResolvedValueOnce({
         gamesPlayed: 10, survived: 4, totalWins: 25, consecutiveGameWins: 2, bestStreak: 5,
       });
@@ -327,6 +328,10 @@ describe("server.js", () => {
         name: "Alice",
         avatar: "🐱",
         level: 3,
+        xp: 375,
+        xpLevelStart: 250,
+        xpNextLevel: 500,
+        levelProgress: 0.5,
         gamesPlayed: 10,
         gamesWon: 4,
         roundWins: 25,
@@ -359,6 +364,10 @@ describe("server.js", () => {
         name: "Bob",
         avatar: "🐶",
         level: 1,
+        xp: 0,
+        xpLevelStart: 0,
+        xpNextLevel: 100,
+        levelProgress: 0,
         gamesPlayed: 0,
         gamesWon: 0,
         roundWins: 0,

@@ -181,3 +181,18 @@ describe("RoomChat", () => {
     expect(__mockSocket.off).toHaveBeenCalledWith("player_typing", expect.any(Function));
   });
 });
+
+describe("RoomChat embedded mode", () => {
+  test("drops the card header when embedded", () => {
+    const { useChat } = require("../../contexts/ChatContext");
+    const { useUser } = require("../../contexts/UserContext");
+    const { useGame } = require("../../contexts/GameContext");
+    useChat.mockReturnValue({ messages: [], rateLimited: false, sendMessage: jest.fn() });
+    useUser.mockReturnValue({ roomId: "r1", user: { socketId: "me" } });
+    useGame.mockReturnValue({ players: [] });
+
+    render(<RoomChat embedded />);
+    expect(screen.queryByText("💬 Room Chat")).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Type a message…")).toBeInTheDocument();
+  });
+});
