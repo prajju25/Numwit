@@ -21,6 +21,7 @@ jest.mock("../services/codeService", () => ({
 }));
 jest.mock("../db/statsService", () => ({
   getWeeklyLeaderboard: jest.fn(),
+  getAllTimeLeaderboard: jest.fn(),
   getPlayerStats: jest.fn(),
 }));
 jest.mock("../db/achievementService", () => ({
@@ -201,6 +202,18 @@ describe("server.js", () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ leaderboard: [{ deviceId: "d1", xp: 100 }] });
+      expect(statsService.getAllTimeLeaderboard).not.toHaveBeenCalled();
+    });
+
+    test("returns the all-time leaderboard for ?period=all", async () => {
+      statsService.getAllTimeLeaderboard.mockResolvedValueOnce([{ name: "Jon" }]);
+
+      const res = await supertest(app).get("/api/leaderboard?period=all&limit=50");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ leaderboard: [{ name: "Jon" }] });
+      expect(statsService.getAllTimeLeaderboard).toHaveBeenCalledWith(50);
+      expect(statsService.getWeeklyLeaderboard).not.toHaveBeenCalled();
     });
 
     test("returns an empty leaderboard when the service returns null", async () => {

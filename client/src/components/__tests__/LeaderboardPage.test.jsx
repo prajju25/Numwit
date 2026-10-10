@@ -215,15 +215,37 @@ describe("LeaderboardPage period tabs and your-rank bar", () => {
   });
   afterEach(() => { delete global.fetch; });
 
-  test("switching to All time shows all-time numbers", async () => {
-    global.fetch = jest.fn(() => Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(5) }) }));
+  test("All time fetches its own ranking, including players inactive this week", async () => {
+    const veterans = [{ id: 99, name: "Jon", avatar: "😎", level: 5, weekGamesPlayed: 0, allTimeGamesPlayed: 12, allTimeGamesWon: 6, allTimeRoundWins: 40 }];
+    global.fetch = jest.fn((url) => Promise.resolve({
+      json: () => Promise.resolve({ leaderboard: url.includes("period=all") ? veterans : [] }),
+    }));
     render(<LeaderboardPage onBack={jest.fn()} />);
     await act(async () => {});
 
-    expect(screen.getAllByText("3 games", { exact: false }).length).toBeGreaterThan(0);
+    expect(global.fetch).toHaveBeenCalledWith("/api/leaderboard?limit=50");
+    expect(screen.getByText("No games played this week yet. Be the first!")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("tab", { name: "All time" }));
+    await act(async () => {});
+
+    expect(global.fetch).toHaveBeenCalledWith("/api/leaderboard?limit=50&period=all");
     expect(screen.getByRole("tab", { name: "All time" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getAllByText("10 games", { exact: false }).length).toBeGreaterThan(0);
+    expect(screen.getByText("Jon")).toBeInTheDocument();
+    expect(screen.getByText("Every game ever played")).toBeInTheDocument();
+
+    // Switching back reuses the cached weekly result
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test("All time shows its own empty state", async () => {
+    global.fetch = jest.fn(() => Promise.resolve({ json: () => Promise.resolve({ leaderboard: [] }) }));
+    render(<LeaderboardPage onBack={jest.fn()} />);
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("tab", { name: "All time" }));
+    await act(async () => {});
+    expect(screen.getByText("No games played yet. Be the first!")).toBeInTheDocument();
   });
 
   test("shows a sticky your-rank bar with Share card when your row is on another page", async () => {

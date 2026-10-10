@@ -6,19 +6,30 @@ import ShareCardModal from "./ShareCardModal";
 
 const PER_PAGE = 10;
 
-function useLB() {
-  const [board, setBoard]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+const LB_URL = {
+  week: "/api/leaderboard?limit=50",
+  all:  "/api/leaderboard?limit=50&period=all",
+};
+
+/** Fetches each period's ranking once, on first view of its tab. */
+function useLB(period) {
+  const [boards, setBoards] = useState({});   // period → rows
+  const [errors, setErrors] = useState({});   // period → message
 
   useEffect(() => {
-    fetch("/api/leaderboard?limit=50")
+    if (boards[period] || errors[period]) return;
+    fetch(LB_URL[period])
       .then((r) => r.json())
-      .then((d) => { setBoard(d.leaderboard || []); setLoading(false); })
-      .catch(() => { setError("Couldn't load leaderboard. Try again."); setLoading(false); });
-  }, []);
+      .then((d) => setBoards((b) => ({ ...b, [period]: d.leaderboard || [] })))
+      .catch(() => setErrors((e) => ({ ...e, [period]: "Couldn't load leaderboard. Try again." })));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period]);
 
-  return { board, loading, error };
+  return {
+    board: boards[period] || [],
+    loading: !boards[period] && !errors[period],
+    error: errors[period] || null,
+  };
 }
 
 function WeekRange() {
@@ -28,7 +39,7 @@ function WeekRange() {
   return <span>{fmt(start)} – {fmt(now)}</span>;
 }
 
-/** Stats for the selected period. Ranking always follows the weekly order. */
+/** Stats for the selected period (each tab is ranked by its own period). */
 function statsFor(entry, period) {
   return period === "week"
     ? { played: entry.weekGamesPlayed ?? 0, won: entry.weekGamesWon ?? 0, rounds: entry.weekRoundWins ?? 0 }
@@ -52,10 +63,13 @@ const PODIUM = [
 ];
 
 export default function LeaderboardPage({ onBack }) {
-  const { board, loading, error } = useLB();
+  const [period, setPeriod]       = useState("week");
+  const { board, loading, error } = useLB(period);
   const { user, deviceId }        = useUser();
   const [page, setPage]           = useState(1);
-  const [period, setPeriod]       = useState("week");
+  const isWeek = period === "week";
+
+  const switchPeriod = (p) => { setPeriod(p); setPage(1); };
   const [shareData, setShareData] = useState(null);
   const [shareLoading, setShareLoading] = useState(false);
 
@@ -76,8 +90,9 @@ export default function LeaderboardPage({ onBack }) {
   // board is fetched with limit=50 — if we got fewer rows than that, this IS
   // the full weekly field, so "#rank of N this week" is accurate. If the
   // field is larger than 50, we don't know the true total, so omit it
-  // rather than show a number we can't back up.
-  const exactWeeklyTotal = board.length < 50 ? board.length : null;
+  // rather than show a number we can't back up. The card's wording is
+  // "this week", so the all-time tab shares the rank alone.
+  const exactWeeklyTotal = isWeek && board.length < 50 ? board.length : null;
 
   const handleShare = async (rank) => {
     if (!deviceId || shareLoading) return;
@@ -129,7 +144,7 @@ export default function LeaderboardPage({ onBack }) {
         </button>
         <div className="flex items-end justify-between gap-3 mt-1">
           <h1 className="font-display text-[30px] sm:text-4xl font-bold m-0">Leaderboard</h1>
-          <p className="text-xs text-[#8F95B8] m-0 pb-1.5">Last 7 days · <WeekRange /></p>
+          <p className="text-xs text-[#8F95B8] m-0 pb-1.5">{isWeek ? <>Last 7 days · <WeekRange /></> : "Every game ever played"}</p>
         </div>
 
         {/* ── Period tabs ───────────────────────────────────────────────── */}
@@ -139,7 +154,7 @@ export default function LeaderboardPage({ onBack }) {
               key={t.id}
               role="tab"
               aria-selected={period === t.id}
-              onClick={() => setPeriod(t.id)}
+              onClick={() => switchPeriod(t.id)}
               className={twMerge(
                 "h-10 rounded-xl text-sm font-bold transition-colors",
                 period === t.id ? "bg-violet-600 text-white" : "text-[#A3A8C7] hover:text-white"
@@ -159,7 +174,7 @@ export default function LeaderboardPage({ onBack }) {
         )}
         {!loading && !error && board.length === 0 && (
           <div className="glass-card mt-10 p-10 text-center text-[#A3A8C7]">
-            No games played this week yet. Be the first!
+            {isWeek ? "No games played this week yet. Be the first!" : "No games played yet. Be the first!"}
           </div>
         )}
 
@@ -267,7 +282,7 @@ export default function LeaderboardPage({ onBack }) {
           <button onClick={onBack} className="btn-primary h-12 px-8 rounded-2xl text-sm font-bold">
             ▶ Play Now
           </button>
-          <p className="text-xs text-[#6E749A] m-0">Rankings cover the last 7 days</p>
+          <p className="text-xs text-[#6E749A] m-0">{isWeek ? "Rankings cover the last 7 days" : "All-time rankings by round wins"}</p>
         </div>
       </div>
 
