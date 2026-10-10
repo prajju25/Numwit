@@ -68,15 +68,16 @@ describe("WaitingRoom", () => {
     setup({ players, hostSocketId: "p0" });
     render(<WaitingRoom />);
 
-    expect(screen.getByText("👑 Host")).toBeInTheDocument();
-    expect(screen.getByText("🤖 Bot")).toBeInTheDocument();
+    expect(screen.getByText("Host")).toBeInTheDocument();
+    expect(screen.getByText("Bot")).toBeInTheDocument();
   });
 
   test("private rooms show a copy-invite-link button that copies the room URL", async () => {
     setup({ roomType: "private", roomId: "abcdef" });
     render(<WaitingRoom />);
 
-    const button = screen.getByText("🔗 Copy Invite Link");
+    expect(screen.getByText("abcdef")).toBeInTheDocument(); // room code
+    const button = screen.getByText("Copy invite link");
     await act(async () => {
       fireEvent.click(button);
     });
@@ -84,7 +85,25 @@ describe("WaitingRoom", () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       `${window.location.origin}/abcdef`
     );
-    expect(await screen.findByText("✅ Link Copied!")).toBeInTheDocument();
+    expect(await screen.findByText("Link copied")).toBeInTheDocument();
+  });
+
+  test("offers the native share sheet when the browser supports it", () => {
+    navigator.share = jest.fn(() => Promise.resolve());
+    setup({ roomType: "private", roomId: "abcdef" });
+    render(<WaitingRoom />);
+
+    fireEvent.click(screen.getByText("Share invite"));
+    expect(navigator.share).toHaveBeenCalledWith(expect.objectContaining({
+      url: `${window.location.origin}/abcdef`,
+    }));
+    delete navigator.share;
+  });
+
+  test("shows an open seat for every free slot up to 8", () => {
+    setup({ players: makePlayers(3) });
+    render(<WaitingRoom />);
+    expect(screen.getAllByText("Open")).toHaveLength(5);
   });
 
   test("public rooms with a pending bot fill show a countdown", () => {
@@ -119,7 +138,7 @@ describe("WaitingRoom", () => {
     });
     render(<WaitingRoom />);
 
-    const startBtn = screen.getByText("▶ Start Game");
+    const startBtn = screen.getByText(`▶ Start game · ${MIN_PLAYERS} players`);
     expect(startBtn).not.toBeDisabled();
 
     fireEvent.click(startBtn);

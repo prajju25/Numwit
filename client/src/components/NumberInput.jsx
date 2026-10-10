@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import PropTypes from "prop-types";
 import NumberGrid from "./NumberGrid";
 import NumberSlider from "./NumberSlider";
+import useIsDesktop from "../hooks/useIsDesktop";
 
 /**
  * NumberInput — responsive wrapper.
@@ -16,39 +17,6 @@ import NumberSlider from "./NumberSlider";
  * Rendering 101 hidden buttons on mobile wastes DOM nodes and memory.
  * The media query listener is cheap and keeps only one component in tree.
  */
-
-const DESKTOP_BREAKPOINT = 1024; // px — matches Tailwind's "lg:" breakpoint
-
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(
-    // Safe default: check window on mount — avoids hydration mismatch if ever SSR'd
-    typeof window !== "undefined"
-      ? window.innerWidth >= DESKTOP_BREAKPOINT
-      : false
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const mq = window.matchMedia(`(min-width: ${DESKTOP_BREAKPOINT}px)`);
-
-    // Sync immediately in case state is stale after mount
-    setIsDesktop(mq.matches);
-
-    const handler = (e) => setIsDesktop(e.matches);
-    // Use addEventListener with fallback for older browsers
-    if (mq.addEventListener) {
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    } else {
-      // Safari < 14 fallback
-      mq.addListener(handler);
-      return () => mq.removeListener(handler);
-    }
-  }, []);
-
-  return isDesktop;
-}
 
 /**
  * Desktop keyboard shortcut: type a number (0-100) then press Enter to submit.
@@ -91,7 +59,7 @@ function useKeyboardSubmit(onSelect, disabled, isDesktop) {
   }, [onSelect, disabled, isDesktop]);
 }
 
-export default function NumberInput({ onSelect, disabled, selectedNumber }) {
+export default function NumberInput({ onSelect, disabled, selectedNumber, lastTarget }) {
   const isDesktop = useIsDesktop();
   useKeyboardSubmit(onSelect, disabled, isDesktop);
 
@@ -101,6 +69,7 @@ export default function NumberInput({ onSelect, disabled, selectedNumber }) {
         onSelect={onSelect}
         disabled={disabled}
         selectedNumber={selectedNumber}
+        lastTarget={lastTarget}
       />
     );
   }
@@ -110,6 +79,7 @@ export default function NumberInput({ onSelect, disabled, selectedNumber }) {
       onSelect={onSelect}
       disabled={disabled}
       selectedNumber={selectedNumber}
+      lastTarget={lastTarget}
     />
   );
 }
@@ -118,4 +88,5 @@ NumberInput.propTypes = {
   onSelect: PropTypes.func.isRequired,
   disabled: PropTypes.bool,
   selectedNumber: PropTypes.number,
+  lastTarget: PropTypes.number,
 };

@@ -93,3 +93,25 @@ describe("PlayerStatCard", () => {
     expect(card.textContent).toMatch(/[a-zA-Z]/); // some quote text is present
   });
 });
+
+describe("PlayerStatCard level ring and streak", () => {
+  const ring = (container) => container.querySelectorAll("circle")[2]; // [0] is the logo dot, [1] the ring track
+  const C = 2 * Math.PI * 30;
+
+  test("level ring reflects levelProgress", () => {
+    const { container } = render(<PlayerStatCard name="A" level={3} stats={{ levelProgress: 0.5 }} />);
+    expect(Number(ring(container).getAttribute("stroke-dashoffset"))).toBeCloseTo(C * 0.5);
+  });
+
+  test("level ring is full when progress is unknown", () => {
+    const { container } = render(<PlayerStatCard name="A" level={3} stats={{}} />);
+    expect(Number(ring(container).getAttribute("stroke-dashoffset"))).toBeCloseTo(0);
+  });
+
+  test("shows the current streak from 2 wins up", () => {
+    const { rerender } = render(<PlayerStatCard name="A" stats={{ currentStreak: 1 }} />);
+    expect(screen.queryByText(/-win streak/)).not.toBeInTheDocument();
+    rerender(<PlayerStatCard name="A" stats={{ currentStreak: 2 }} />);
+    expect(screen.getByText("2-win streak")).toBeInTheDocument();
+  });
+});

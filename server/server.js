@@ -182,10 +182,16 @@ app.get("/api/player/:deviceId/card", async (req, res) => {
     const gamesPlayed = stats?.gamesPlayed || 0;
     const gamesWon = stats?.survived || 0;
 
+    const progress = userService.levelProgress(profile.xp);
+
     res.json({
       name: profile.name,
       avatar: profile.avatar,
       level: profile.level,
+      xp: progress.xp,
+      xpLevelStart: progress.xpLevelStart,
+      xpNextLevel: progress.xpNextLevel,
+      levelProgress: progress.progress,
       gamesPlayed,
       gamesWon,
       roundWins: stats?.totalWins || 0,

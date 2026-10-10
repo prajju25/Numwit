@@ -22,6 +22,8 @@ function buildShareText({ name, level, stats, variant }) {
   return `🧠 I'm Level ${level} on Numwit with ${s.gamesWon ?? 0} wins and a ${s.bestStreak ?? 0}-win best streak. Can you beat me?`;
 }
 
+const EXPORT_WIDTH = 1080;
+
 export default function ShareCardModal({ player, variant, rank, totalPlayers, onClose }) {
   const cardRef = useRef(null);
   const [busyAction, setBusyAction] = useState(null); // "device" | "download" | null
@@ -61,7 +63,13 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
   const renderCardToPng = async () => {
     const { toPng } = await import("html-to-image");
     if (!cardRef.current) throw new Error("Card not ready");
-    return toPng(cardRef.current, { pixelRatio: 2 });
+    // Export at 1080px wide (→ 1080×1350 for the 4:5 card) whatever the
+    // on-screen size, and leave out the animated sheen overlay.
+    const width = cardRef.current.offsetWidth || 360;
+    return toPng(cardRef.current, {
+      pixelRatio: EXPORT_WIDTH / width,
+      filter: (node) => !node.classList?.contains("nw-sheen"),
+    });
   };
 
   const handleDownload = async () => {
@@ -104,8 +112,8 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
   };
 
   const overlayContent = (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4 py-8 overflow-y-auto">
-      <div className="w-full max-w-sm space-y-4 animate-fadeIn">
+    <div className="fixed inset-0 z-50 bg-[#05060D]/80 backdrop-blur-md flex items-start sm:items-center justify-center px-4 py-6 overflow-y-auto nw-fade">
+      <div className="w-full max-w-[360px] flex flex-col items-center gap-4 nw-rise">
         <PlayerStatCard
           ref={cardRef}
           name={name}
@@ -117,30 +125,38 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
           totalPlayers={totalPlayers}
         />
 
-        <div className="glass-card p-4 space-y-2.5">
-          <div className="grid grid-cols-2 gap-2.5">
+        <div className="w-full flex flex-col gap-2.5">
+          <button
+            onClick={handleShareDevice}
+            disabled={busyAction === "device"}
+            className="btn-gold w-full h-14 text-base disabled:opacity-60"
+          >
+            {busyAction === "device" ? "Preparing image…" : "Share via Device"}
+          </button>
+
+          <div className="grid grid-cols-4 gap-2">
             <button
               onClick={handlePostX}
-              className="py-2.5 rounded-xl text-sm font-bold text-white bg-black border border-white/20 hover:bg-white/10 transition-all"
+              className="h-11 rounded-xl text-xs font-bold text-white bg-black border border-white/20 hover:bg-white/10 transition-all"
             >
               Post on X
             </button>
             <button
               onClick={handleFacebook}
-              className="py-2.5 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 transition-all"
+              className="h-11 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 transition-all"
             >
               Facebook
             </button>
             <button
               onClick={handleReddit}
-              className="py-2.5 rounded-xl text-sm font-bold text-white bg-orange-600 hover:bg-orange-500 transition-all"
+              className="h-11 rounded-xl text-xs font-bold text-white bg-orange-600 hover:bg-orange-500 transition-all"
             >
               Reddit
             </button>
             <button
               onClick={handleCopyText}
               className={
-                "py-2.5 rounded-xl text-sm font-bold border transition-all " +
+                "h-11 rounded-xl text-xs font-bold border transition-all " +
                 (copied
                   ? "bg-green-500/20 border-green-400/40 text-green-300"
                   : "bg-white/5 border-white/15 text-white/80 hover:bg-white/10")
@@ -151,17 +167,9 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
           </div>
 
           <button
-            onClick={handleShareDevice}
-            disabled={busyAction === "device"}
-            className="btn-primary w-full py-3 text-sm disabled:opacity-50"
-          >
-            {busyAction === "device" ? "Preparing image…" : "Share via Device"}
-          </button>
-
-          <button
             onClick={handleDownload}
             disabled={busyAction === "download"}
-            className="w-full py-2.5 rounded-xl text-xs font-semibold text-white/50 hover:text-white/80 border border-white/10 hover:border-white/20 transition-all disabled:opacity-50"
+            className="w-full h-11 rounded-xl text-sm font-semibold text-white/70 hover:text-white border border-white/10 hover:border-white/20 bg-white/[0.03] transition-all disabled:opacity-50"
           >
             {busyAction === "download" ? "Generating…" : "Download image"}
           </button>
@@ -171,7 +179,7 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
 
         <button
           onClick={onClose}
-          className="w-full text-center text-xs text-white/30 hover:text-white/60 transition"
+          className="w-full min-h-[44px] text-center text-sm text-white/45 hover:text-white/75 transition"
         >
           Close
         </button>

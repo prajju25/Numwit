@@ -45,7 +45,14 @@ describe("PlayerScorePanel", () => {
       />
     );
     const li = screen.getByText(/Alice/).closest("li");
-    expect(li.className).toMatch(/animate-pulse/);
+    expect(li).toHaveAttribute("data-danger", "true");
+  });
+
+  test("marks players who have locked in this round and highlights me", () => {
+    render(<PlayerScorePanel players={players} points={{}} eliminatedPlayers={[]} lockedIds={["b"]} mySocketId="a" />);
+    expect(screen.getByText(/Bob/).closest("li")).toHaveTextContent("locked");
+    expect(screen.getByText(/Alice/).closest("li")).not.toHaveTextContent("locked");
+    expect(screen.getByText(/Alice/).closest("li").className).toMatch(/violet/);
   });
 
   test("renders the elimination threshold footer", () => {
@@ -55,6 +62,6 @@ describe("PlayerScorePanel", () => {
 
   test("renders gracefully with no players", () => {
     render(<PlayerScorePanel players={[]} points={{}} eliminatedPlayers={[]} />);
-    expect(screen.getByText("Scores")).toBeInTheDocument();
+    expect(screen.getByText("Standings")).toBeInTheDocument();
   });
 });

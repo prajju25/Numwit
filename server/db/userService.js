@@ -34,6 +34,21 @@ function xpForNextLevel(level) {
 }
 
 /**
+ * Progress through the current level, for level rings / XP bars.
+ * progress is 0–1; at max level it is 1 and xpNextLevel is null.
+ */
+function levelProgress(xp) {
+  const safeXp = Math.max(0, xp || 0);
+  const level = xpToLevel(safeXp);
+  const xpLevelStart = XP_THRESHOLDS[level - 1];
+  const xpNextLevel = xpForNextLevel(level);
+  const progress = xpNextLevel
+    ? (safeXp - xpLevelStart) / (xpNextLevel - xpLevelStart)
+    : 1;
+  return { xp: safeXp, level, xpLevelStart, xpNextLevel, progress };
+}
+
+/**
  * Upsert a user by deviceId. Creates on first visit, updates name/avatar.
  * Returns the user record (or null if DB unavailable).
  */
@@ -127,5 +142,5 @@ async function updateConsecutiveGameWins(deviceId, survived) {
 module.exports = {
   upsertUser, awardXp, getProfile, getTotalUsers,
   updateConsecutiveGameWins,
-  xpToLevel, xpForNextLevel, XP_THRESHOLDS,
+  xpToLevel, xpForNextLevel, levelProgress, XP_THRESHOLDS,
 };

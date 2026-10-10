@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge";
 import { useUser } from "../contexts/UserContext";
 import RoomTypeOverlay from "./RoomTypeOverlay";
 import { avatars } from "../constants/constants";
+import BrandMark from "./BrandMark";
 
 export default function Login() {
   const { user, setUser, roomId, setHasStarted, setIsWaitingRoom } = useUser();
@@ -35,12 +36,12 @@ export default function Login() {
       <div className="w-full flex items-center justify-center px-4">
         <form
           onSubmit={handleSubmit}
-          className="glass-card w-full max-w-md px-8 py-10 space-y-7 animate-fadeIn"
+          className="glass-card rounded-3xl w-full max-w-md px-5 sm:px-8 py-8 sm:py-10 space-y-7 nw-rise"
         >
           {/* Title */}
           <div className="text-center space-y-1">
-            <div className="text-5xl mb-3">🧠</div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            <div className="flex justify-center mb-3"><BrandMark size={52} /></div>
+            <h2 className="font-display text-2xl sm:text-3xl font-bold text-white">
               Join Numwit
             </h2>
             <p className="text-white/50 text-sm">Set up your profile to start playing</p>
@@ -73,9 +74,9 @@ export default function Login() {
                   key={av}
                   onClick={() => setAvatar(av)}
                   className={twMerge(
-                    "text-2xl sm:text-3xl p-2.5 rounded-xl border-2 transition-all duration-200",
+                    "text-2xl sm:text-3xl h-14 rounded-2xl border-2 transition-all duration-200 active:scale-90",
                     av === avatar
-                      ? "border-violet-500 bg-violet-500/20 scale-110 shadow-lg shadow-violet-500/30"
+                      ? "border-violet-500 bg-violet-500/20 scale-105 shadow-lg shadow-violet-500/30"
                       : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/10"
                   )}
                 >
@@ -90,13 +91,13 @@ export default function Login() {
             <button
               type="button"
               onClick={handleRandomize}
-              className="btn-secondary px-4 py-2.5 text-sm"
+              className="btn-secondary px-4 h-12 text-sm"
             >
               🎲 Randomize
             </button>
             <button
               type="submit"
-              className="btn-primary flex-1 py-2.5 text-sm"
+              className="btn-primary flex-1 h-12 text-base font-extrabold"
             >
               Start Game →
             </button>

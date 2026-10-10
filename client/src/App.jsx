@@ -15,6 +15,7 @@ import { VoiceProvider } from "./contexts/VoiceContext";
 import AchievementToast from "./components/AchievementToast";
 import FeedbackWidget from "./components/FeedbackWidget";
 import LeaderboardPage from "./components/LeaderboardPage";
+import BrandMark from "./components/BrandMark";
 
 // Mute toggle button — reads from SoundContext
 function MuteButton() {
@@ -23,10 +24,13 @@ function MuteButton() {
     <button
       onClick={toggleMute}
       title={muted ? "Unmute sounds" : "Mute sounds"}
-      className="text-xl p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-all duration-200"
+      className="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 transition-all duration-200"
       aria-label={muted ? "Unmute" : "Mute"}
     >
-      {muted ? "🔇" : "🔊"}
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M11 5L6 9H3v6h3l5 4V5z" />
+        {muted ? <path d="M22 9l-6 6M16 9l6 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />}
+      </svg>
     </button>
   );
 }
@@ -189,7 +193,7 @@ function AppInner() {
 
       {reconnecting && (
         <div
-          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-amber-200 border border-amber-400/30 shadow-lg animate-pulse"
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-amber-200 border border-amber-400/30 shadow-lg nw-fade"
           style={{ background: "rgba(120,53,15,0.85)", backdropFilter: "blur(10px)" }}
         >
           <span className="animate-spin">🔄</span> Reconnecting…
@@ -210,19 +214,17 @@ function AppInner() {
       {!showLandingPage && (
         <div className="min-h-screen w-full flex flex-col items-center px-4 sm:px-8">
           {/* Sticky top navbar */}
-          <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-5 py-3 border-b border-white/10"
-            style={{ background: "rgba(26,26,46,0.85)", backdropFilter: "blur(20px)" }}
+          <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between gap-2 px-3 sm:px-5 py-2.5 border-b border-white/[0.07]"
+            style={{ background: "rgba(11,14,28,0.78)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" }}
           >
             <h1
               onClick={goHome}
               role="button"
               title="Back to home"
-              className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2 cursor-pointer select-none"
+              className="font-display text-lg sm:text-xl font-bold text-white flex items-center gap-2 cursor-pointer select-none"
             >
-              <span>🧠</span>
-              <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
-                Numwit
-              </span>
+              <BrandMark size={28} />
+              <span>Numwit</span>
             </h1>
             <div className="flex items-center gap-2">
               {/* Leaderboard button — always visible in the non-landing flow */}
@@ -230,7 +232,7 @@ function AppInner() {
                 <button
                   onClick={openLeaderboard}
                   title="View leaderboard"
-                  className="text-sm font-semibold px-3 py-2 rounded-full bg-white/10 hover:bg-yellow-500/20 hover:text-yellow-300 border border-white/10 transition-all duration-200"
+                  className="text-sm font-semibold px-3 h-10 sm:h-11 rounded-xl bg-white/5 hover:bg-amber-500/15 hover:text-amber-200 border border-white/10 transition-all duration-200"
                 >
                   🏆 Leaderboard
                 </button>
@@ -241,14 +243,14 @@ function AppInner() {
                     onClick={goHome}
                     title="Leave room"
                     aria-label="Leave room"
-                    className="text-sm font-semibold px-3 py-2 rounded-full bg-white/10 hover:bg-red-500/20 hover:text-red-300 border border-white/10 transition-all duration-200"
+                    className="text-sm font-semibold px-3 h-10 sm:h-11 rounded-xl bg-white/5 text-red-300 hover:bg-red-500/15 border border-white/10 transition-all duration-200"
                   >
                     🚪 Leave
                   </button>
                   <MuteButton />
-                  <div className="flex items-center gap-2 glass-card-sm px-3 py-1.5">
+                  <div className="hidden sm:flex items-center gap-2 glass-card-sm px-3 h-11">
                     <span className="text-lg">{user.avatar}</span>
-                    <span className="font-semibold text-white text-sm">{user.name}</span>
+                    <span className="font-semibold text-white text-sm max-w-[120px] truncate">{user.name}</span>
                   </div>
                 </>
               )}
@@ -256,26 +258,28 @@ function AppInner() {
           </header>
 
           {/* Page content — padded below navbar */}
-          <main className="flex items-center justify-center w-full max-w-2xl mx-auto pt-24 pb-8 min-h-screen">
+          <main className={twMerge(
+            "flex items-start sm:items-center justify-center w-full mx-auto pt-20 sm:pt-24 pb-8 min-h-screen",
+            showGame ? "max-w-6xl" : "max-w-2xl"
+          )}>
             {showLogin && <Login />}
-            {/* VoiceProvider is a single instance wrapping both screens so
-                peer connections survive the WaitingRoom → GameBoard transition. */}
+            {/* VoiceProvider and ChatProvider are single instances wrapping both
+                screens so peer connections and the chat log survive the
+                WaitingRoom → GameBoard transition. */}
             {(showWaiting || showGame) && (
               <VoiceProvider roomId={roomId}>
-                {showWaiting && (
-                  <ChatProvider>
-                    <WaitingRoom />
-                  </ChatProvider>
-                )}
-                {showGame && (
-                  <NumwitRuleProvider>
-                    <GameBoard />
-                  </NumwitRuleProvider>
-                )}
+                <ChatProvider>
+                  {showWaiting && <WaitingRoom />}
+                  {showGame && (
+                    <NumwitRuleProvider>
+                      <GameBoard />
+                    </NumwitRuleProvider>
+                  )}
+                </ChatProvider>
               </VoiceProvider>
             )}
             {isJoiningRoom && (
-              <div className="text-center animate-pulse text-lg text-white/60">
+              <div className="text-center animate-pulse text-lg text-white/60 self-center">
                 Joining room…
               </div>
             )}

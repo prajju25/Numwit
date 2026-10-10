@@ -50,15 +50,15 @@ export default function TutorialOverlay({ dismissed, onDismiss }) {
   return (
     <div className="w-full" style={{ animation: "slideDown 0.25s ease-out" }}>
       <style>{`@keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-      <div className="flex items-start gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
+      <div className="flex items-start gap-3 bg-violet-500/10 border border-violet-400/30 rounded-2xl px-4 py-3">
         <span className="text-2xl shrink-0">{tip.icon}</span>
         <div className="flex-1 text-left">
-          <p className="text-sm font-semibold text-indigo-800">{tip.title}</p>
-          <p className="text-xs text-indigo-600 mt-0.5 leading-relaxed">{tip.body}</p>
+          <p className="text-sm font-bold text-violet-200 m-0">{tip.title}</p>
+          <p className="text-xs text-[#B4B9D6] mt-0.5 mb-0 leading-relaxed">{tip.body}</p>
         </div>
         <button
           onClick={handleDismiss}
-          className="text-indigo-400 hover:text-indigo-700 text-lg leading-none shrink-0"
+          className="w-9 h-9 -mt-1.5 -mr-2 rounded-lg text-white/40 hover:text-white hover:bg-white/5 text-lg leading-none shrink-0"
           aria-label="Dismiss tip"
         >
           ×

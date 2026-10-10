@@ -38,7 +38,7 @@ export default function DuelView({ players, points, eliminatedPlayers, mySocketI
   const renderCard = (player, isMe) => {
     if (!player) {
       return (
-        <div className="flex-1 flex items-center justify-center rounded-2xl border-2 border-dashed border-white/10 p-4 text-white/20 text-sm">
+        <div className="flex-1 flex items-center justify-center rounded-2xl border-2 border-dashed border-white/10 p-4 text-white/25 text-sm">
           ?
         </div>
       );
@@ -49,25 +49,25 @@ export default function DuelView({ players, points, eliminatedPlayers, mySocketI
     return (
       <div
         className={twMerge(
-          "flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
+          "nw-rise flex-1 flex flex-col items-center gap-1.5 p-4 rounded-2xl border-2 transition-all",
           isMe
-            ? "border-indigo-300 bg-indigo-50 animate-duel-glow"
-            : "border-gray-200 bg-gray-50",
-          danger ? "border-red-300 bg-red-50" : ""
+            ? "border-violet-400/60 bg-violet-500/[0.12] animate-duel-glow"
+            : "border-white/10 bg-white/[0.04]",
+          danger ? "border-red-400/50 bg-red-500/10" : ""
         )}
       >
         <span className="text-4xl">{player.avatar}</span>
-        <span className="font-bold text-sm text-gray-800">{player.name}</span>
-        {isMe && <span className="text-xs text-indigo-500 font-semibold">YOU</span>}
+        <span className="font-bold text-sm text-white truncate max-w-full">{player.name}</span>
+        {isMe && <span className="text-[10px] tracking-widest text-violet-300 font-bold">YOU</span>}
         <div className={twMerge(
-          "text-2xl font-bold tabular-nums",
-          danger ? "text-red-500 animate-pulse" : "text-gray-700"
+          "nums text-2xl font-extrabold",
+          danger ? "text-red-300 animate-pulse" : "text-white"
         )}>
           {pts}
-          <span className="text-sm font-normal text-gray-400">/{ELIMINATION_THRESHOLD}</span>
+          <span className="text-sm font-normal text-white/35">/{ELIMINATION_THRESHOLD}</span>
         </div>
         {danger && (
-          <span className="text-xs text-red-500 font-semibold animate-pulse">⚠️ Danger zone!</span>
+          <span className="text-xs text-red-300 font-semibold animate-pulse">⚠️ Danger zone!</span>
         )}
       </div>
     );
@@ -77,13 +77,13 @@ export default function DuelView({ players, points, eliminatedPlayers, mySocketI
     <div className="w-full space-y-4">
       {/* Duel header */}
       <div className="text-center">
-        <span className="inline-block bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+        <span className="inline-block bg-red-500/15 border border-red-400/40 text-red-200 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
           ⚔️ 1v1 Duel
         </span>
       </div>
 
       {/* Two-player cycle reminder */}
-      <div className="text-xs text-center text-gray-500 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+      <div className="text-xs text-center text-orange-100/80 bg-orange-500/10 border border-orange-400/25 rounded-xl px-3 py-2">
         Special rules: <strong>100 beats 0</strong> · <strong>0 beats 1</strong> · <strong>1 beats 100</strong>
       </div>
 
@@ -91,7 +91,7 @@ export default function DuelView({ players, points, eliminatedPlayers, mySocketI
       <div className="flex items-center gap-3">
         {renderCard(leftPlayer, false)}
         <div className="flex flex-col items-center gap-1 shrink-0">
-          <span className="text-2xl font-black text-gray-300">VS</span>
+          <span className="font-display text-2xl font-bold text-gradient">VS</span>
         </div>
         {renderCard(rightPlayer, !isObserver)}
       </div>

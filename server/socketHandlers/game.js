@@ -201,6 +201,8 @@ async function submitNumber(io, room, socketId, number) {
     io.to(roomId).emit("waiting_for_players", {
       submitted: game.submittedCount,
       total: activePlayers.length,
+      // Who has locked in (not what they picked) so clients can tick avatars.
+      submittedIds: Object.keys(game.numbers),
     });
     return;
   }
@@ -515,11 +517,15 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer) {
 
     // Emit XP update to the specific player
     if (xpResult && targetSocket) {
+      const progress = userService.levelProgress(xpResult.xp);
       targetSocket.emit("xp_update", {
-        xp:       xpResult.xp,
-        level:    xpResult.level,
-        xpGained: xpResult.xpGained,
-        levelUp:  xpResult.levelUp,
+        xp:           xpResult.xp,
+        level:        xpResult.level,
+        xpGained:     xpResult.xpGained,
+        levelUp:      xpResult.levelUp,
+        xpLevelStart: progress.xpLevelStart,
+        xpNextLevel:  progress.xpNextLevel,
+        progress:     progress.progress,
       });
     }
   }

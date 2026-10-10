@@ -21,17 +21,17 @@ export default function LevelBadge({ level, className }) {
     level >= 3 ? "green" : "gray";
 
   const colors = {
-    gray:   "bg-gray-100 text-gray-500",
-    green:  "bg-green-100 text-green-700",
-    blue:   "bg-blue-100 text-blue-700",
-    purple: "bg-purple-100 text-purple-700",
-    gold:   "bg-amber-100 text-amber-700 font-bold",
+    gray:   "bg-white/10 text-white/70",
+    green:  "bg-emerald-500/20 text-emerald-200",
+    blue:   "bg-sky-500/20 text-sky-200",
+    purple: "bg-violet-500/25 text-violet-200",
+    gold:   "bg-amber-400/20 text-amber-200 font-bold",
   };
 
   return (
     <span
       className={twMerge(
-        "inline-flex items-center justify-center text-xs rounded-full px-1.5 py-0.5 tabular-nums shrink-0",
+        "nums inline-flex items-center justify-center text-xs font-bold rounded-md px-1.5 py-0.5 shrink-0",
         colors[tier],
         className
       )}
