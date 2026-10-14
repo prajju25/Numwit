@@ -233,7 +233,7 @@ function AppInner() {
               title="Back to home"
               className="font-display text-lg sm:text-xl font-bold text-white flex items-center gap-2 cursor-pointer select-none"
             >
-              <BrandMark size={28} />
+              <BrandMark size={40} />
               <span>Numwit</span>
             </h1>
             <div className="flex items-center gap-2">

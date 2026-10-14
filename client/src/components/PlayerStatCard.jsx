@@ -93,7 +93,7 @@ const PlayerStatCard = forwardRef(function PlayerStatCard(
       {/* Header */}
       <div className="relative flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BrandMark size={22} />
+          <BrandMark size={30} />
           <span className="font-display font-bold text-[15px]">Numwit</span>
         </div>
         {badge && (
