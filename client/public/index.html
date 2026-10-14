@@ -3,10 +3,85 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Numwit</title>
+
+    <!-- Primary -->
+    <title>Numwit — Multiplayer Number Mind Game | Guess 80% of the Average</title>
+    <meta name="description" content="Numwit is a free real-time multiplayer mind game for 3–8 players. Everyone picks a number from 0 to 100, the target is 80% of the average, and the closest pick wins. No signup — play in your browser." />
+    <meta name="keywords" content="numwit, number game, multiplayer game, keynesian beauty contest, guess 2/3 of the average, mind game, browser game, party game, game theory" />
+    <link rel="canonical" href="https://numwit.prajvex.com/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+
+    <!-- App / mobile -->
+    <meta name="theme-color" content="#0B0E1C" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="application-name" content="Numwit" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Numwit" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Icons -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- Open Graph (WhatsApp, Facebook, LinkedIn, Discord…) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Numwit" />
+    <meta property="og:url" content="https://numwit.prajvex.com/" />
+    <meta property="og:title" content="Numwit — Don't guess the number. Guess everyone else." />
+    <meta property="og:description" content="Free real-time mind game for 3–8 players. Pick 0–100; the target is 80% of the average. Closest pick wins. No signup." />
+    <meta property="og:image" content="https://numwit.prajvex.com/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Numwit — a multiplayer number mind game. Target: 80% of the average." />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Numwit — Don't guess the number. Guess everyone else." />
+    <meta name="twitter:description" content="Free real-time mind game for 3–8 players. Pick 0–100; the target is 80% of the average. Closest pick wins." />
+    <meta name="twitter:image" content="https://numwit.prajvex.com/og-image.jpg" />
+    <meta name="twitter:image:alt" content="Numwit — a multiplayer number mind game. Target: 80% of the average." />
+
+    <!-- Structured data (search engines) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "Numwit",
+        "url": "https://numwit.prajvex.com/",
+        "image": "https://numwit.prajvex.com/og-image.jpg",
+        "description": "A free real-time multiplayer mind game based on the Keynesian beauty contest. Everyone picks a number from 0 to 100; the target is 80% of the average and the closest pick wins.",
+        "genre": ["Party game", "Strategy", "Puzzle"],
+        "gamePlatform": "Web browser",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Any",
+        "playMode": ["MultiPlayer", "SinglePlayer"],
+        "numberOfPlayers": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 8 },
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+
+    <!-- Fonts are @imported from index.css — warm up the connections early -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="background-color: #0B0E1C">
+    <div id="root">
+      <!-- Shown until the app loads (and to crawlers that don't run JavaScript); React replaces it. -->
+      <main style="max-width: 640px; margin: 0 auto; padding: 96px 20px; color: #EDEEF7; font-family: system-ui, sans-serif">
+        <h1>Numwit — Don't guess the number. Guess everyone else.</h1>
+        <p>Numwit is a free real-time multiplayer mind game for 3–8 players. Everyone picks a number from 0 to 100 at the same time. The target is 80% of the average, and the closest pick wins the round. Five penalty points and you're out — last mind standing wins.</p>
+        <p>Play public rooms, private rooms with friends, or practice against bots. No signup, no download.</p>
+      </main>
+    </div>
     <div id="overlay-root"></div>
+    <noscript>Numwit needs JavaScript to run. Please enable it to play.</noscript>
   </body>
 </html>

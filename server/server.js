@@ -242,7 +242,12 @@ app.use("/admin", adminAuth, express.static(path.join(__dirname, "admin")));
 // index.html so React Router (client-side routing) can take over. Must be
 // registered after all /api routes above and after express.static, but
 // before server.listen.
+//
+// Only the home page and the leaderboard are indexable; room links (/<code>)
+// and anything else that falls through here are noindex.
+const INDEXABLE_PATHS = new Set(["/", "/leaderboard"]);
 app.get(/^\/(?!api|socket\.io).*/, (req, res) => {
+  if (!INDEXABLE_PATHS.has(req.path)) res.set("X-Robots-Tag", "noindex");
   res.sendFile(path.join(__dirname, "../client/dist/index.html"), (err) => {
     if (err) res.status(404).send("Not found");
   });
