@@ -13,7 +13,7 @@ primary_region = "iad"    # pick the Fly region closest to your Neon database (s
 
   # Public build-time values baked into the client bundle (not secrets).
   [build.args]
-    UMAMI_WEBSITE_ID = ""   # paste the Website ID from cloud.umami.is to enable analytics
+    UMAMI_WEBSITE_ID = "d802f32d-2a62-4e74-b231-f1d34187480c"   # paste the Website ID from cloud.umami.is to enable analytics
 
 [deploy]
   # Applies Prisma migrations before each new version goes live.
