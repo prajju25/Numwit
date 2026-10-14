@@ -7,6 +7,7 @@ import { twMerge } from "tailwind-merge";
 import RoomChat from "./RoomChat";
 import GameSettingsPanel from "./GameSettingsPanel";
 import VoicePanel from "./VoicePanel";
+import { track } from "../services/analytics";
 
 const DEFAULT_SETTINGS = {
   timerDuration: 30,
@@ -36,6 +37,7 @@ export default function WaitingRoom() {
   const startGame = () => socket.emit("start_game", { roomId, settings });
 
   const handleInvite = () => {
+    track("invite", { method: "copy_link" });
     navigator.clipboard.writeText(inviteUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -43,6 +45,7 @@ export default function WaitingRoom() {
   };
 
   const handleNativeShare = () => {
+    track("invite", { method: "native_share" });
     navigator.share({ title: "Numwit", text: "Join my Numwit room — can you outguess us?", url: inviteUrl })
       .catch(() => {}); // AbortError = user closed the sheet
   };

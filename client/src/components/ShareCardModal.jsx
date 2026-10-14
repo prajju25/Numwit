@@ -3,6 +3,7 @@ import ReactDOM from "react-dom";
 import PropTypes from "prop-types";
 import PlayerStatCard from "./PlayerStatCard";
 import { SITE_URL } from "../hooks/usePageMeta";
+import { track } from "../services/analytics";
 
 /**
  * ShareCardModal
@@ -40,19 +41,25 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
     window.open(url, "_blank", "noopener,noreferrer,width=600,height=500");
   };
 
+  const shared = (method) => track("share", { method, variant });
+
   const handlePostX = () => {
+    shared("x");
     openShareWindow(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`);
   };
 
   const handleFacebook = () => {
+    shared("facebook");
     openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`);
   };
 
   const handleReddit = () => {
+    shared("reddit");
     openShareWindow(`https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}`);
   };
 
   const handleCopyText = () => {
+    shared("copy_text");
     const full = `${shareText} ${shareUrl}`;
     navigator.clipboard.writeText(full).then(() => {
       setCopied(true);
@@ -75,6 +82,7 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
   };
 
   const handleDownload = async () => {
+    shared("download");
     setError(null);
     setBusyAction("download");
     try {
@@ -91,6 +99,7 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
   };
 
   const handleShareDevice = async () => {
+    shared("device");
     setError(null);
     setBusyAction("device");
     try {

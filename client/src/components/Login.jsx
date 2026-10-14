@@ -4,6 +4,7 @@ import { useUser } from "../contexts/UserContext";
 import RoomTypeOverlay from "./RoomTypeOverlay";
 import { avatars } from "../constants/constants";
 import BrandMark from "./BrandMark";
+import { track } from "../services/analytics";
 
 export default function Login() {
   const { user, setUser, roomId, setHasStarted, setIsWaitingRoom } = useUser();
@@ -17,9 +18,11 @@ export default function Login() {
     e.preventDefault();
     if (!name.trim()) { setError("Please enter a name."); return; }
     setUser({ name: name.trim(), avatar });
+    track("profile_done", { viaInvite: !!roomId });
     if (!roomId) {
       setShowRoomChoice(true);
     } else {
+      track("room_join", { type: "invite" });
       setHasStarted(true);
       setIsWaitingRoom(true);
     }

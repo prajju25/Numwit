@@ -124,3 +124,22 @@ describe("LandingPage install button", () => {
     expect(screen.queryByText("Install app")).not.toBeInTheDocument();
   });
 });
+
+describe("LandingPage analytics", () => {
+  afterEach(() => { delete window.umami; });
+
+  test("Play now reports play_click with its source", async () => {
+    window.umami = { track: jest.fn() };
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ json: () => Promise.resolve({ activePlayers: 0, gamesPlayedToday: 0, activeRooms: 0 }) })
+    );
+    const onPlay = jest.fn();
+    render(<LandingPage onPlay={onPlay} onLeaderboard={jest.fn()} />);
+    await act(async () => {});
+
+    const { fireEvent } = require("@testing-library/react");
+    fireEvent.click(screen.getByText("Ready? Enter the game →"));
+    expect(window.umami.track).toHaveBeenCalledWith("play_click", { source: "footer" });
+    expect(onPlay).toHaveBeenCalled();
+  });
+});

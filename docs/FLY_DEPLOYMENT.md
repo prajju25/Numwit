@@ -270,6 +270,55 @@ Manual deploys from your machine still work (`fly deploy`), but they build
 from your **local folder** — be on an up-to-date `main` with no uncommitted
 changes first.
 
+## 13. Analytics and growth metrics
+
+**Product analytics — Umami Cloud** (cookieless, no consent banner, free up
+to ~100K events/month):
+
+1. Sign up at <https://cloud.umami.is/signup> → **Add website** → name
+   `Numwit`, domain `numwit.prajvex.com`.
+2. Copy the **Website ID** (a UUID — public, not a secret).
+3. Paste it into `fly.toml`:
+
+   ```toml
+   [build.args]
+     UMAMI_WEBSITE_ID = "your-website-id"
+   ```
+
+4. Commit, merge, deploy. Analytics only runs on `numwit.prajvex.com`, so
+   local dev and `numwit.fly.dev` never count.
+
+Page views are automatic. The funnel is tracked with custom events (Umami →
+your site → **Events**; build a **Funnel** report from them):
+
+| Event | Fired when | Data |
+|---|---|---|
+| `play_click` | Play button on the landing page | `source` (hero / hero_mobile / footer) |
+| `profile_done` | Name + avatar submitted | `viaInvite` |
+| `room_join` | Room type chosen, or joined via invite link | `type` (public / private / solo / invite) |
+| `first_pick` | First number submitted in a game (round 1) | — |
+| `game_finished` | Game-over screen shown | `won`, `rounds` |
+| `share_card_open` | Share card opened | `from` (victory / leaderboard) |
+| `share` | A share action on the card | `method`, `variant` |
+| `invite` | Invite link copied / shared from the waiting room | `method` |
+| `install_click`, `app_installed` | Install button / app installed | — |
+
+**Growth metrics — admin dashboard** (`/admin` → Growth), computed from real
+games only (bots never count): weekly active players vs last week, players
+returning from last week, new players, games by room type, rounds logged, and
+daily active players for 14 days.
+
+**Round log** — every round is stored anonymously in `RoundLog` (human picks
+only, no identities) for the "what do humans actually pick?" analysis. Query
+it from the Neon SQL editor, e.g. average first-round human pick:
+
+```sql
+SELECT round, ROUND(AVG(p)::numeric, 1) AS avg_pick, COUNT(*) AS picks
+FROM "RoundLog", UNNEST("humanPicks") AS p
+WHERE NOT "isVoid"
+GROUP BY round ORDER BY round LIMIT 10;
+```
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |

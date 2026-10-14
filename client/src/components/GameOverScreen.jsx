@@ -9,6 +9,7 @@ import RoundHistory from "./RoundHistory";
 import LevelBadge from "./LevelBadge";
 import ShareCardModal from "./ShareCardModal";
 import { useGame } from "../contexts/GameContext";
+import { track } from "../services/analytics";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 const CONFETTI = ["#FBBF24", "#8B5CF6", "#22D3EE", "#34D399", "#F472B6"];
@@ -42,8 +43,15 @@ export default function GameOverScreen({ data, players }) {
   const [shareData, setShareData] = useState(null);
   const [shareLoading, setShareLoading] = useState(false);
 
+  // Funnel: one event per finished game, when this screen first appears
+  React.useEffect(() => {
+    track("game_finished", { won: iWon, rounds: history?.length || 0 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleShare = async () => {
     if (!deviceId || shareLoading) return;
+    track("share_card_open", { from: "victory" });
     setShareLoading(true);
     try {
       const res = await fetch(`/api/player/${deviceId}/card`);

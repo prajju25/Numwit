@@ -4,6 +4,9 @@ import App from "./App";
 import "./index.css";
 import { UserProvider } from "./contexts/UserContext";
 import { GameProvider } from "./contexts/GameContext";
+import { initAnalytics } from "./services/analytics";
+
+initAnalytics();
 
 const root = document.getElementById("root");
 

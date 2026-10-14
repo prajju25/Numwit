@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { track } from "../services/analytics";
 
 /**
  * Captures the browser's "install this app" prompt (Chrome/Edge on Android
@@ -14,7 +15,10 @@ export default function useInstallPrompt() {
       e.preventDefault(); // keep it for our button instead of the mini-infobar
       setDeferred(e);
     };
-    const onInstalled = () => setDeferred(null);
+    const onInstalled = () => {
+      track("app_installed");
+      setDeferred(null);
+    };
     window.addEventListener("beforeinstallprompt", onPrompt);
     window.addEventListener("appinstalled", onInstalled);
     return () => {

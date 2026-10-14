@@ -1,5 +1,8 @@
 # ── Stage 1: build the React client ─────────────────────────────────────────
 FROM node:20-bookworm-slim AS client-build
+# Umami website id for analytics (public value; empty = analytics off)
+ARG UMAMI_WEBSITE_ID=""
+ENV UMAMI_WEBSITE_ID=$UMAMI_WEBSITE_ID
 WORKDIR /client
 COPY client/package*.json ./
 RUN npm ci

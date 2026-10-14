@@ -194,3 +194,15 @@ describe("ShareCardModal links", () => {
     expect(window.open.mock.calls[0][0]).toContain(encodeURIComponent("https://numwit.prajvex.com"));
   });
 });
+
+describe("ShareCardModal analytics", () => {
+  afterEach(() => { delete window.umami; });
+
+  test("each share action reports the method and card variant", () => {
+    window.umami = { track: jest.fn() };
+    window.open = jest.fn();
+    render(<ShareCardModal player={{ name: "Alice", level: 2, stats: {} }} variant="victory" onClose={() => {}} />);
+    fireEvent.click(screen.getByText("Reddit"));
+    expect(window.umami.track).toHaveBeenCalledWith("share", { method: "reddit", variant: "victory" });
+  });
+});
