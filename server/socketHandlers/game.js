@@ -15,6 +15,7 @@ const roomCleanup = require("../services/roomCleanup");
 const userService = require("../db/userService");
 const statsService = require("../db/statsService");
 const achievementService = require("../db/achievementService");
+const roundLogService = require("../db/roundLogService");
 
 // Pause after a round_result is broadcast, before the next round begins.
 // Gives players time to read the result overlay and see the "next round
@@ -230,6 +231,23 @@ async function submitBotNumber(io, roomId, botSocketId, number) {
   await submitNumber(io, room, botSocketId, number);
 }
 
+// ── recordRound ──────────────────────────────────────────────────────────────
+// Anonymous behaviour log (human picks only). Fire-and-forget: a slow or
+// missing database must never delay or break the game. Call before the room
+// is saved so game.logId (set on first use) persists for later rounds.
+function recordRound(room, game, activePlayers, result) {
+  try {
+    const entry = roundLogService.buildRoundLog(room, game, activePlayers, result);
+    if (entry) {
+      roundLogService.logRound(entry).catch(function(e) {
+        console.error("logRound error:", e.message);
+      });
+    }
+  } catch (e) {
+    console.error("recordRound error:", e.message);
+  }
+}
+
 // ── resolveRound ─────────────────────────────────────────────────────────────
 async function resolveRound(io, room, activePlayers) {
   const roomId = room.id;
@@ -238,6 +256,7 @@ async function resolveRound(io, room, activePlayers) {
   const result = evaluateRound(game, activePlayers);
 
   if (result.roundVoid) {
+    recordRound(room, game, activePlayers, result);
     game.numbers      = {};
     game.submittedCount = 0;
     game.status       = NUMWIT_GAME_STATUS.IN_PROGRESS;
@@ -256,6 +275,7 @@ async function resolveRound(io, room, activePlayers) {
   }
 
   Object.assign(game, result.updatedGame);
+  recordRound(room, game, activePlayers, result);
 
   // Track per-round wins and exact matches so persistGameOver can read them.
   // winHistory, exactMatchHistory, consecWinHistory, maxConsecWinHistory,
