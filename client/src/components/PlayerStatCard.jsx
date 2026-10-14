@@ -138,7 +138,7 @@ const PlayerStatCard = forwardRef(function PlayerStatCard(
       <div className="relative flex items-end justify-between mt-4">
         <div>
           <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#A9AED0] m-0">Win rate</p>
-          <p className="nums text-[68px] font-extrabold leading-[0.9] tracking-[-0.06em] m-0"
+          <p className="nums text-[68px] font-extrabold leading-[0.9] tracking-[-0.06em] pr-[0.12em] m-0"
             style={{ background: `linear-gradient(180deg,#FFFFFF 20%,${heroTint} 100%)`, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
             {`${s.winRate ?? 0}%`}
           </p>

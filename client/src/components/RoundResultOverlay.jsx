@@ -199,9 +199,10 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
       onClick={handleSkip}
     >
       <div
+        data-rv-stage
         className={twMerge(
           flags,
-          "relative w-full sm:max-w-md max-h-[100dvh] overflow-y-auto flex flex-col gap-3.5 px-4 pt-5 pb-5 sm:rounded-3xl sm:border sm:border-white/10"
+          "relative w-full sm:max-w-md lg:max-w-5xl max-h-[100dvh] lg:max-h-[92dvh] overflow-y-auto [scrollbar-width:thin] flex flex-col gap-3.5 lg:gap-5 px-4 pt-5 pb-5 lg:px-8 lg:pt-7 lg:pb-6 sm:rounded-3xl sm:border sm:border-white/10 sm:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]"
         )}
         style={{ background: "radial-gradient(100% 40% at 50% 22%, rgba(34,211,238,.12), rgba(34,211,238,0) 70%), radial-gradient(120% 40% at 50% 0%, rgba(124,58,237,.25), rgba(124,58,237,0) 70%), #080A15" }}
         onClick={(e) => e.stopPropagation()}
@@ -219,17 +220,21 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
           )}
         </div>
 
+        {/* Phone: one column. Desktop: the reveal on the left, results on the right. */}
+        <div className="flex flex-col gap-3.5 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-8 lg:items-start">
+        <div className="flex flex-col gap-3.5 lg:gap-5 min-w-0">
+
         {/* Winner banner */}
-        <div className="nw-rv-banner text-center">
+        <div className="nw-rv-banner text-center lg:text-left">
           <p className="text-xs text-amber-300 uppercase font-extrabold tracking-[0.16em] m-0">
             {isMultiWin ? "🏆 Winners" : "🏆 Winner"}
           </p>
           {winners.length > 0 ? winners.map((w) => (
-            <p key={w.socketId} className="font-display text-[28px] font-bold text-white m-0 leading-tight">
+            <p key={w.socketId} className="font-display text-[28px] lg:text-[36px] font-bold text-white m-0 leading-tight">
               {w.avatar} {w.name}{w.socketId === mySocketId ? " (you)" : ""}
             </p>
           )) : (
-            <p className="font-display text-[28px] font-bold text-white m-0">—</p>
+            <p className="font-display text-[28px] lg:text-[36px] font-bold text-white m-0">—</p>
           )}
           {iWon && <p className="text-sm text-amber-200 mt-1 mb-0">You read the room.</p>}
         </div>
@@ -237,7 +242,7 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
         {/* Number line stage */}
         {hasLine && (
           <section className="glass-card rounded-[22px] px-3.5 pt-4 pb-3" aria-label={`Average ${avg.toFixed(2)}, target ${tgt.toFixed(2)}`}>
-            <div className="relative h-[200px] mx-2" aria-hidden="true">
+            <div className="relative h-[200px] lg:h-[250px] mx-2" aria-hidden="true">
               <div className="nw-rv-avg absolute top-8 bottom-[34px] border-l-2 border-dashed border-white/80" style={{ left: `${clampPct(avg)}%` }}>
                 <span className="nums absolute -top-6 left-1.5 whitespace-nowrap text-xs font-bold text-white">avg {avgShown.toFixed(1)}</span>
               </div>
@@ -289,19 +294,22 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
         <div className="nw-rv-eq flex items-stretch gap-2">
           <div className="flex-1 rounded-2xl bg-black/30 border border-white/[0.08] px-3 py-2.5 text-center">
             <p className="label-muted mb-0.5 mt-0">Average</p>
-            <p className="nums text-2xl font-extrabold text-white m-0">
+            <p className="nums text-2xl lg:text-3xl font-extrabold text-white m-0">
               {avg != null ? avg.toFixed(2) : "—"}
             </p>
           </div>
           <div className="nums flex items-center text-sm font-bold text-[#8F95B8]">×{multiplier ?? ""}</div>
           <div className="flex-1 rounded-2xl bg-cyan-400/[0.08] border border-cyan-400/30 px-3 py-2.5 text-center">
             <p className="label-muted mb-0.5 mt-0">Target</p>
-            <p className="nums text-2xl font-extrabold text-cyan-300 m-0">
+            <p className="nums text-2xl lg:text-3xl font-extrabold text-cyan-300 m-0">
               {tgt != null ? tgt.toFixed(2) : "—"}
             </p>
           </div>
         </div>
 
+        </div>
+
+        <div className="flex flex-col gap-3.5 min-w-0 lg:pt-1">
         {/* Special-rule banners */}
         {(result.exactMatch || result.twoPlayerCycle || isMultiWin) && (
           <div className="nw-rv-late flex flex-col gap-1.5">
@@ -402,6 +410,8 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
             <div className="nw-rv-nextbar h-full bg-gradient-to-r from-violet-500 to-cyan-400" />
           </div>
         </footer>
+        </div>
+        </div>
       </div>
     </div>
   );

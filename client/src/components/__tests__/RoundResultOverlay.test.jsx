@@ -234,7 +234,7 @@ describe("RoundResultOverlay reveal choreography", () => {
   beforeEach(() => { jest.useFakeTimers(); });
   afterEach(() => { jest.useRealTimers(); delete window.matchMedia; });
 
-  const stage = (container) => container.querySelector(".nw-rv-banner").parentElement;
+  const stage = (container) => container.querySelector("[data-rv-stage]");
 
   test("steps through phase flags p1…p5 and counts the average and target up", () => {
     const { container } = render(<RoundResultOverlay result={result} voidData={null} players={players} onDismiss={() => {}} />);
