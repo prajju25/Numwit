@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import ReactDOM from "react-dom";
 import PropTypes from "prop-types";
 import PlayerStatCard from "./PlayerStatCard";
+import { SITE_URL } from "../hooks/usePageMeta";
 
 /**
  * ShareCardModal
@@ -31,7 +32,8 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
   const [error, setError] = useState(null);
 
   const { name, avatar, level, stats } = player || {};
-  const shareUrl  = typeof window !== "undefined" ? window.location.origin : "https://numwit.gg";
+  // Always the canonical domain, even when played via numwit.fly.dev or localhost
+  const shareUrl  = SITE_URL;
   const shareText = buildShareText({ name, level, stats, variant });
 
   const openShareWindow = (url) => {

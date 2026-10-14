@@ -178,7 +178,7 @@ const PlayerStatCard = forwardRef(function PlayerStatCard(
         <p className="text-[11px] italic leading-snug text-[#D4D7EE] max-w-[55%] m-0">&ldquo;{quote}&rdquo;</p>
         <div className="text-right">
           <p className="font-display text-[13px] font-bold m-0">Can you beat me?</p>
-          <p className="nums text-[11px] font-bold text-cyan-300 m-0">numwit.gg</p>
+          <p className="nums text-[11px] font-bold text-cyan-300 m-0">numwit.prajvex.com</p>
         </div>
       </div>
     </div>

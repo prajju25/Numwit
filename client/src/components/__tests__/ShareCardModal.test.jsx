@@ -185,3 +185,12 @@ describe("ShareCardModal", () => {
     document.body.removeChild(portalRoot);
   });
 });
+
+describe("ShareCardModal links", () => {
+  test("shares the canonical numwit.prajvex.com URL", () => {
+    window.open = jest.fn();
+    render(<ShareCardModal player={{ name: "Alice", level: 2, stats: {} }} variant="leaderboard" onClose={() => {}} />);
+    fireEvent.click(screen.getByText("Post on X"));
+    expect(window.open.mock.calls[0][0]).toContain(encodeURIComponent("https://numwit.prajvex.com"));
+  });
+});
