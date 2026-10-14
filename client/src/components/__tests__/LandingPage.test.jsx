@@ -102,3 +102,25 @@ describe("LandingPage", () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("LandingPage install button", () => {
+  test("appears only when the browser offers installation", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ json: () => Promise.resolve({ activePlayers: 0, gamesPlayedToday: 0, activeRooms: 0 }) })
+    );
+    render(<LandingPage onPlay={jest.fn()} onLeaderboard={jest.fn()} />);
+    await act(async () => {});
+    expect(screen.queryByText("Install app")).not.toBeInTheDocument();
+
+    const e = new Event("beforeinstallprompt");
+    e.prompt = jest.fn();
+    e.userChoice = Promise.resolve({ outcome: "accepted" });
+    act(() => { window.dispatchEvent(e); });
+
+    const { fireEvent } = require("@testing-library/react");
+    fireEvent.click(screen.getByText("Install app"));
+    await act(async () => {});
+    expect(e.prompt).toHaveBeenCalled();
+    expect(screen.queryByText("Install app")).not.toBeInTheDocument();
+  });
+});

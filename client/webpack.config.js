@@ -1,5 +1,6 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const CopyWebpackPlugin = require("copy-webpack-plugin");
 
 module.exports = {
   entry: "./src/index.jsx",
@@ -43,6 +44,11 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       template: "./public/index.html", // <== Important!
+    }),
+    // Icons, manifest, service worker, robots.txt, sitemap.xml, og-image —
+    // served from the site root as-is.
+    new CopyWebpackPlugin({
+      patterns: [{ from: "public", to: ".", globOptions: { ignore: ["**/index.html"] } }],
     }),
   ],
 };

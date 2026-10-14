@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import BrandMark from "./BrandMark";
+import useInstallPrompt from "../hooks/useInstallPrompt";
 
 const STATS_POLL_MS = 10000;
 
@@ -120,6 +121,7 @@ function DemoRound() {
 
 export default function LandingPage({ onPlay, onLeaderboard }) {
   const stats = useLiveStats();
+  const { canInstall, promptInstall } = useInstallPrompt();
   const hasStats = stats.activePlayers > 0 || stats.gamesPlayedToday > 0;
 
   return (
@@ -138,6 +140,15 @@ export default function LandingPage({ onPlay, onLeaderboard }) {
                 <span className="nw-live w-[7px] h-[7px] rounded-full bg-emerald-400" />
                 {stats.activePlayers} online
               </span>
+            )}
+            {canInstall && (
+              <button
+                onClick={promptInstall}
+                className="h-11 px-3 sm:px-4 rounded-xl flex items-center gap-2 bg-violet-500/15 border border-violet-400/45 hover:bg-violet-500/25 transition text-violet-100 text-sm font-bold"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+                Install app
+              </button>
             )}
             <button
               onClick={onLeaderboard}

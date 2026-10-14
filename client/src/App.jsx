@@ -16,6 +16,7 @@ import AchievementToast from "./components/AchievementToast";
 import FeedbackWidget from "./components/FeedbackWidget";
 import LeaderboardPage from "./components/LeaderboardPage";
 import BrandMark from "./components/BrandMark";
+import usePageMeta from "./hooks/usePageMeta";
 
 // Mute toggle button — reads from SoundContext
 function MuteButton() {
@@ -153,6 +154,15 @@ function AppInner() {
 
   // Landing page: only shown when nothing else is active and user chose to see it
   const showLandingPage = showLanding && showLogin && !isJoiningRoom;
+
+  // Tab title + canonical URL for the current view
+  usePageMeta(
+    showLeaderboard ? "Leaderboard"
+      : showGame ? "In game"
+      : showWaiting ? "Waiting room"
+      : null,
+    showLeaderboard ? "/leaderboard" : "/"
+  );
 
   // Leave the current room (if any) and return to the home/landing page.
   // Used both by the "Leave Room" button and by clicking the Numwit logo.

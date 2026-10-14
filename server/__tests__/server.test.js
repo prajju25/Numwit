@@ -293,6 +293,14 @@ describe("server.js", () => {
       const res = await supertest(app).get("/api/does-not-exist");
       expect(res.status).toBe(404);
     });
+
+    test("marks room links noindex but leaves the leaderboard indexable", async () => {
+      const room = await supertest(app).get("/k7qx2m");
+      expect(room.headers["x-robots-tag"]).toBe("noindex");
+
+      const leaderboard = await supertest(app).get("/leaderboard");
+      expect(leaderboard.headers["x-robots-tag"]).toBeUndefined();
+    });
   });
 
   describe("GET /api/player/:deviceId/stats", () => {
