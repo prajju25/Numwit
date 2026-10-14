@@ -131,7 +131,7 @@ export default function LandingPage({ onPlay, onLeaderboard }) {
         {/* ── Top bar ─────────────────────────────────────────────────────── */}
         <header className="flex items-center justify-between gap-3 py-3.5 sm:py-5">
           <span className="flex items-center gap-2.5">
-            <BrandMark size={30} />
+            <BrandMark size={46} />
             <span className="font-display text-xl sm:text-2xl font-bold">Numwit</span>
           </span>
           <div className="flex items-center gap-2">

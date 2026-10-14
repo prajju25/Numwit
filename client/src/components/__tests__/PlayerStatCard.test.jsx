@@ -95,7 +95,7 @@ describe("PlayerStatCard", () => {
 });
 
 describe("PlayerStatCard level ring and streak", () => {
-  const ring = (container) => container.querySelectorAll("circle")[2]; // [0] is the logo dot, [1] the ring track
+  const ring = (container) => container.querySelectorAll("circle")[1]; // [0] is the ring track
   const C = 2 * Math.PI * 30;
 
   test("level ring reflects levelProgress", () => {

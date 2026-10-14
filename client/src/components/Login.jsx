@@ -40,7 +40,7 @@ export default function Login() {
         >
           {/* Title */}
           <div className="text-center space-y-1">
-            <div className="flex justify-center mb-3"><BrandMark size={52} /></div>
+            <div className="flex justify-center mb-2"><BrandMark size={128} /></div>
             <h2 className="font-display text-2xl sm:text-3xl font-bold text-white">
               Join Numwit
             </h2>
