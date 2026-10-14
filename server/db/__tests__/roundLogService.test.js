@@ -47,8 +47,12 @@ describe("roundLogService.buildRoundLog", () => {
       humanWon: true,
     });
     expect(game.logId).toBe(entry.gameId);
-    const serialized = JSON.stringify(entry);
-    ["h1", "h2", "d1", "Alice", "Bob"].forEach((id) => expect(serialized).not.toContain(id));
+    // No identity in any field. gameId is excluded: it's a random hex UUID
+    // that can contain short strings like "d1" by pure chance.
+    const { gameId, ...rest } = entry;
+    expect(gameId).toMatch(/^[0-9a-f-]{36}$/);
+    const serialized = JSON.stringify(rest);
+    ["h1", "h2", "b1", "d1", "d2", "Alice", "Bob"].forEach((id) => expect(serialized).not.toContain(id));
   });
 
   test("reuses the game's id across rounds", () => {
