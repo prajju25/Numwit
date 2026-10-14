@@ -183,6 +183,16 @@
     <div class="loading">Loading stats…</div>
   </div>
 
+  <!-- Growth -->
+  <div class="section">
+    <h2>
+      Growth (real players)
+      <span class="controls"><span style="color:var(--text-dim)">Weekly active = finished ≥1 game in the last 7 days</span></span>
+    </h2>
+    <div class="grid" id="growthStats"><div class="loading">Loading growth metrics…</div></div>
+    <div id="growthDaily" style="margin-top:12px"></div>
+  </div>
+
   <!-- Active Rooms -->
   <div class="section">
     <h2>
@@ -252,6 +262,7 @@
     const API_HEALTH        = "/api/health";
     const API_PUBLIC_STATS  = "/api/stats";
     const API_LEADERBOARD   = "/api/admin/leaderboard";
+    const API_METRICS       = "/api/admin/metrics";
 
     // ── State ────────────────────────────────────────────────────────────────
     let allRooms        = [];
@@ -308,6 +319,34 @@
     }
 
     // ── Stats cards ──────────────────────────────────────────────────────────
+    function renderGrowth(m) {
+      const delta = m.weeklyActivePlayers - m.previousWeekActivePlayers;
+      const cards = [
+        { label: "Weekly active players", value: m.weeklyActivePlayers + ' <span style="font-size:0.8rem;color:' + (delta >= 0 ? "#34D399" : "#F87171") + '">' + (delta >= 0 ? "+" : "") + delta + '</span>' },
+        { label: "Previous week",          value: m.previousWeekActivePlayers },
+        { label: "Returning from last week", value: m.returningPlayers + (m.returningRate != null ? ' <span style="font-size:0.8rem;color:var(--text-dim)">(' + m.returningRate + '%)</span>' : "") },
+        { label: "New players (7d)",       value: m.newPlayers7d },
+        { label: "Games finished (7d)",    value: m.games7d },
+        { label: "Rounds logged (7d / all)", value: m.rounds7d + " / " + m.roundsTotal },
+      ];
+      document.getElementById("growthStats").innerHTML = cards.map((c) =>
+        '<div class="card"><div class="value">' + c.value + '</div><div class="label">' + c.label + '</div></div>'
+      ).join("") + '<div class="byType" style="grid-column:1/-1">Games (7d): ' +
+        ["public", "private", "solo"].map((t) => '<span>' + ((m.gamesByRoomType || {})[t] || 0) + '</span> ' + t).join(" &nbsp;·&nbsp; ") + '</div>';
+
+      const max = Math.max(1, ...m.daily.map((d) => d.players));
+      document.getElementById("growthDaily").innerHTML =
+        '<div style="display:flex;align-items:flex-end;gap:4px;height:90px">' +
+        m.daily.map((d) =>
+          '<div title="' + d.date + ': ' + d.players + ' players" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">' +
+            '<span style="font-size:0.65rem;color:var(--text-dim)">' + d.players + '</span>' +
+            '<div style="width:100%;height:' + Math.max(2, Math.round((d.players / max) * 64)) + 'px;background:#8B5CF6;border-radius:3px"></div>' +
+            '<span style="font-size:0.6rem;color:var(--text-dim)">' + d.date.slice(5) + '</span>' +
+          '</div>'
+        ).join("") + '</div>' +
+        '<div style="font-size:0.75rem;color:var(--text-dim);margin-top:4px">Daily active players, last 14 days (UTC)</div>';
+    }
+
     function renderStats(data) {
       const rooms = data.rooms || {};
       const feedback = data.feedback || {};
@@ -578,6 +617,13 @@
       } catch (err) {
         errEl.textContent = "Failed to load stats: " + err.message;
         errEl.style.display = "block";
+      }
+
+      try {
+        renderGrowth(await fetchJson(API_METRICS));
+      } catch (err) {
+        document.getElementById("growthStats").innerHTML =
+          '<div class="error">Failed to load growth metrics: ' + escapeHtml(err.message) + '</div>';
       }
 
       try {
