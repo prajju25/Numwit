@@ -99,3 +99,31 @@ model Feedback {
   @@index([status])
   @@index([createdAt])
 }
+
+// ── RoundLog ──────────────────────────────────────────────────────────────────
+// One row per resolved round, for aggregate behaviour analysis ("what do
+// humans actually pick?"). Deliberately anonymous: no user ids, names or
+// socket ids — only an opaque per-game id so rounds of the same game can be
+// grouped. Bot picks are excluded from humanPicks; average/target are the
+// round's real values (which bots do influence — see humanCount/playerCount).
+model RoundLog {
+  id               String   @id @default(uuid())
+  gameId           String               // random per game, not linked to players
+  round            Int
+  roomType         String               // public | private | solo
+  playerCount      Int                  // active players this round (humans + bots)
+  humanCount       Int
+  humanPicks       Int[]                // submitted picks of human players only
+  invalidCount     Int      @default(0) // picks voided by the duplicate rule
+  average          Float?
+  target           Float?
+  targetMultiplier Float
+  isVoid           Boolean  @default(false)
+  exactMatch       Boolean  @default(false)
+  isDuel           Boolean  @default(false)
+  humanWon         Boolean  @default(false) // at least one human among the winners
+  playedAt         DateTime @default(now())
+
+  @@index([playedAt])
+  @@index([gameId])
+}

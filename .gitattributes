@@ -1,2 +1,4 @@
 # Shell scripts run inside Linux containers — never convert to CRLF
 *.sh text eol=lf
+# Prisma checksums migration files: keep them byte-identical on every OS
+*.sql text eol=lf

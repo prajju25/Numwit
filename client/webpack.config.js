@@ -1,4 +1,5 @@
 const path = require("path");
+const webpack = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 
@@ -44,6 +45,11 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       template: "./public/index.html", // <== Important!
+    }),
+    // Umami website id (public, not a secret) — analytics stays off when empty.
+    // Set via fly.toml [build.args] → Dockerfile ARG → this env var.
+    new webpack.DefinePlugin({
+      "process.env.UMAMI_WEBSITE_ID": JSON.stringify(process.env.UMAMI_WEBSITE_ID || ""),
     }),
     // Icons, manifest, service worker, robots.txt, sitemap.xml, og-image —
     // served from the site root as-is.

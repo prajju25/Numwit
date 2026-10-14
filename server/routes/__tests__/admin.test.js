@@ -14,10 +14,14 @@ jest.mock("../../db/feedbackService", () => ({
 jest.mock("../../db/userService", () => ({
   getTotalUsers: jest.fn(),
 }));
+jest.mock("../../db/metricsService", () => ({
+  getGrowthMetrics: jest.fn(),
+}));
 
 const roomManager = require("../../utils/roomManager");
 const feedbackService = require("../../db/feedbackService");
 const userService = require("../../db/userService");
+const metricsService = require("../../db/metricsService");
 const adminRoutes = require("../admin");
 
 function makeApp() {
@@ -30,6 +34,27 @@ function makeApp() {
 describe("admin routes", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe("GET /api/admin/metrics", () => {
+    test("returns growth metrics", async () => {
+      metricsService.getGrowthMetrics.mockResolvedValueOnce({ weeklyActivePlayers: 12 });
+      const res = await supertest(makeApp()).get("/api/admin/metrics");
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ weeklyActivePlayers: 12 });
+    });
+
+    test("returns 503 without a database and 500 on errors", async () => {
+      metricsService.getGrowthMetrics.mockResolvedValueOnce(null);
+      expect((await supertest(makeApp()).get("/api/admin/metrics")).status).toBe(503);
+
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      metricsService.getGrowthMetrics.mockRejectedValueOnce(new Error("db down"));
+      const res = await supertest(makeApp()).get("/api/admin/metrics");
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: "metrics unavailable" });
+      errSpy.mockRestore();
+    });
   });
 
   describe("GET /api/admin/stats", () => {

@@ -30,6 +30,10 @@ jest.mock("../../db/statsService", () => ({
 jest.mock("../../db/achievementService", () => ({
   checkAndAward: jest.fn(() => Promise.resolve([])),
 }));
+jest.mock("../../db/roundLogService", () => ({
+  buildRoundLog: jest.fn(() => ({ gameId: "g1" })),
+  logRound: jest.fn(() => Promise.resolve(null)),
+}));
 
 const gameManager = require("../../utils/gameManager");
 const roomManager = require("../../utils/roomManager");
@@ -38,6 +42,7 @@ const botService = require("../../services/botService");
 const userService = require("../../db/userService");
 const statsService = require("../../db/statsService");
 const achievementService = require("../../db/achievementService");
+const roundLogService = require("../../db/roundLogService");
 const handleGameEvents = require("../game");
 const { NUMWIT_GAME_STATUS } = require("../../constants/constants");
 
@@ -373,6 +378,35 @@ describe("game socket handler", () => {
         expect(room.game.status).toBe(NUMWIT_GAME_STATUS.IN_PROGRESS);
         expect(timerService.startTimer).toHaveBeenCalledWith(io, "r1", room, 30, expect.any(Function));
         expect(botService.scheduleBotSubmissions).toHaveBeenCalledWith("r1", room.game, expect.any(Function));
+        // void rounds are logged too (everyone-picked-the-same is interesting data)
+        expect(roundLogService.buildRoundLog).toHaveBeenCalledWith(room, room.game, expect.any(Array), expect.objectContaining({ roundVoid: true }));
+        expect(roundLogService.logRound).toHaveBeenCalledWith({ gameId: "g1" });
+      });
+
+      test("round logging failures never break the round", async () => {
+        jest.useFakeTimers();
+        const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        const room = makeRoom();
+        roomManager.getRoomById.mockResolvedValue(room);
+        gameManager.evaluateRound.mockReturnValue(makeNormalResult());
+        roundLogService.buildRoundLog.mockImplementationOnce(() => { throw new Error("boom"); });
+
+        const io = makeIo();
+        const socket = makeSocket("p1");
+        handleGameEvents(io, socket);
+        await getHandler(socket, "send_number")({ roomId: "r1", user: { name: "P" }, no: 50 });
+
+        expect(io._emit).toHaveBeenCalledWith("round_result", expect.objectContaining({ winnerIds: ["p2"] }));
+        expect(errSpy).toHaveBeenCalledWith("recordRound error:", "boom");
+
+        roundLogService.logRound.mockRejectedValueOnce(new Error("db down"));
+        gameManager.evaluateRound.mockReturnValue(makeNormalResult());
+        const room2 = makeRoom();
+        roomManager.getRoomById.mockResolvedValue(room2);
+        await getHandler(socket, "send_number")({ roomId: "r1", user: { name: "P" }, no: 50 });
+        await Promise.resolve();
+        expect(errSpy).toHaveBeenCalledWith("logRound error:", "db down");
+        errSpy.mockRestore();
       });
 
       test("a normal round emits round_result, updates points/winHistory, and schedules the next round", async () => {
@@ -392,6 +426,7 @@ describe("game socket handler", () => {
         expect(io._emit).toHaveBeenCalledWith("round_result", expect.objectContaining({ winnerIds: ["p2"] }));
         expect(room.game.winHistory.p2).toBe(1);
         expect(room.game.points).toEqual({ p1: 1, p2: 0, p3: 2 });
+        expect(roundLogService.buildRoundLog).toHaveBeenCalledWith(room, room.game, expect.any(Array), expect.objectContaining({ winnerIds: ["p2"] }));
 
         await jest.advanceTimersByTimeAsync(10000);
 

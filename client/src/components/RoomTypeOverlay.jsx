@@ -3,11 +3,13 @@ import ReactDOM from "react-dom";
 import PropTypes from "prop-types";
 import { useUser } from "../contexts/UserContext";
 import socket from "../socket";
+import { track } from "../services/analytics";
 
 export default function RoomTypeOverlay({ onClose }) {
   const { user, deviceId, setRoomType, setIsJoiningRoom, roomId } = useUser();
 
   const handleRoomSelection = (type) => {
+    track("room_join", { type });
     setRoomType(type);
     setIsJoiningRoom(true);
     socket.emit("join_room", { roomId, user, roomType: type, deviceId });

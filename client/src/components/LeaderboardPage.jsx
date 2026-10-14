@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { twMerge } from "tailwind-merge";
 import { useUser } from "../contexts/UserContext";
 import ShareCardModal from "./ShareCardModal";
+import { track } from "../services/analytics";
 
 const PER_PAGE = 10;
 
@@ -96,6 +97,7 @@ export default function LeaderboardPage({ onBack }) {
 
   const handleShare = async (rank) => {
     if (!deviceId || shareLoading) return;
+    track("share_card_open", { from: "leaderboard", period });
     setShareLoading(true);
     try {
       const res = await fetch(`/api/player/${deviceId}/card`);

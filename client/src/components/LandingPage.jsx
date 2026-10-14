@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import BrandMark from "./BrandMark";
 import useInstallPrompt from "../hooks/useInstallPrompt";
+import { track } from "../services/analytics";
 
 const STATS_POLL_MS = 10000;
 
@@ -122,6 +123,8 @@ function DemoRound() {
 export default function LandingPage({ onPlay, onLeaderboard }) {
   const stats = useLiveStats();
   const { canInstall, promptInstall } = useInstallPrompt();
+  const play = (source) => () => { track("play_click", { source }); onPlay(); };
+  const install = () => { track("install_click"); promptInstall(); };
   const hasStats = stats.activePlayers > 0 || stats.gamesPlayedToday > 0;
 
   return (
@@ -143,7 +146,7 @@ export default function LandingPage({ onPlay, onLeaderboard }) {
             )}
             {canInstall && (
               <button
-                onClick={promptInstall}
+                onClick={install}
                 className="h-11 px-3 sm:px-4 rounded-xl flex items-center gap-2 bg-violet-500/15 border border-violet-400/45 hover:bg-violet-500/25 transition text-violet-100 text-sm font-bold"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
@@ -176,7 +179,7 @@ export default function LandingPage({ onPlay, onLeaderboard }) {
               <strong className="text-cyan-300 font-bold">80% of the average</strong>. Closest pick wins the round.
             </p>
             <div className="hidden lg:flex flex-wrap gap-3 mt-2">
-              <button onClick={onPlay} className="btn-primary h-[60px] px-8 rounded-2xl inline-flex items-center gap-2.5 text-lg font-extrabold">
+              <button onClick={play("hero")} className="btn-primary h-[60px] px-8 rounded-2xl inline-flex items-center gap-2.5 text-lg font-extrabold">
                 <PlayIcon />
                 Play now — it&apos;s free
               </button>
@@ -189,7 +192,7 @@ export default function LandingPage({ onPlay, onLeaderboard }) {
 
         {/* ── CTA (mobile/tablet) ─────────────────────────────────────────── */}
         <section className="lg:hidden flex flex-col gap-2.5 pt-1">
-          <button onClick={onPlay} className="btn-primary h-[58px] rounded-2xl flex items-center justify-center gap-2.5 text-[17px] font-extrabold">
+          <button onClick={play("hero_mobile")} className="btn-primary h-[58px] rounded-2xl flex items-center justify-center gap-2.5 text-[17px] font-extrabold">
             <PlayIcon />
             Play now — it&apos;s free
           </button>
@@ -238,7 +241,7 @@ export default function LandingPage({ onPlay, onLeaderboard }) {
 
         {/* ── Footer CTA ──────────────────────────────────────────────────── */}
         <footer className="py-10 sm:py-14 flex flex-col items-center gap-2.5">
-          <button onClick={onPlay} className="text-violet-300 font-bold hover:text-violet-200 transition-colors text-[15px] min-h-[44px]">
+          <button onClick={play("footer")} className="text-violet-300 font-bold hover:text-violet-200 transition-colors text-[15px] min-h-[44px]">
             Ready? Enter the game →
           </button>
           <p className="text-xs text-[#6E749A] m-0">No account needed. Ever.</p>

@@ -10,6 +10,7 @@ const userService = require("../db/userService");
 const timerService = require("../services/timerService");
 const botService = require("../services/botService");
 const statsService = require("../db/statsService");
+const metricsService = require("../db/metricsService");
 
 const router = express.Router();
 
@@ -28,6 +29,20 @@ router.get("/stats", async (req, res) => {
   } catch (err) {
     console.error("GET /api/admin/stats error:", err.message);
     res.status(500).json({ error: "stats unavailable" });
+  }
+});
+
+// -- GET /api/admin/metrics -----------------------------------------------------------
+// Growth metrics from real players: weekly active players, returning players,
+// new players, games, logged rounds, and a 14-day daily-active series.
+router.get("/metrics", async (req, res) => {
+  try {
+    const metrics = await metricsService.getGrowthMetrics();
+    if (!metrics) return res.status(503).json({ error: "database unavailable" });
+    res.json(metrics);
+  } catch (err) {
+    console.error("GET /api/admin/metrics error:", err.message);
+    res.status(500).json({ error: "metrics unavailable" });
   }
 });
 

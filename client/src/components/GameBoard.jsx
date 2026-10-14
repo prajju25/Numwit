@@ -17,6 +17,7 @@ import TutorialOverlay from "./TutorialOverlay";
 import FloatingAlert from "../modals/FloatingAlert";
 import VoicePanel from "./VoicePanel";
 import GameChat from "./GameChat";
+import { track } from "../services/analytics";
 
 function GameBoard() {
   const { roomId, user } = useUser();
@@ -57,6 +58,7 @@ function GameBoard() {
     setSubmitted(true);
     setSelectedNumber(no);
     socket.emit("send_number", { roomId, user, no });
+    if (gameData.round === 1) track("first_pick");
   };
 
   const isEliminated = eliminatedPlayers?.includes(mySocketId);
