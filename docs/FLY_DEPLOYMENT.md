@@ -250,8 +250,14 @@ progress):
 
 1. Merge your PR into `main` once its tests are green.
 2. GitHub → **Actions** → **CI / Deploy** → **Run workflow** → branch `main` → **Run workflow**.
-3. The run re-runs both test suites and deploys only if they pass. Progress and
-   history appear under the repo's **Environments → production**.
+3. The run re-runs both test suites. If they pass, **Deploy to Fly.io** waits
+   with "Waiting for review" → **Review deployments** → **Approve** (or Reject).
+   Progress and history appear under the repo's **Environments → production**.
+
+Only the repository owner can deploy: the job checks
+`github.actor == github.repository_owner`, and the `production` environment has
+the owner as its required reviewer. Pull requests (including from forks) run
+the tests only, with a read-only token and no secrets.
 
 One-time setup — a deploy token scoped to this app:
 
