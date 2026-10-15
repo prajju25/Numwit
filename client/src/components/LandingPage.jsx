@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import BrandMark from "./BrandMark";
 import useInstallPrompt from "../hooks/useInstallPrompt";
 import { track } from "../services/analytics";
+import ProfileMenu from "./ProfileMenu";
 
 const STATS_POLL_MS = 10000;
 
@@ -153,6 +154,7 @@ export default function LandingPage({ onPlay, onLeaderboard }) {
                 Install app
               </button>
             )}
+            <ProfileMenu />
             <button
               onClick={onLeaderboard}
               aria-label="Leaderboard"

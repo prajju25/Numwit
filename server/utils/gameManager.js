@@ -17,6 +17,7 @@ const hasExactMatch = rules.hasExactMatch;
 const computePenalties = rules.computePenalties;
 
 const saveRoom = require("./roomManager").saveRoom;
+const normalizeDifficulty = require("../services/botBrain").normalizeDifficulty;
 
 function shuffleArray(arr) {
   return arr.slice().sort(function() { return Math.random() - 0.5; });
@@ -45,7 +46,10 @@ function sanitizeSettings(raw) {
 
   const duplicateRuleEnabled = raw.duplicateRuleEnabled !== false;
 
-  return { timerDuration, eliminationThreshold, targetMultiplier, duplicateRuleEnabled };
+  // How hard computer players try (see services/botBrain.js)
+  const botDifficulty = normalizeDifficulty(raw.botDifficulty);
+
+  return { timerDuration, eliminationThreshold, targetMultiplier, duplicateRuleEnabled, botDifficulty };
 }
 
 // ── createGameData ─────────────────────────────────────────────────────────────

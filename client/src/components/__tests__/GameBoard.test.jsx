@@ -109,6 +109,20 @@ describe("GameBoard", () => {
     expect(screen.getByText(/Pick a number closest to 80% of the average/)).toBeInTheDocument();
   });
 
+  test("shows the bot difficulty chip only when bots are playing", () => {
+    useNumwit.mockReturnValue({
+      ...baseNumwit(),
+      gameData: { ...baseGameData, gameSettings: { botDifficulty: "sharp" } },
+    });
+    const { unmount } = render(<GameBoard />);
+    expect(screen.queryByText(/Sharp/)).not.toBeInTheDocument();
+    unmount();
+
+    useGame.mockReturnValue({ players: [players[0], { ...players[1], isBot: true }, { ...players[2], isBot: true }] });
+    render(<GameBoard />);
+    expect(screen.getByText(/Sharp/)).toBeInTheDocument();
+  });
+
   test("shows 'Pick your number' and renders NumberInput by default", () => {
     render(<GameBoard />);
 

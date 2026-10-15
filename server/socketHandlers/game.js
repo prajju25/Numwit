@@ -16,6 +16,7 @@ const userService = require("../db/userService");
 const statsService = require("../db/statsService");
 const achievementService = require("../db/achievementService");
 const roundLogService = require("../db/roundLogService");
+const withRoomLock = require("../utils/roomLock").withRoomLock;
 
 // Pause after a round_result is broadcast, before the next round begins.
 // Gives players time to read the result overlay and see the "next round
@@ -57,31 +58,34 @@ module.exports = function handleGameEvents(io, socket) {
       return socket.emit("invalid_number", { message: "Number must be 0-100" });
     }
 
-    const room = await getRoomById(roomId);
-    if (!room) return socket.emit("not_in_room");
+    // One at a time per room, so simultaneous picks can't overwrite each other
+    await withRoomLock(roomId, async function() {
+      const room = await getRoomById(roomId);
+      if (!room) return socket.emit("not_in_room");
 
-    const game = room.game;
-    if (!game) return socket.emit("not_in_room");
+      const game = room.game;
+      if (!game) return socket.emit("not_in_room");
 
-    const isInRoom = room.users.some(function(u) { return u.socketId === socket.id; });
-    if (!isInRoom) return socket.emit("not_in_room");
+      const isInRoom = room.users.some(function(u) { return u.socketId === socket.id; });
+      if (!isInRoom) return socket.emit("not_in_room");
 
-    // Mid-game joiners are in pendingJoiners, not yet in turnOrder — they cannot submit.
-    const isInTurnOrder = game.turnOrder.indexOf(socket.id) !== -1;
-    if (!isInTurnOrder) return;
+      // Mid-game joiners are in pendingJoiners, not yet in turnOrder — they cannot submit.
+      const isInTurnOrder = game.turnOrder.indexOf(socket.id) !== -1;
+      if (!isInTurnOrder) return;
 
-    const isEliminated = game.eliminatedPlayers.indexOf(socket.id) !== -1;
-    if (isEliminated) return;
+      const isEliminated = game.eliminatedPlayers.indexOf(socket.id) !== -1;
+      if (isEliminated) return;
 
-    if (game.numbers[socket.id] !== undefined) {
-      return socket.emit("duplicate_submission", { message: "You already submitted for this round" });
-    }
-    if (game.status === NUMWIT_GAME_STATUS.COMPLETED) {
-      return socket.emit("round_already_completed");
-    }
+      if (game.numbers[socket.id] !== undefined) {
+        return socket.emit("duplicate_submission", { message: "You already submitted for this round" });
+      }
+      if (game.status === NUMWIT_GAME_STATUS.COMPLETED) {
+        return socket.emit("round_already_completed");
+      }
 
-    socket.emit("number_received", { no: number });
-    await submitNumber(io, room, socket.id, number);
+      socket.emit("number_received", { no: number });
+      await submitNumber(io, room, socket.id, number);
+    });
   });
 
   // ── restart_game ────────────────────────────────────────────────────────────
@@ -112,7 +116,7 @@ module.exports = function handleGameEvents(io, socket) {
       await saveRoom(room);
       io.to(roomId).emit("game_reset");
       io.to(roomId).emit("room_update", room);
-      await startGameForRoom(io, roomId, {});
+      await startGameForRoom(io, roomId, { botDifficulty: room.botDifficulty });
       return;
     }
 
@@ -174,7 +178,7 @@ async function startGameForRoom(io, roomId, settings) {
     });
     timerService.startTimer(io, roomId, room, timerDuration, handleTimerExpiry);
     botService.scheduleBotSubmissions(roomId, gameData, function(botSocketId, number) {
-      submitBotNumber(io, roomId, botSocketId, number);
+      return submitBotNumber(io, roomId, botSocketId, number);
     });
   }, 300);
 }
@@ -219,6 +223,12 @@ async function submitNumber(io, room, socketId, number) {
 // happened may be stale) and re-validates before submitting, mirroring the
 // guards in the send_number handler.
 async function submitBotNumber(io, roomId, botSocketId, number) {
+  return withRoomLock(roomId, function() {
+    return submitBotNumberLocked(io, roomId, botSocketId, number);
+  });
+}
+
+async function submitBotNumberLocked(io, roomId, botSocketId, number) {
   const room = await getRoomById(roomId);
   if (!room || !room.game) return;
   const game = room.game;
@@ -248,12 +258,35 @@ function recordRound(room, game, activePlayers, result) {
   }
 }
 
+// ── rememberPicks ────────────────────────────────────────────────────────────
+// What bots learn from: everyone's picks in finished rounds (void ones too —
+// a duel tie still shows which move a player favours). Capped so the room
+// object in Redis stays small.
+const PICK_HISTORY_LIMIT = 12;
+function rememberPicks(game, activePlayers, result) {
+  const picks = {};
+  (result.submissions || []).forEach(function(s) {
+    if (typeof s.number === "number") picks[s.socketId] = s.number;
+  });
+  if (!Array.isArray(game.pickHistory)) game.pickHistory = [];
+  game.pickHistory.push({
+    picks: picks,
+    target: result.roundVoid ? null : result.target,
+    duel: activePlayers.length === 2,
+  });
+  if (game.pickHistory.length > PICK_HISTORY_LIMIT) {
+    game.pickHistory = game.pickHistory.slice(-PICK_HISTORY_LIMIT);
+  }
+}
+
 // ── resolveRound ─────────────────────────────────────────────────────────────
 async function resolveRound(io, room, activePlayers) {
   const roomId = room.id;
   const game   = room.game;
 
   const result = evaluateRound(game, activePlayers);
+
+  rememberPicks(game, activePlayers, result);
 
   if (result.roundVoid) {
     recordRound(room, game, activePlayers, result);
@@ -269,7 +302,7 @@ async function resolveRound(io, room, activePlayers) {
     const voidTimer = game.settings?.timerDuration || 30;
     timerService.startTimer(io, roomId, room, voidTimer, handleTimerExpiry);
     botService.scheduleBotSubmissions(roomId, game, function(botSocketId, number) {
-      submitBotNumber(io, roomId, botSocketId, number);
+      return submitBotNumber(io, roomId, botSocketId, number);
     });
     return;
   }
@@ -444,7 +477,7 @@ async function advanceToNextRound(io, roomId) {
   });
   timerService.startTimer(io, roomId, room, nextTimer, handleTimerExpiry);
   botService.scheduleBotSubmissions(roomId, game, function(botSocketId, number) {
-    submitBotNumber(io, roomId, botSocketId, number);
+    return submitBotNumber(io, roomId, botSocketId, number);
   });
 }
 
@@ -512,6 +545,7 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer) {
       playerCount:        sessionStats.playerCount,
       maxConsecRoundWins: sessionStats.maxConsecRoundWins,
       wasLastPlace:       sessionStats.wasLastPlace,
+      botDifficulty:      game.settings?.botDifficulty,
     };
 
     const newAchievements = await achievementService.checkAndAward(
@@ -553,6 +587,12 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer) {
 
 // ── handleTimerExpiry ────────────────────────────────────────────────────────
 async function handleTimerExpiry(io, roomId) {
+  return withRoomLock(roomId, function() {
+    return handleTimerExpiryLocked(io, roomId);
+  });
+}
+
+async function handleTimerExpiryLocked(io, roomId) {
   const room = await getRoomById(roomId);
   if (!room || !room.game) return;
 

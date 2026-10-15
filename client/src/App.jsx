@@ -16,6 +16,7 @@ import AchievementToast from "./components/AchievementToast";
 import FeedbackWidget from "./components/FeedbackWidget";
 import LeaderboardPage from "./components/LeaderboardPage";
 import BrandMark from "./components/BrandMark";
+import ProfileMenu from "./components/ProfileMenu";
 import usePageMeta from "./hooks/usePageMeta";
 
 // Mute toggle button — reads from SoundContext
@@ -238,6 +239,7 @@ function AppInner() {
             </h1>
             <div className="flex items-center gap-2">
               {/* Leaderboard button — always visible in the non-landing flow */}
+              {!showWaiting && !showGame && <ProfileMenu />}
               {!showWaiting && !showGame && (
                 <button
                   onClick={openLeaderboard}
@@ -272,7 +274,7 @@ function AppInner() {
             "flex items-start sm:items-center justify-center w-full mx-auto pt-20 sm:pt-24 pb-8 min-h-screen",
             showGame ? "max-w-6xl" : "max-w-2xl"
           )}>
-            {showLogin && <Login />}
+            {showLogin && <Login onCancel={goHome} />}
             {/* VoiceProvider and ChatProvider are single instances wrapping both
                 screens so peer connections and the chat log survive the
                 WaitingRoom → GameBoard transition. */}
