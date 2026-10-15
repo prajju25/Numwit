@@ -53,3 +53,5 @@ In Progress:
 Flow 3 (On Game Start)
 -- Client | GameBoard - start_game client (host) → server Trigger to begin game. game starts with 3 rounds.
 -- Server - CLient | game_started server → all clients Acknowledge start and broadcast round 1. random turns for round 1 until all players gets 1 turn. Next round the turn goes as per the round 1 order. need to maintain scoring points of each user
+
+<!-- Ruleset test PR — safe to close without merging. -->
