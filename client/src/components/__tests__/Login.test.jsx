@@ -137,6 +137,20 @@ describe("Login", () => {
     expect(screen.getByRole("button", { name: avatars[2] }).className).toMatch(/border-violet-500/);
   });
 
+  test("follows profile edits made elsewhere (e.g. the top-right menu)", () => {
+    // New player submitted the form, then cancelled the room choice
+    useUser.mockReturnValue({ user: null, setUser, roomId: null, setHasStarted, setIsWaitingRoom });
+    const { rerender } = render(<Login />);
+    fireEvent.change(screen.getByLabelText("Your Nickname"), { target: { value: "test" } });
+
+    // ...and renamed themselves from the profile menu
+    useUser.mockReturnValue({ user: { name: "test123", avatar: avatars[4] }, setUser, roomId: null, setHasStarted, setIsWaitingRoom });
+    rerender(<Login />);
+
+    expect(screen.getByLabelText("Your Nickname").value).toBe("test123");
+    expect(screen.getByRole("button", { name: avatars[4] }).className).toMatch(/border-violet-500/);
+  });
+
   describe("returning player (saved profile, no invite)", () => {
     beforeEach(() => {
       useUser.mockReturnValue({

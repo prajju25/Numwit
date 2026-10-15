@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { twMerge } from "tailwind-merge";
 import { useUser } from "../contexts/UserContext";
@@ -19,6 +19,15 @@ export default function Login({ onCancel }) {
   const [avatar, setAvatar] = useState(user?.avatar || avatars[0]);
   const [error, setError]   = useState("");
   const [showRoomChoice, setShowRoomChoice] = useState(returning);
+
+  // Keep the form in step with the saved profile when it changes elsewhere
+  // (e.g. edited from the top-right profile menu while this form is open).
+  useEffect(() => {
+    if (!user) return;
+    setName(user.name || "");
+    setAvatar(user.avatar || avatars[0]);
+    setError("");
+  }, [user?.name, user?.avatar]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
