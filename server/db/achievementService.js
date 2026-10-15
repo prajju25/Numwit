@@ -33,6 +33,9 @@ const ACHIEVEMENTS = [
   { id: "century",          name: "Century",          icon: "💯", description: "Play 100 games" },
   { id: "full_house",       name: "Full House",       icon: "🎉", description: "Play in a full 8-player room" },
   { id: "dragon_energy",    name: "Dragon Energy",    icon: "🐉", description: "Win a game after being in last place" },
+  // Bot difficulty ladder (Play vs Computer)
+  { id: "sharp_wit",        name: "Sharp Wit",        icon: "🧠", description: "Beat the Sharp bots" },
+  { id: "ruthless_slayer",  name: "Ruthless Slayer",  icon: "😈", description: "Beat the Ruthless bots" },
 ];
 
 // Seed achievements into DB once (idempotent)
@@ -84,7 +87,7 @@ async function unlock(userId, achievementId) {
  * @param {string} userId       — DB user id
  * @param {object} sessionData  — {
  *   wins, exactMatches, penalties, survived, eliminatedCount, isDuel, cameBackFrom4,
- *   roomType, playerCount, maxConsecRoundWins, wasLastPlace
+ *   roomType, playerCount, maxConsecRoundWins, wasLastPlace, botDifficulty
  * }
  * @param {object} allTimeStats — {
  *   gamesPlayed, totalWins, exactMatches,
@@ -140,6 +143,12 @@ async function checkAndAward(userId, sessionData, allTimeStats) {
   // Situational
   await check("full_house",    (s.playerCount || 0) >= 8);
   await check("dragon_energy", s.wasLastPlace && s.survived);
+
+  // Beat the bots at a fixed level (adaptive does not count). Ruthless also
+  // earns Sharp Wit — it is the harder of the two.
+  const beatBots = s.survived && s.roomType === "solo";
+  await check("sharp_wit",       beatBots && (s.botDifficulty === "sharp" || s.botDifficulty === "ruthless"));
+  await check("ruthless_slayer", beatBots && s.botDifficulty === "ruthless");
 
   return newlyUnlocked;
 }

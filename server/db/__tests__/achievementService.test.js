@@ -12,7 +12,7 @@ describe("achievementService", () => {
 
   describe("ACHIEVEMENTS catalogue", () => {
     test("contains 20 achievements with unique ids", () => {
-      expect(ACHIEVEMENTS).toHaveLength(20);
+      expect(ACHIEVEMENTS).toHaveLength(22);
       const ids = ACHIEVEMENTS.map((a) => a.id);
       expect(new Set(ids).size).toBe(ids.length);
     });
@@ -211,6 +211,28 @@ describe("achievementService", () => {
       mockDbWithUnlocked([], null);
       const result = await checkAndAward("user1", { wins: 1, exactMatches: 0, penalties: 0, survived: false }, {});
       expect(result).toEqual([]);
+    });
+
+    test.each([
+      ["sharp", "solo", ["sharp_wit"]],
+      ["ruthless", "solo", ["sharp_wit", "ruthless_slayer"]],
+      ["adaptive", "solo", []],
+      ["casual", "solo", []],
+      ["ruthless", "public", []],
+    ])("beating %s bots in a %s room awards %j", async (botDifficulty, roomType, expected) => {
+      mockDbWithUnlocked([]);
+      const result = await checkAndAward("user1", { wins: 0, exactMatches: 0, penalties: 2, survived: true, roomType, botDifficulty }, {});
+      const ids = result.map((a) => a.id);
+      ["sharp_wit", "ruthless_slayer"].forEach((id) => {
+        if (expected.includes(id)) expect(ids).toContain(id);
+        else expect(ids).not.toContain(id);
+      });
+    });
+
+    test("losing to ruthless bots awards nothing from the ladder", async () => {
+      mockDbWithUnlocked([]);
+      const result = await checkAndAward("user1", { wins: 2, exactMatches: 0, penalties: 5, survived: false, roomType: "solo", botDifficulty: "ruthless" }, {});
+      expect(result.map((a) => a.id)).not.toContain("ruthless_slayer");
     });
 
     test("defaults allTimeStats to {} when not provided", async () => {

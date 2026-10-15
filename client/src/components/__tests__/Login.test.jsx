@@ -11,6 +11,7 @@ jest.mock("../../contexts/UserContext", () => ({
 jest.mock("../RoomTypeOverlay", () => (props) => (
   <div data-testid="room-type-overlay">
     <button onClick={props.onClose}>close-overlay</button>
+    {props.onCancel && <button onClick={props.onCancel}>cancel-overlay</button>}
   </div>
 ));
 
@@ -122,11 +123,11 @@ describe("Login", () => {
     expect(screen.queryByText("Please enter a name.")).not.toBeInTheDocument();
   });
 
-  test("initializes name/avatar from existing user", () => {
+  test("invite link with a saved profile: shows the form prefilled", () => {
     useUser.mockReturnValue({
       user: { name: "ExistingUser", avatar: avatars[2] },
       setUser,
-      roomId: null,
+      roomId: "abc123",
       setHasStarted,
       setIsWaitingRoom,
     });
@@ -134,5 +135,41 @@ describe("Login", () => {
     render(<Login />);
     expect(screen.getByLabelText("Your Nickname").value).toBe("ExistingUser");
     expect(screen.getByRole("button", { name: avatars[2] }).className).toMatch(/border-violet-500/);
+  });
+
+  describe("returning player (saved profile, no invite)", () => {
+    beforeEach(() => {
+      useUser.mockReturnValue({
+        user: { name: "ExistingUser", avatar: avatars[2] },
+        setUser,
+        roomId: null,
+        setHasStarted,
+        setIsWaitingRoom,
+      });
+    });
+
+    test("skips the form and opens the room choice straight away", () => {
+      render(<Login />);
+      expect(screen.getByTestId("room-type-overlay")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Your Nickname")).not.toBeInTheDocument();
+    });
+
+    test("Cancel goes back via onCancel", () => {
+      const onCancel = jest.fn();
+      render(<Login onCancel={onCancel} />);
+      fireEvent.click(screen.getByText("cancel-overlay"));
+      expect(onCancel).toHaveBeenCalled();
+      expect(screen.queryByTestId("room-type-overlay")).not.toBeInTheDocument();
+    });
+
+    test("Cancel without onCancel just closes; choosing a room closes too", () => {
+      const { unmount } = render(<Login />);
+      fireEvent.click(screen.getByText("cancel-overlay"));
+      expect(screen.queryByTestId("room-type-overlay")).not.toBeInTheDocument();
+      unmount();
+      render(<Login />);
+      fireEvent.click(screen.getByText("close-overlay"));
+      expect(screen.queryByTestId("room-type-overlay")).not.toBeInTheDocument();
+    });
   });
 });

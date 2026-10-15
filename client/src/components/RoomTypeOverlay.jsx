@@ -18,7 +18,7 @@ function loadDifficulty() {
   return "adaptive";
 }
 
-export default function RoomTypeOverlay({ onClose }) {
+export default function RoomTypeOverlay({ onClose, onCancel }) {
   const { user, deviceId, setRoomType, setIsJoiningRoom, roomId } = useUser();
   const [pickingDifficulty, setPickingDifficulty] = useState(false);
   const [difficulty, setDifficulty] = useState(loadDifficulty);
@@ -122,7 +122,7 @@ export default function RoomTypeOverlay({ onClose }) {
         🤖 Play vs Computer
       </button>
 
-      <button onClick={onClose} className="min-h-[44px] px-4 text-sm text-white/40 hover:text-white/70 transition">
+      <button onClick={onCancel || onClose} className="min-h-[44px] px-4 text-sm text-white/40 hover:text-white/70 transition">
         Cancel
       </button>
     </div>
@@ -140,4 +140,6 @@ export default function RoomTypeOverlay({ onClose }) {
 
 RoomTypeOverlay.propTypes = {
   onClose: PropTypes.func.isRequired,
+  // Cancel button only; defaults to onClose
+  onCancel: PropTypes.func,
 };

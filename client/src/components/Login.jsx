@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import { twMerge } from "tailwind-merge";
 import { useUser } from "../contexts/UserContext";
 import RoomTypeOverlay from "./RoomTypeOverlay";
@@ -6,13 +7,18 @@ import { avatars } from "../constants/constants";
 import BrandMark from "./BrandMark";
 import { track } from "../services/analytics";
 
-export default function Login() {
+export default function Login({ onCancel }) {
   const { user, setUser, roomId, setHasStarted, setIsWaitingRoom } = useUser();
+
+  // Returning players (profile saved on this device) skip the form and go
+  // straight to choosing a room; they edit their profile from the top-right menu.
+  // Invite links still show the form so the player can confirm who they are.
+  const [returning] = useState(() => !!user?.name && !roomId);
 
   const [name, setName]     = useState(user?.name || "");
   const [avatar, setAvatar] = useState(user?.avatar || avatars[0]);
   const [error, setError]   = useState("");
-  const [showRoomChoice, setShowRoomChoice] = useState(false);
+  const [showRoomChoice, setShowRoomChoice] = useState(returning);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -33,6 +39,15 @@ export default function Login() {
     setAvatar(avatars[Math.floor(Math.random() * avatars.length)]);
     setError("");
   };
+
+  if (returning) {
+    return showRoomChoice ? (
+      <RoomTypeOverlay
+        onClose={() => setShowRoomChoice(false)}
+        onCancel={() => { setShowRoomChoice(false); if (onCancel) onCancel(); }}
+      />
+    ) : null;
+  }
 
   return (
     <>
@@ -114,3 +129,7 @@ export default function Login() {
     </>
   );
 }
+
+Login.propTypes = {
+  onCancel: PropTypes.func,
+};
