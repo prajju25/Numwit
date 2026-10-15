@@ -154,15 +154,17 @@ describe("lobby socket handler", () => {
         roomId: null,
         user: { name: "Solo" },
         roomType: "solo",
+        botDifficulty: "sharp",
       });
 
       const roomNo = socket.join.mock.calls[0][0];
 
+      expect(room.botDifficulty).toBe("sharp");
       expect(botService.fillRoomWithBots).toHaveBeenCalledWith(room, MIN_PLAYERS);
       expect(roomManager.saveRoom).toHaveBeenCalledWith(room);
       expect(io._emit).toHaveBeenCalledWith("room_update", room);
       expect(io._emit).toHaveBeenCalledWith("bots_added", { roomId: roomNo, bots });
-      expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, roomNo, {});
+      expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, roomNo, { botDifficulty: "sharp" });
     });
 
     test("solo mode without added bots does not emit bots_added", async () => {
@@ -183,7 +185,8 @@ describe("lobby socket handler", () => {
       const roomNo = socket.join.mock.calls[0][0];
 
       expect(io._emit).not.toHaveBeenCalledWith("bots_added", expect.anything());
-      expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, roomNo, {});
+      // No difficulty chosen → adaptive
+      expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, roomNo, { botDifficulty: "adaptive" });
     });
 
     test("joins an existing public room found via getPublicRooms", async () => {

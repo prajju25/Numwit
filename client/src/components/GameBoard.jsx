@@ -18,6 +18,7 @@ import FloatingAlert from "../modals/FloatingAlert";
 import VoicePanel from "./VoicePanel";
 import GameChat from "./GameChat";
 import { track } from "../services/analytics";
+import { BOT_DIFFICULTIES } from "../constants/constants";
 
 function GameBoard() {
   const { roomId, user } = useUser();
@@ -65,6 +66,11 @@ function GameBoard() {
   const activePlayers = (players || []).filter((p) => !(eliminatedPlayers || []).includes(p.socketId));
   const isDuel = activePlayers.length === 2;
   const pct = (gameData.targetMultiplier * 100 || 80).toFixed(0);
+  // Which computer opponents you face (only shown when bots are in the game)
+  const hasBots = (players || []).some((p) => p.isBot);
+  const botLevel = hasBots
+    ? BOT_DIFFICULTIES.find((d) => d.id === gameData.gameSettings?.botDifficulty)
+    : null;
 
   // Last round's target — shown as a marker on the slider / a zone on the grid.
   const lastRound = history?.length ? history[history.length - 1] : null;
@@ -107,6 +113,14 @@ function GameBoard() {
           <span className="nums px-2 py-0.5 rounded-full text-[11px] font-bold text-cyan-300 bg-cyan-400/10 border border-cyan-400/35">
             ×{(pct / 100).toFixed(1)}
           </span>
+          {botLevel && (
+            <span
+              title={`Bots: ${botLevel.label} — ${botLevel.blurb}`}
+              className="px-2 py-0.5 rounded-full text-[11px] font-bold text-violet-200 bg-violet-500/10 border border-violet-400/35 whitespace-nowrap"
+            >
+              {botLevel.icon} {botLevel.label}
+            </span>
+          )}
         </div>
         <p className="text-xs text-[#8F95B8] mt-0.5 mb-0">
           Pick a number closest to {pct}% of the average

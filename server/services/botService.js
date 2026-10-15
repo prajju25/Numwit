@@ -25,6 +25,7 @@
 const constants = require("../constants/constants");
 const BOT_NAMES = constants.BOT_NAMES;
 const BOT_AVATARS = constants.BOT_AVATARS;
+const chooseBotNumbers = require("./botBrain").chooseBotNumbers;
 
 // Pending one-shot "fill this room with bots" timers: Map<roomId, timeoutId>
 const fillTimers = new Map();
@@ -134,6 +135,15 @@ function scheduleBotSubmissions(roomId, game, submitFn) {
   clearSubmissionTimers(roomId);
   if (!game || !game.turnOrder) return;
 
+  // All bots decide together at the start of the round (from previous rounds
+  // only), so they can avoid voiding each other with duplicate picks.
+  let picks = {};
+  try {
+    picks = chooseBotNumbers(game, isBot);
+  } catch (e) {
+    console.error("botBrain error:", e.message);
+  }
+
   const timers = [];
   game.turnOrder.forEach(function(socketId) {
     if (!isBot(socketId)) return;
@@ -142,7 +152,8 @@ function scheduleBotSubmissions(roomId, game, submitFn) {
 
     const delay = 1000 + Math.random() * 3000; // 1-4s
     const t = setTimeout(function() {
-      submitFn(socketId, getBotNumber(game));
+      const n = picks[socketId];
+      submitFn(socketId, typeof n === "number" ? n : getBotNumber(game));
     }, delay);
     timers.push(t);
   });

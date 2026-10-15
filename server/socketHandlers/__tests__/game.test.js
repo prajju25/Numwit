@@ -16,6 +16,7 @@ jest.mock("../../services/botService", () => ({
   scheduleBotSubmissions: jest.fn(),
   clearSubmissionTimers: jest.fn(),
   removeRoom: jest.fn(),
+  fillRoomWithBots: jest.fn(() => []),
 }));
 jest.mock("../../db/userService", () => ({
   awardXp: jest.fn(() => Promise.resolve(null)),
@@ -383,6 +384,38 @@ describe("game socket handler", () => {
         expect(roundLogService.logRound).toHaveBeenCalledWith({ gameId: "g1" });
       });
 
+      test("remembers each round's picks for the bots, void rounds included, capped at 12", async () => {
+        jest.useFakeTimers();
+        const room = makeRoom();
+        room.game.pickHistory = Array.from({ length: 12 }, (_, i) => ({ picks: {}, target: i, duel: false }));
+        roomManager.getRoomById.mockResolvedValue(room);
+        gameManager.evaluateRound.mockReturnValue(makeNormalResult());
+
+        const io = makeIo();
+        const socket = makeSocket("p1");
+        handleGameEvents(io, socket);
+        await getHandler(socket, "send_number")({ roomId: "r1", user: { name: "P" }, no: 50 });
+
+        expect(room.game.pickHistory).toHaveLength(12);
+        expect(room.game.pickHistory[0].target).toBe(1);
+        expect(room.game.pickHistory[11]).toEqual({ picks: { p1: 50, p2: 40, p3: 10 }, target: 24, duel: false });
+
+      });
+
+      test("a void round is remembered with no target", async () => {
+        jest.useFakeTimers();
+        const room = makeRoom();
+        roomManager.getRoomById.mockResolvedValue(room);
+        gameManager.evaluateRound.mockReturnValue({ roundVoid: true, reason: "x", round: 1, submissions: [{ socketId: "p1", number: 7 }, { socketId: "p2" }] });
+
+        const io = makeIo();
+        const socket = makeSocket("p1");
+        handleGameEvents(io, socket);
+        await getHandler(socket, "send_number")({ roomId: "r1", user: { name: "P" }, no: 7 });
+
+        expect(room.game.pickHistory).toEqual([{ picks: { p1: 7 }, target: null, duel: false }]);
+      });
+
       test("round logging failures never break the round", async () => {
         jest.useFakeTimers();
         const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
@@ -672,6 +705,20 @@ describe("game socket handler", () => {
       expect(roomManager.saveRoom).toHaveBeenCalledWith(room);
       expect(io._emit).toHaveBeenCalledWith("game_reset");
       expect(io._emit).toHaveBeenCalledWith("room_update", room);
+    });
+
+    test("solo restart refills bots and keeps the chosen bot difficulty", async () => {
+      const room = { id: "r1", type: "solo", hostSocketId: "h1", botDifficulty: "ruthless", users: [], game: { round: 4 } };
+      roomManager.getRoomById.mockResolvedValue(room);
+      gameManager.createGameData.mockResolvedValue(null); // stop after settings are passed
+      const io = makeIo();
+      const socket = makeSocket("h1");
+      handleGameEvents(io, socket);
+
+      await getHandler(socket, "restart_game")({ roomId: "r1" });
+
+      expect(botService.fillRoomWithBots).toHaveBeenCalled();
+      expect(gameManager.sanitizeSettings).toHaveBeenCalledWith({ botDifficulty: "ruthless" });
     });
 
     test("host restart cancels a pending round-advance so next_round never fires", async () => {

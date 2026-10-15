@@ -112,7 +112,7 @@ module.exports = function handleGameEvents(io, socket) {
       await saveRoom(room);
       io.to(roomId).emit("game_reset");
       io.to(roomId).emit("room_update", room);
-      await startGameForRoom(io, roomId, {});
+      await startGameForRoom(io, roomId, { botDifficulty: room.botDifficulty });
       return;
     }
 
@@ -248,12 +248,35 @@ function recordRound(room, game, activePlayers, result) {
   }
 }
 
+// ── rememberPicks ────────────────────────────────────────────────────────────
+// What bots learn from: everyone's picks in finished rounds (void ones too —
+// a duel tie still shows which move a player favours). Capped so the room
+// object in Redis stays small.
+const PICK_HISTORY_LIMIT = 12;
+function rememberPicks(game, activePlayers, result) {
+  const picks = {};
+  (result.submissions || []).forEach(function(s) {
+    if (typeof s.number === "number") picks[s.socketId] = s.number;
+  });
+  if (!Array.isArray(game.pickHistory)) game.pickHistory = [];
+  game.pickHistory.push({
+    picks: picks,
+    target: result.roundVoid ? null : result.target,
+    duel: activePlayers.length === 2,
+  });
+  if (game.pickHistory.length > PICK_HISTORY_LIMIT) {
+    game.pickHistory = game.pickHistory.slice(-PICK_HISTORY_LIMIT);
+  }
+}
+
 // ── resolveRound ─────────────────────────────────────────────────────────────
 async function resolveRound(io, room, activePlayers) {
   const roomId = room.id;
   const game   = room.game;
 
   const result = evaluateRound(game, activePlayers);
+
+  rememberPicks(game, activePlayers, result);
 
   if (result.roundVoid) {
     recordRound(room, game, activePlayers, result);

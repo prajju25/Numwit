@@ -15,6 +15,7 @@ const botService = require("../services/botService");
 const roomCleanup = require("../services/roomCleanup");
 const gameHandlers = require("./game");
 const startGameForRoom = gameHandlers.startGameForRoom;
+const normalizeDifficulty = require("../services/botBrain").normalizeDifficulty;
 
 // ── Reconnection grace-period state ───────────────────────────────────────────
 // When a user disconnects (e.g. mobile switching apps) we wait 60 s before
@@ -132,6 +133,8 @@ module.exports = function handleLobbyEvents(io, socket) {
       // room) and start the game right away. See PLAY_VS_COMPUTER_PROPOSAL.md.
       if (roomType === "solo" && !room.game) {
         const addedSoloBots = botService.fillRoomWithBots(room, MIN_PLAYERS);
+        // Kept on the room so "Play again" uses the same difficulty
+        room.botDifficulty = normalizeDifficulty(data.botDifficulty);
         await saveRoom(room);
 
         io.to(roomNo).emit("room_update", room);
@@ -139,7 +142,7 @@ module.exports = function handleLobbyEvents(io, socket) {
           io.to(roomNo).emit("bots_added", { roomId: roomNo, bots: addedSoloBots });
         }
 
-        await startGameForRoom(io, roomNo, {});
+        await startGameForRoom(io, roomNo, { botDifficulty: room.botDifficulty });
         return;
       }
 

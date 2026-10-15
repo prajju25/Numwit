@@ -14,18 +14,21 @@ describe("gameManager", () => {
         eliminationThreshold: 5,
         targetMultiplier: 0.8,
         duplicateRuleEnabled: true,
+        botDifficulty: "adaptive",
       });
       expect(sanitizeSettings(null)).toEqual({
         timerDuration: 30,
         eliminationThreshold: 5,
         targetMultiplier: 0.8,
         duplicateRuleEnabled: true,
+        botDifficulty: "adaptive",
       });
       expect(sanitizeSettings("nope")).toEqual({
         timerDuration: 30,
         eliminationThreshold: 5,
         targetMultiplier: 0.8,
         duplicateRuleEnabled: true,
+        botDifficulty: "adaptive",
       });
     });
 
@@ -35,12 +38,14 @@ describe("gameManager", () => {
         eliminationThreshold: 7,
         targetMultiplier: 0.6,
         duplicateRuleEnabled: false,
+        botDifficulty: "ruthless",
       });
       expect(result).toEqual({
         timerDuration: 60,
         eliminationThreshold: 7,
         targetMultiplier: 0.6,
         duplicateRuleEnabled: false,
+        botDifficulty: "ruthless",
       });
     });
 
@@ -55,7 +60,13 @@ describe("gameManager", () => {
         eliminationThreshold: 5,
         targetMultiplier: 0.8,
         duplicateRuleEnabled: true,
+        botDifficulty: "adaptive",
       });
+    });
+
+    test("botDifficulty falls back to adaptive for unknown values", () => {
+      expect(sanitizeSettings({ botDifficulty: "godlike" }).botDifficulty).toBe("adaptive");
+      expect(sanitizeSettings({ botDifficulty: "casual" }).botDifficulty).toBe("casual");
     });
 
     test("duplicateRuleEnabled defaults to true unless explicitly false", () => {
@@ -91,6 +102,7 @@ describe("gameManager", () => {
         eliminationThreshold: 5,
         targetMultiplier: 0.8,
         duplicateRuleEnabled: true,
+        botDifficulty: "adaptive",
       });
     });
 
