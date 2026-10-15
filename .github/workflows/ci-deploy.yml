@@ -5,12 +5,21 @@
 #   restarts the server and ends games in progress, so pick a quiet moment.
 #
 # Requires the repository secret FLY_API_TOKEN (`fly tokens create deploy`).
+#
+# Safe for a public repo: pull requests from forks run the tests only, with a
+# read-only token and no secrets. Deploys need a manual start on main by the
+# repository owner AND approval in the "production" environment
+# (Settings → Environments → production → Required reviewers).
 
 name: CI / Deploy
 
 on:
   pull_request:
   workflow_dispatch:
+
+# Least privilege: jobs can read the code, nothing else.
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
@@ -40,7 +49,11 @@ jobs:
   deploy:
     name: Deploy to Fly.io
     needs: test
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    # Only the owner can ship, even if collaborators with write access are added later
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == github.repository_owner
     runs-on: ubuntu-latest
     environment:
       name: production
