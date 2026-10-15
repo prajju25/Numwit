@@ -1,5 +1,5 @@
 # NumWit — Execution Roadmap
-*Derived from GROWTH_PLAN.md, cross-referenced against the current codebase · first written June 2026 · **last updated 15 Oct 2026***
+*Derived from GROWTH_PLAN.md, cross-referenced against the current codebase · first written June 2026 · **last updated 16 Oct 2026***
 
 This is the actionable, build-status-aware version of GROWTH_PLAN.md. That document is the
 playbook (why each idea works); this one is the sequence (what to actually do, in what order,
@@ -9,8 +9,8 @@ and who does it) — and the single place where status is tracked.
 🔧 Engineering task · 📣 Manual task (marketing/outreach — no code, only you can do this)
 
 **Live at:** https://numwit.prajvex.com — Fly.io (1 always-on Machine) + Upstash Redis + Neon
-Postgres. Deploy: merge to `main`, then GitHub → Actions → **CI / Deploy** → Run workflow
-(see `docs/FLY_DEPLOYMENT.md`).
+Postgres. Deploy: merge to `main`, then GitHub → Actions → **CI / Deploy** → Run workflow, then
+approve the `production` deployment (see `docs/FLY_DEPLOYMENT.md`).
 
 ---
 
@@ -18,10 +18,11 @@ Postgres. Deploy: merge to `main`, then GitHub → Actions → **CI / Deploy** �
 
 **Core game (built before June 2026)**
 - ✅ Public / private / solo rooms, with bot auto-fill for public rooms
-- ✅ Solo mode vs. adaptive bots (Section 1's "no other game in this category has this")
+- ✅ Solo mode vs. bots (Section 1's "no other game in this category has this") — made
+  genuinely smart in Oct 2026, see below
 - ✅ Win streak tracking — current streak (`consecutiveGameWins`) and best streak ever
   (`bestStreak`)
-- ✅ Achievements (20) + XP/Level system
+- ✅ Achievements (22) + XP/Level system
 - ✅ Feedback widget (bug/feature pipeline)
 - ✅ Voice chat + emote reactions
 - ✅ Round history view
@@ -53,6 +54,19 @@ Postgres. Deploy: merge to `main`, then GitHub → Actions → **CI / Deploy** �
     players, games by room type, 14-day daily-active chart (real players only)
   - `RoundLog` table: every round's human picks, anonymous — the raw material for the
     Section 5 Path D data post
+- ✅ **Smarter bots** — bots learn how each player picks (from earlier rounds only, never the
+  current one), counter a player's favourite duel move (0 / 1 / 100), and never block each
+  other with duplicate picks. "Play vs Computer" asks for a level: Casual / Sharp / Ruthless /
+  Adaptive (default — tougher while you lead, gentler while you trail). New achievements:
+  🧠 Sharp Wit and 😈 Ruthless Slayer
+- ✅ **Returning players skip the profile form** — "Play now" goes straight to the room
+  picker; name and avatar are edited from a top-right profile menu
+- ✅ **Fix: rounds waiting for the timer** — two picks arriving together could overwrite each
+  other (and the lost player got a no-show penalty); room updates are now one at a time
+- ✅ **Repo ready to be public** — `main` protected (PR + Code Owner review + both test
+  suites), deploys only by the owner and only after approval in the `production`
+  environment, read-only workflow token, secret scanning + push protection, history checked
+  for leaked keys; Node 22 in CI and the Docker image, Fly deploy action pinned
 
 ---
 
@@ -66,8 +80,8 @@ is why the public launch posts wait for them.
 ### Sprint 1 — A first game that clicks 🔜 *(next)*
 🔧 GROWTH_PLAN Summary #2 + Section 2 #1 (text version)
 1. **Quick start vs bots** — "Play now" puts a first-time visitor straight into a game against
-   bots with an auto-generated name + avatar (editable later). Public / private / bots stay one
-   tap away for returning players.
+   bots with an auto-generated name + avatar (editable later). Returning players already go
+   straight to public / private / bots (done Oct 2026).
 2. **Round-1 explainer** — after the first round, a short, specific explanation of why the
    target was low ("most people pick around 50 → target 0.8 × 41.6 = 33 — next round, think one
    step further").

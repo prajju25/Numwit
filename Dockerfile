@@ -1,5 +1,5 @@
 # ── Stage 1: build the React client ─────────────────────────────────────────
-FROM node:20-bookworm-slim AS client-build
+FROM node:22-bookworm-slim AS client-build
 # Umami website id for analytics (public value; empty = analytics off)
 ARG UMAMI_WEBSITE_ID=""
 ENV UMAMI_WEBSITE_ID=$UMAMI_WEBSITE_ID
@@ -10,7 +10,7 @@ COPY client/ .
 RUN npm run build
 
 # ── Stage 2: server + built client ──────────────────────────────────────────
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 # Prisma's query engine needs OpenSSL; CA certs for TLS to Neon/Upstash.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends openssl ca-certificates \
