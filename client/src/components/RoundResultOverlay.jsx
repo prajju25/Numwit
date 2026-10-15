@@ -3,6 +3,9 @@ import PropTypes from "prop-types";
 import { twMerge } from "tailwind-merge";
 import socket from "../socket";
 import { useUser } from "../contexts/UserContext";
+import {
+  explainFirstRound, explainerGamesSeen, markExplainerSeen, EXPLAINER_GAMES,
+} from "../services/roundInsights";
 
 // The server waits ROUND_RESULT_DELAY_MS (10s) after round_result before
 // emitting next_round. The overlay shows the full result immediately and
@@ -48,6 +51,17 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
   const [tgtShown, setTgtShown] = useState(null);
   const tweenRef = useRef(null);
   const mySocketId = useUser()?.user?.socketId ?? socket.id;
+  // "Why was the target X?" — round 1 of a player's first few games
+  const [explainer, setExplainer] = useState(null);
+  useEffect(() => {
+    const e = result && !voidData && result.round === 1 ? explainFirstRound(result) : null;
+    if (e && explainerGamesSeen() < EXPLAINER_GAMES) {
+      setExplainer(e);
+      markExplainerSeen();
+    } else {
+      setExplainer(null);
+    }
+  }, [result, voidData]);
 
   useEffect(() => { setVisible(true); setCountdown(COUNTDOWN_SECONDS); }, [result, voidData]);
 
@@ -310,6 +324,15 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
         </div>
 
         <div className="flex flex-col gap-3.5 min-w-0 lg:pt-1">
+        {explainer && (
+          <section className="nw-rv-eq rounded-[16px] px-4 py-3 border border-violet-400/35 bg-violet-500/10" aria-label="How the target works">
+            <p className="text-sm font-bold text-violet-100 m-0">💡 {explainer.title}</p>
+            {explainer.steps.map((step) => (
+              <p key={step} className="text-[13px] leading-relaxed text-[#C7CBE6] mt-1.5 mb-0">{step}</p>
+            ))}
+          </section>
+        )}
+
         {/* Special-rule banners */}
         {(result.exactMatch || result.twoPlayerCycle || isMultiWin) && (
           <div className="nw-rv-late flex flex-col gap-1.5">

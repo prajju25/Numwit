@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { twMerge } from "tailwind-merge";
 import { useUser } from "../contexts/UserContext";
@@ -6,19 +6,40 @@ import RoomTypeOverlay from "./RoomTypeOverlay";
 import { avatars } from "../constants/constants";
 import BrandMark from "./BrandMark";
 import { track } from "../services/analytics";
+import socket from "../socket";
+import { randomProfile } from "../services/profile";
 
 export default function Login({ onCancel }) {
-  const { user, setUser, roomId, setHasStarted, setIsWaitingRoom } = useUser();
+  const {
+    user, setUser, roomId, setHasStarted, setIsWaitingRoom,
+    deviceId, setRoomType, setIsJoiningRoom,
+  } = useUser();
 
-  // Returning players (profile saved on this device) skip the form and go
-  // straight to choosing a room; they edit their profile from the top-right menu.
-  // Invite links still show the form so the player can confirm who they are.
-  const [returning] = useState(() => !!user?.name && !roomId);
+  // Three ways in:
+  //  · first visit (no profile, no invite) → random name + avatar, straight into
+  //    a game against Adaptive bots — the quickest way to "get" the game;
+  //  · returning player → straight to the room picker;
+  //  · invite link → this form, so the player confirms who they are.
+  // Names are changed later from the top-right profile menu.
+  const [mode] = useState(() => (roomId ? "invite" : user?.name ? "returning" : "quickStart"));
 
+  const quickStarted = useRef(false);
+  useEffect(() => {
+    if (mode !== "quickStart" || quickStarted.current) return;
+    quickStarted.current = true;
+    const profile = randomProfile();
+    setUser({ ...profile, autoNamed: true });
+    track("profile_done", { viaInvite: false, auto: true });
+    track("room_join", { type: "solo", quickStart: true, botDifficulty: "adaptive" });
+    setRoomType("solo");
+    setIsJoiningRoom(true);
+    socket.emit("join_room", { roomId: null, user: profile, roomType: "solo", deviceId, botDifficulty: "adaptive" });
+  }, [mode]);
+
+  const [showRoomChoice, setShowRoomChoice] = useState(mode === "returning");
   const [name, setName]     = useState(user?.name || "");
   const [avatar, setAvatar] = useState(user?.avatar || avatars[0]);
   const [error, setError]   = useState("");
-  const [showRoomChoice, setShowRoomChoice] = useState(returning);
 
   // Keep the form in step with the saved profile when it changes elsewhere
   // (e.g. edited from the top-right profile menu while this form is open).
@@ -33,23 +54,22 @@ export default function Login({ onCancel }) {
     e.preventDefault();
     if (!name.trim()) { setError("Please enter a name."); return; }
     setUser({ name: name.trim(), avatar });
-    track("profile_done", { viaInvite: !!roomId });
-    if (!roomId) {
-      setShowRoomChoice(true);
-    } else {
-      track("room_join", { type: "invite" });
-      setHasStarted(true);
-      setIsWaitingRoom(true);
-    }
+    track("profile_done", { viaInvite: true });
+    track("room_join", { type: "invite" });
+    setHasStarted(true);
+    setIsWaitingRoom(true);
   };
 
   const handleRandomize = () => {
-    setName(`Player${Math.floor(100 + Math.random() * 900)}`);
-    setAvatar(avatars[Math.floor(Math.random() * avatars.length)]);
+    const profile = randomProfile();
+    setName(profile.name);
+    setAvatar(profile.avatar);
     setError("");
   };
 
-  if (returning) {
+  if (mode === "quickStart") return null; // "Joining room…" shows while the game starts
+
+  if (mode === "returning") {
     return showRoomChoice ? (
       <RoomTypeOverlay
         onClose={() => setShowRoomChoice(false)}
@@ -59,7 +79,6 @@ export default function Login({ onCancel }) {
   }
 
   return (
-    <>
       <div className="w-full flex items-center justify-center px-4">
         <form
           onSubmit={handleSubmit}
@@ -71,7 +90,7 @@ export default function Login({ onCancel }) {
             <h2 className="font-display text-2xl sm:text-3xl font-bold text-white">
               Join Numwit
             </h2>
-            <p className="text-white/50 text-sm">Set up your profile to start playing</p>
+            <p className="text-white/50 text-sm">You&apos;ve been invited to a room — pick your name</p>
           </div>
 
           {/* Name input */}
@@ -131,11 +150,6 @@ export default function Login({ onCancel }) {
           </div>
         </form>
       </div>
-
-      {showRoomChoice && (
-        <RoomTypeOverlay onClose={() => setShowRoomChoice(false)} />
-      )}
-    </>
   );
 }
 

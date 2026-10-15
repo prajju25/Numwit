@@ -77,19 +77,33 @@ before moving on. Sprints 1–2 fix the plan's two biggest problems ("the mechan
 until round 3" and "every session that ends without a share is a missed acquisition"), which
 is why the public launch posts wait for them.
 
-### Sprint 1 — A first game that clicks 🔜 *(next)*
+### Sprint 1 — A first game that clicks ✅ *(shipped 16 Oct 2026)*
 🔧 GROWTH_PLAN Summary #2 + Section 2 #1 (text version)
-1. **Quick start vs bots** — "Play now" puts a first-time visitor straight into a game against
-   bots with an auto-generated name + avatar (editable later). Returning players already go
-   straight to public / private / bots (done Oct 2026).
-2. **Round-1 explainer** — after the first round, a short, specific explanation of why the
-   target was low ("most people pick around 50 → target 0.8 × 41.6 = 33 — next round, think one
-   step further").
-3. **Wordle-style text share** — copy-paste emoji summary of the player's rounds + placement +
-   link; works in WhatsApp / Discord / X with no image.
+1. ✅ **Quick start vs bots** — a first-time visitor's "Play now" goes straight into a game
+   against Adaptive bots as e.g. "Player482" with a random avatar. A "Set name" badge on the
+   profile menu and a game-over card invite them to pick a real name; renaming works mid-game
+   (everyone in the room sees it). Returning players go to the room picker; invite links still
+   show the profile form.
+2. ✅ **Round-1 explainer** — "Why was the target 24.3?" with that round's real numbers, in the
+   round-result screen for a player's first 3 games; the round-2 strategy tip now projects one
+   step ahead from round 1's actual target.
+3. ✅ **Wordle-style text share** — "Share result as text" on the game-over screen
+   (share sheet on phones, clipboard on desktop):
+   ```
+   Numwit 🧠 🥇 1st of 3 · won 4/8 rounds
+   ⬛🟩⬛🟩⬛🟩⬛🟩
+   Closest: 6.8 off the target
+   https://numwit.prajvex.com
+   ```
+   Final standings now rank by elimination order (knocked out later = higher), points only as
+   a tie-break.
 
-**Success metric:** % of `play_click` visitors reaching `first_pick` and `game_finished`;
-`share` events per finished game.
+Also fixed while testing: refreshing mid-game and pressing "Play now" pulled players back into
+the old game for 60s; bots dueling each other could void the same round over and over.
+
+**Success metric:** % of `play_click` visitors reaching `first_pick` and `game_finished`
+(quick start sends `profile_done` with `auto: true`); `share` events per finished game —
+`method: text_copy / text_sheet` for the text share vs the image card.
 
 ### Sprint 2 — Identity + invites ⬜
 🔧 Section 2 #2, #6

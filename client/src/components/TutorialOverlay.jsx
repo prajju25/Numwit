@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import PropTypes from "prop-types";
 import { useNumwit } from "../contexts/NumwitRuleContext";
+import { nextRoundTip } from "../services/roundInsights";
 
 
 /**
@@ -11,7 +12,7 @@ import { useNumwit } from "../contexts/NumwitRuleContext";
  * Dismisses permanently for the session once the user closes it.
  *
  * Round 1 tip: explain the core rule
- * Round 2 tip: hint about psychology / strategy
+ * Round 2 tip: strategy, using round 1's real target when there is one
  */
 
 const TIPS = {
@@ -32,12 +33,16 @@ const TIPS = {
  * onDismiss: (round) => void
  */
 export default function TutorialOverlay({ dismissed, onDismiss }) {
-  const { gameData } = useNumwit();
+  const { gameData, history } = useNumwit();
   // fall back to local state when used standalone (e.g. tests)
   const [localDismissed, setLocalDismissed] = useState({});
 
   const round = gameData?.round;
-  const tip = TIPS[round];
+  let tip = TIPS[round];
+  if (round === 2 && history?.length) {
+    const body = nextRoundTip(history[history.length - 1], gameData?.targetMultiplier);
+    if (body) tip = { ...tip, body };
+  }
 
   const isDismissed = dismissed ? dismissed[round] : localDismissed[round];
   const handleDismiss = () => {

@@ -10,6 +10,9 @@ import LevelBadge from "./LevelBadge";
 import ShareCardModal from "./ShareCardModal";
 import { useGame } from "../contexts/GameContext";
 import { track } from "../services/analytics";
+import { buildShareText, roundSquare, playedRounds } from "../services/shareText";
+import { rankPlayers } from "../services/standings";
+import { openProfileMenu } from "../services/profile";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 const CONFETTI = ["#FBBF24", "#8B5CF6", "#22D3EE", "#34D399", "#F472B6"];
@@ -20,6 +23,12 @@ const PODIUM_STYLE = [
   { h: "h-[72px]",  box: "from-slate-300/20 to-slate-300/[0.04] border-slate-300/30", name: "text-white font-bold", avatar: "text-[28px]" },
   { h: "h-[54px]",  box: "from-amber-700/25 to-amber-700/[0.04] border-amber-600/40", name: "text-white font-bold", avatar: "text-[26px]" },
 ];
+
+/** Phones get the native share sheet; desktops copy to the clipboard. */
+function prefersShareSheet() {
+  return typeof navigator !== "undefined" && typeof navigator.share === "function"
+    && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+}
 
 /** Where the XP bar animates from/to (0–100), from the xp_update payload. */
 function xpBarRange(xpData) {
@@ -42,6 +51,7 @@ export default function GameOverScreen({ data, players }) {
   const [showHistory, setShowHistory] = useState(false);
   const [shareData, setShareData] = useState(null);
   const [shareLoading, setShareLoading] = useState(false);
+  const [textStatus, setTextStatus] = useState(""); // "", "copied", "failed"
 
   // Funnel: one event per finished game, when this screen first appears
   React.useEffect(() => {
@@ -73,20 +83,34 @@ export default function GameOverScreen({ data, players }) {
 
   const handleRestart = () => socket.emit("restart_game", { roomId });
 
-  // Winner first, then fewest penalty points.
-  const sorted = [...(players || [])].sort((a, b) => {
-    if (a.socketId === data?.winnerSocketId) return -1;
-    if (b.socketId === data?.winnerSocketId) return 1;
-    const pa = data?.points?.[a.socketId] ?? 0;
-    const pb = data?.points?.[b.socketId] ?? 0;
-    return pa - pb;
-  });
+  // Wordle-style text result: share sheet on phones, clipboard elsewhere
+  const handleTextShare = async () => {
+    const text = buildShareText({ history, mySocketId, placement, playerCount: sorted.length });
+    try {
+      if (prefersShareSheet()) {
+        await navigator.share({ text });
+        track("share", { method: "text_sheet", variant: "game_over" });
+      } else {
+        await navigator.clipboard.writeText(text);
+        track("share", { method: "text_copy", variant: "game_over" });
+        setTextStatus("copied");
+        setTimeout(() => setTextStatus(""), 2500);
+      }
+    } catch (err) {
+      if (err?.name !== "AbortError") setTextStatus("failed"); // AbortError = closed the share sheet
+    }
+  };
+
+  // Winner first, then who lasted longest (points break ties)
+  const sorted = rankPlayers(players, data, history);
+  const placement = sorted.findIndex((p) => p.socketId === mySocketId) + 1 || null;
   const podium = sorted.slice(0, 3);
   const rest = sorted.slice(3);
 
   const rounds = history?.length || 0;
   const myRoundWins = (history || []).filter((r) => r.winnerIds?.includes(mySocketId)).length;
   const xpRange = xpData ? xpBarRange(xpData) : null;
+  const squares = playedRounds(history, mySocketId).slice(0, 10).map((r) => roundSquare(r, mySocketId)).join("");
 
   return (
     <div className="relative w-full max-w-md mx-auto flex flex-col gap-4 animate-fadeIn">
@@ -211,7 +235,34 @@ export default function GameOverScreen({ data, players }) {
             Waiting for host to start a new game…
           </div>
         )}
+
+        {rounds > 0 && (
+          <button
+            onClick={handleTextShare}
+            className="min-h-[50px] px-4 rounded-2xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] transition flex items-center gap-3 text-left"
+          >
+            <span className="text-[15px] tracking-[0.05em] truncate" aria-hidden="true">{squares}</span>
+            <span className="flex-1 text-right text-sm font-bold text-violet-200 whitespace-nowrap">
+              {textStatus === "copied" ? "✓ Copied — paste anywhere"
+                : textStatus === "failed" ? "Couldn't copy — try again"
+                : "Share result as text"}
+            </span>
+          </button>
+        )}
       </section>
+
+      {/* Quick-start players got a random name — invite them to pick one */}
+      {user?.autoNamed && (
+        <section className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-amber-400/30 bg-amber-400/[0.07]">
+          <span className="text-2xl" aria-hidden="true">{user.avatar}</span>
+          <p className="flex-1 text-[13px] text-[#C7CBE6] m-0">
+            You played as <strong className="text-white">{user.name}</strong>. Pick a name so friends know it&apos;s you on the leaderboard.
+          </p>
+          <button onClick={openProfileMenu} className="shrink-0 px-3 h-10 rounded-xl text-sm font-bold text-amber-100 bg-amber-400/15 border border-amber-400/40 hover:bg-amber-400/25 transition">
+            Choose name
+          </button>
+        </section>
+      )}
 
       {/* ── Achievements unlocked this game ─────────────────────────────── */}
       {newAchievements?.length > 0 && (

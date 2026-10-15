@@ -212,6 +212,26 @@ describe("botBrain", () => {
       expect(mean).toBeLessThan(11); // below the human's expected ~9, not chasing the old target
     });
 
+    test("bot-vs-bot duels mix 0/1/100 so they don't tie forever", () => {
+      // Human knocked out; two bots left with the same history to read
+      const g = game({
+        eliminatedPlayers: ["h1"],
+        pickHistory: [1, 1, 1].map(() => ({ picks: { "bot-0": 1, "bot-1": 1 }, target: null, duel: true })),
+        settings: { botDifficulty: "ruthless" },
+      });
+      const rng = seeded(12);
+      let ties = 0;
+      const seen = new Set();
+      for (let i = 0; i < 300; i++) {
+        const p = chooseBotNumbers(g, isBot, rng);
+        if (p["bot-0"] === p["bot-1"]) ties++;
+        seen.add(p["bot-0"]);
+      }
+      expect([...seen].sort((x, y) => x - y)).toEqual([0, 1, 100]);
+      expect(ties / 300).toBeGreaterThan(0.2);
+      expect(ties / 300).toBeLessThan(0.45); // ≈ 1/3, not every round
+    });
+
     test("works with Math.random and a bare game object", () => {
       const out = chooseBotNumbers({ turnOrder: ["h1", "bot-0", "bot-1"] }, isBot);
       expect(Object.keys(out)).toHaveLength(2);

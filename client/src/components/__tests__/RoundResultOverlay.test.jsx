@@ -275,3 +275,28 @@ describe("RoundResultOverlay reveal choreography", () => {
     expect(screen.getByText("avg 41.6")).toBeInTheDocument();
   });
 });
+
+describe("RoundResultOverlay first-round explainer", () => {
+  const round1 = { ...baseResult, round: 1, average: 41.6, target: 33.28 };
+  beforeEach(() => localStorage.clear());
+
+  test("explains round 1's target for a player's first 3 games, then stops", () => {
+    for (let game = 1; game <= 3; game++) {
+      const { unmount } = render(<RoundResultOverlay result={{ ...round1 }} voidData={null} players={players} onDismiss={() => {}} />);
+      expect(screen.getByText("💡 Why was the target 33.3?")).toBeInTheDocument();
+      expect(screen.getByText(/41.6 × 0.8 = 33.3/)).toBeInTheDocument();
+      unmount();
+    }
+    render(<RoundResultOverlay result={{ ...round1 }} voidData={null} players={players} onDismiss={() => {}} />);
+    expect(screen.queryByText(/Why was the target/)).not.toBeInTheDocument();
+  });
+
+  test("not shown after round 1 or for a duel-cycle win", () => {
+    const { unmount } = render(<RoundResultOverlay result={baseResult} voidData={null} players={players} onDismiss={() => {}} />);
+    expect(screen.queryByText(/Why was the target/)).not.toBeInTheDocument();
+    unmount();
+    render(<RoundResultOverlay result={{ ...round1, twoPlayerCycle: true }} voidData={null} players={players} onDismiss={() => {}} />);
+    expect(screen.queryByText(/Why was the target/)).not.toBeInTheDocument();
+    expect(localStorage.getItem("numwit_explainer_games")).toBeNull();
+  });
+});

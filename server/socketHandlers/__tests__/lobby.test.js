@@ -610,4 +610,100 @@ describe("lobby socket handler", () => {
       expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, "roomBF4", {});
     });
   });
+
+  describe("update_profile", () => {
+    async function joinedSocket(id) {
+      const room = { id: "roomP", users: [{ socketId: id, name: "Player482", avatar: "😎" }, { socketId: "bot-roomP-0", name: "Bot Ada", isBot: true }], game: { round: 2 } };
+      roomManager.addUserToRoom.mockResolvedValue(room);
+      roomManager.getRoomById.mockResolvedValue(room);
+      const io = makeIo();
+      const socket = makeSocket(id);
+      handleLobbyEvents(io, socket);
+      await getHandler(socket, "join_room")({ roomId: "roomP", user: { name: "Player482", avatar: "😎" }, roomType: "private", deviceId: "devP" });
+      // Forget the join, keep the registered handlers
+      [roomManager.saveRoom, roomManager.getRoomById, userService.upsertUser, io._emit].forEach((m) => m.mockClear());
+      roomManager.getRoomById.mockResolvedValue(room);
+      return { io, socket, room };
+    }
+
+    test("renames the player in their room, saves it, tells everyone, and updates the profile", async () => {
+      const { io, socket, room } = await joinedSocket("sP1");
+      await getHandler(socket, "update_profile")({ name: "  <b>Ace</b>  ", avatar: "🦊" });
+
+      expect(room.users[0]).toMatchObject({ name: "Ace", avatar: "🦊" });
+      expect(room.users[1].name).toBe("Bot Ada");
+      expect(roomManager.saveRoom).toHaveBeenCalledWith(room);
+      expect(io._emit).toHaveBeenCalledWith("room_update", room);
+      expect(userService.upsertUser).toHaveBeenCalledWith("devP", "Ace", "🦊");
+    });
+
+    test("ignores empty names and missing avatars", async () => {
+      const { socket } = await joinedSocket("sP2");
+      await getHandler(socket, "update_profile")({ name: "   ", avatar: "🦊" });
+      await getHandler(socket, "update_profile")({ name: "Ace" });
+      await getHandler(socket, "update_profile")();
+      expect(roomManager.saveRoom).not.toHaveBeenCalled();
+      expect(userService.upsertUser).not.toHaveBeenCalled();
+    });
+
+    test("outside a room it only updates the stored profile (if any)", async () => {
+      const io = makeIo();
+      const socket = makeSocket("loner");
+      handleLobbyEvents(io, socket);
+      await getHandler(socket, "update_profile")({ name: "Solo", avatar: "🐸" });
+      expect(roomManager.getRoomById).not.toHaveBeenCalled();
+      expect(userService.upsertUser).not.toHaveBeenCalled();
+    });
+
+    test("does nothing when the room is gone or the player is no longer in it", async () => {
+      const { socket, room } = await joinedSocket("sP3");
+      room.users = room.users.filter((u) => u.socketId !== "sP3");
+      await getHandler(socket, "update_profile")({ name: "Ace", avatar: "🦊" });
+      roomManager.getRoomById.mockResolvedValue(null);
+      await getHandler(socket, "update_profile")({ name: "Ace", avatar: "🦊" });
+      expect(roomManager.saveRoom).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("rejoining after a disconnect (60s grace period)", () => {
+    async function droppedFrom(roomId, deviceId) {
+      const room = { id: roomId, users: [{ socketId: "old-" + deviceId, deviceId }], game: { round: 8 } };
+      roomManager.addUserToRoom.mockResolvedValue(room);
+      roomManager.getRoomById.mockResolvedValue(room);
+      const io = makeIo();
+      const oldSocket = makeSocket("old-" + deviceId);
+      handleLobbyEvents(io, oldSocket);
+      await getHandler(oldSocket, "join_room")({ roomId, user: { name: "P" }, roomType: "private", deviceId });
+      await getHandler(oldSocket, "disconnect")();
+      roomManager.addUserToRoom.mockClear();
+      roomManager.removeUserFromRoom.mockClear();
+      return { io, room };
+    }
+
+    test("the app's reconnect (same room id) goes straight back to that room", async () => {
+      const { io } = await droppedFrom("roomR1", "devR1");
+      const socket = makeSocket("new-R1");
+      handleLobbyEvents(io, socket);
+      roomManager.addUserToRoom.mockResolvedValue({ id: "roomR1", users: [], game: { round: 8 } });
+      await getHandler(socket, "join_room")({ roomId: "roomR1", user: { name: "P" }, roomType: "private", deviceId: "devR1" });
+
+      expect(roomManager.addUserToRoom.mock.calls[0][0]).toBe("roomR1");
+      expect(roomManager.removeUserFromRoom).not.toHaveBeenCalled();
+    });
+
+    test("a fresh choice (refresh, then Play now) starts a new game and leaves the old room", async () => {
+      const { io } = await droppedFrom("roomR2", "devR2");
+      const socket = makeSocket("new-R2");
+      handleLobbyEvents(io, socket);
+      roomManager.removeUserFromRoom.mockResolvedValue(null);
+      roomManager.addUserToRoom.mockImplementation(async (id) => ({ id, users: [{ socketId: "new-R2" }], game: null }));
+      botService.fillRoomWithBots.mockReturnValue([]);
+      await getHandler(socket, "join_room")({ roomId: null, user: { name: "P" }, roomType: "solo", deviceId: "devR2" });
+
+      const newRoom = roomManager.addUserToRoom.mock.calls[0][0];
+      expect(newRoom).not.toBe("roomR2");
+      expect(roomManager.removeUserFromRoom).toHaveBeenCalledWith("old-devR2");
+      expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, newRoom, { botDifficulty: "adaptive" });
+    });
+  });
 });

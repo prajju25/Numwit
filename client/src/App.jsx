@@ -260,10 +260,8 @@ function AppInner() {
                     🚪 Leave
                   </button>
                   <MuteButton />
-                  <div className="hidden sm:flex items-center gap-2 glass-card-sm px-3 h-11">
-                    <span className="text-lg">{user.avatar}</span>
-                    <span className="font-semibold text-white text-sm max-w-[120px] truncate">{user.name}</span>
-                  </div>
+                  {/* Rename works mid-game too (server updates the room) */}
+                  <ProfileMenu />
                 </>
               )}
             </div>
