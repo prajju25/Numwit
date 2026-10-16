@@ -18,6 +18,7 @@ import LeaderboardPage from "./components/LeaderboardPage";
 import BrandMark from "./components/BrandMark";
 import ProfileMenu from "./components/ProfileMenu";
 import usePageMeta from "./hooks/usePageMeta";
+import { trackView } from "./services/analytics";
 
 // Mute toggle button — reads from SoundContext
 function MuteButton() {
@@ -155,6 +156,16 @@ function AppInner() {
 
   // Landing page: only shown when nothing else is active and user chose to see it
   const showLandingPage = showLanding && showLogin && !isJoiningRoom;
+
+  // Analytics screens owned here; the room picker, invite form, game and
+  // results report themselves (see services/analytics.js for the list)
+  const analyticsView = showLeaderboard ? ["/leaderboard", "Leaderboard"]
+    : showWaiting ? ["/play/waiting", "Waiting room"]
+    : showLandingPage ? ["/", "Home"]
+    : null;
+  useEffect(() => {
+    if (analyticsView) trackView(analyticsView[0], analyticsView[1]);
+  }, [analyticsView?.[0]]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tab title + canonical URL for the current view
   usePageMeta(

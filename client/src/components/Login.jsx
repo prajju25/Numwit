@@ -5,7 +5,7 @@ import { useUser } from "../contexts/UserContext";
 import RoomTypeOverlay from "./RoomTypeOverlay";
 import { avatars } from "../constants/constants";
 import BrandMark from "./BrandMark";
-import { track } from "../services/analytics";
+import { track, trackView } from "../services/analytics";
 import socket from "../socket";
 import { randomProfile } from "../services/profile";
 
@@ -37,6 +37,12 @@ export default function Login({ onCancel }) {
   }, [mode]);
 
   const [showRoomChoice, setShowRoomChoice] = useState(mode === "returning");
+
+  // Analytics screen (quick start goes straight to the game, which reports itself)
+  useEffect(() => {
+    if (mode === "returning") trackView("/play/choose", "Choose room");
+    if (mode === "invite") trackView("/play/invite", "Invite");
+  }, [mode]);
   const [name, setName]     = useState(user?.name || "");
   const [avatar, setAvatar] = useState(user?.avatar || avatars[0]);
   const [error, setError]   = useState("");

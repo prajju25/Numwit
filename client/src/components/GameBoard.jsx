@@ -17,7 +17,7 @@ import TutorialOverlay from "./TutorialOverlay";
 import FloatingAlert from "../modals/FloatingAlert";
 import VoicePanel from "./VoicePanel";
 import GameChat from "./GameChat";
-import { track } from "../services/analytics";
+import { track, trackView } from "../services/analytics";
 import { BOT_DIFFICULTIES } from "../constants/constants";
 
 function GameBoard() {
@@ -38,6 +38,12 @@ function GameBoard() {
   useEffect(() => {
     if (roundResult || roundVoid) setShowOverlay(true);
   }, [roundResult, roundVoid]);
+
+  // Analytics screen: playing vs the game-over results (and back on "Play again")
+  useEffect(() => {
+    if (gameOver) trackView("/play/results", "Results");
+    else trackView("/play/game", "Game");
+  }, [!!gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (timerKey && timerRef.current) {

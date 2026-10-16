@@ -4,12 +4,12 @@ import Login from "../Login";
 import { useUser } from "../../contexts/UserContext";
 import { avatars } from "../../constants/constants";
 import socket from "../../socket";
-import { track } from "../../services/analytics";
+import { track, trackView } from "../../services/analytics";
 
 jest.mock("../../contexts/UserContext", () => ({
   useUser: jest.fn(),
 }));
-jest.mock("../../services/analytics", () => ({ track: jest.fn() }));
+jest.mock("../../services/analytics", () => ({ track: jest.fn(), trackView: jest.fn() }));
 
 jest.mock("../RoomTypeOverlay", () => (props) => (
   <div data-testid="room-type-overlay">
@@ -69,6 +69,7 @@ describe("Login", () => {
     test("renders nothing itself (the app shows 'Joining room…')", () => {
       const { container } = render(<Login />);
       expect(container).toBeEmptyDOMElement();
+      expect(trackView).not.toHaveBeenCalled(); // the game reports /play/game itself
     });
   });
 
@@ -80,6 +81,7 @@ describe("Login", () => {
       expect(screen.getByTestId("room-type-overlay")).toBeInTheDocument();
       expect(screen.queryByLabelText("Your Nickname")).not.toBeInTheDocument();
       expect(socket.emit).not.toHaveBeenCalled();
+      expect(trackView).toHaveBeenCalledWith("/play/choose", "Choose room");
     });
 
     test("Cancel goes back via onCancel", () => {
@@ -108,6 +110,7 @@ describe("Login", () => {
       render(<Login />);
       expect(screen.getByLabelText("Your Nickname")).toBeInTheDocument();
       expect(screen.getByText(/invited to a room/)).toBeInTheDocument();
+      expect(trackView).toHaveBeenCalledWith("/play/invite", "Invite");
       avatars.forEach((av) => {
         expect(screen.getByRole("button", { name: av })).toBeInTheDocument();
       });

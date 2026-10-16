@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import GameBoard from "../GameBoard";
+import { resetAnalytics } from "../../services/analytics";
 import { useGame } from "../../contexts/GameContext";
 import { useUser } from "../../contexts/UserContext";
 import { useNumwit } from "../../contexts/NumwitRuleContext";
@@ -350,5 +351,26 @@ describe("GameBoard", () => {
     render(<GameBoard />);
 
     expect(screen.getByText(/⚔️ Duel —/)).toBeInTheDocument();
+  });
+});
+
+describe("GameBoard analytics screens", () => {
+  const urls = () => window.umami.track.mock.calls.map(([build]) => build({}).url);
+  beforeEach(() => {
+    resetAnalytics();
+    window.umami = { track: jest.fn() };
+    useUser.mockReturnValue({ roomId: "room1", user: { socketId: "p0" } });
+    useGame.mockReturnValue({ players });
+  });
+  afterEach(() => { delete window.umami; });
+
+  test("reports /play/game, then /play/results at game over, then /play/game on Play again", () => {
+    useNumwit.mockReturnValue(baseNumwit());
+    const { rerender } = render(<GameBoard />);
+    useNumwit.mockReturnValue({ ...baseNumwit(), gameOver: { winnerSocketId: "p0" } });
+    rerender(<GameBoard />);
+    useNumwit.mockReturnValue(baseNumwit());
+    rerender(<GameBoard />);
+    expect(urls()).toEqual(["/play/game", "/play/results", "/play/game"]);
   });
 });

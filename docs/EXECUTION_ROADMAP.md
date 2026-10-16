@@ -181,6 +181,7 @@ fix the leaving problem before spending more on acquisition.
 | Question | Where |
 |---|---|
 | Where do visitors drop off? | Umami → Events → Funnel: `play_click` → `profile_done` → `room_join` → `first_pick` → `game_finished` |
+| How far do visitors get? Time spent? | Umami → Pages: `/` → `/play/choose` or `/play/game` → `/play/results` (one virtual page per screen, from 17 Oct 2026) |
 | Do finished games get shared? | Umami → Events: `share`, `share_card_open`, `invite` |
 | Weekly active players (north star), returning players | `/admin` → Growth |
 | What do humans actually pick? | Neon SQL editor → `RoundLog` (example query in `docs/FLY_DEPLOYMENT.md` §13) |

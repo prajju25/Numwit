@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import App from "../App";
+import { resetAnalytics } from "../services/analytics";
 import { useUser } from "../contexts/UserContext";
 import { useGame } from "../contexts/GameContext";
 import { useSound } from "../contexts/SoundContext";
@@ -276,5 +277,37 @@ describe("App", () => {
     expect(resetGame).toHaveBeenCalled();
     expect(resetUser).toHaveBeenCalled();
     expect(window.location.pathname).toBe("/");
+  });
+});
+
+describe("App analytics screens", () => {
+  const urls = () => window.umami.track.mock.calls.map(([build]) => build({}).url);
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetAnalytics();
+    window.umami = { track: jest.fn() };
+    useGame.mockReturnValue({ resetGame: jest.fn() });
+    useSound.mockReturnValue({ muted: false, toggleMute: jest.fn() });
+    window.history.pushState({}, "", "/");
+  });
+  afterEach(() => { delete window.umami; });
+
+  test("home is reported as /, the waiting room as /play/waiting", () => {
+    useUser.mockReturnValue(baseUser());
+    const { unmount } = render(<App />);
+    expect(urls()).toEqual(["/"]);
+    unmount();
+
+    useUser.mockReturnValue(baseUser({ user: { name: "A", avatar: "🐱" }, hasStarted: true, isWaitingRoom: true, roomId: "r1" }));
+    render(<App />);
+    expect(urls()).toEqual(["/", "/play/waiting"]);
+  });
+
+  test("the leaderboard is reported as /leaderboard", () => {
+    window.history.pushState({}, "", "/leaderboard");
+    global.fetch = jest.fn(() => new Promise(() => {})); // leaderboard data never arrives — not under test
+    useUser.mockReturnValue(baseUser());
+    render(<App />);
+    expect(urls()).toEqual(["/leaderboard"]);
   });
 });
