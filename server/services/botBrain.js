@@ -255,7 +255,11 @@ function chooseBotNumbers(game, isBot, rng = Math.random) {
   if (active.length === 2) {
     botIds.forEach((id) => {
       const opponent = active.find((x) => x !== id);
-      out[id] = duelPick(opponent, history, params, rng);
+      // Bot vs bot: both would read the same history, pick the same counter
+      // and tie (void) round after round — play the even 0/1/100 mix instead.
+      out[id] = isBot(opponent)
+        ? DUEL_MOVES[Math.floor(rng() * 3) % 3]
+        : duelPick(opponent, history, params, rng);
     });
     return out;
   }

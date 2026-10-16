@@ -16,6 +16,7 @@ const roomCleanup = require("../services/roomCleanup");
 const gameHandlers = require("./game");
 const startGameForRoom = gameHandlers.startGameForRoom;
 const normalizeDifficulty = require("../services/botBrain").normalizeDifficulty;
+const withRoomLock = require("../utils/roomLock").withRoomLock;
 
 // ── Reconnection grace-period state ───────────────────────────────────────────
 // When a user disconnects (e.g. mobile switching apps) we wait 60 s before
@@ -63,7 +64,12 @@ module.exports = function handleLobbyEvents(io, socket) {
     // straight back into that exact room instead of running it through public
     // matchmaking / room creation, which could otherwise land them in a
     // *different* public room than the one they (and their game state) left.
-    if (cancelledPending) {
+    //
+    // Only when the client asks for that same room: the app's reconnect sends
+    // the room it was in. A join with no room id (or another one) is a fresh
+    // choice — e.g. refresh, then "Play now" — and must not be pulled back
+    // into the old, possibly finished, game.
+    if (cancelledPending && roomId === cancelledPending.roomId) {
       const stillExists = await getRoomById(cancelledPending.roomId);
       if (stillExists) {
         roomNo = cancelledPending.roomId;
@@ -186,6 +192,32 @@ module.exports = function handleLobbyEvents(io, socket) {
       console.error(`join_room error: ${err.message}`);
       socket.emit("error_message", { message: err.message });
     }
+  });
+
+  // ── update_profile ──────────────────────────────────────────────────────────
+  // Rename / change avatar from the profile menu, including mid-game, so other
+  // players see the change straight away. Locked like game updates: saving the
+  // room here must not overwrite a pick saved at the same moment.
+  socket.on("update_profile", async function(data) {
+    const name = String(data?.name || "").replace(/<[^>]*>/g, "").trim().slice(0, 20);
+    const avatar = String(data?.avatar || "").slice(0, 16);
+    if (!name || !avatar) return;
+    console.debug(`Socket: "update_profile" ${socket.id} → ${name}`);
+
+    const deviceId = socketToDevice[socket.id];
+    if (deviceId) upsertUser(deviceId, name, avatar).catch(() => {});
+
+    const roomId = socketToRoom[socket.id];
+    if (!roomId) return;
+    await withRoomLock(roomId, async function() {
+      const room = await getRoomById(roomId);
+      const me = room && room.users.find(function(u) { return u.socketId === socket.id; });
+      if (!me) return;
+      me.name = name;
+      me.avatar = avatar;
+      await saveRoom(room);
+      io.to(roomId).emit("room_update", room);
+    });
   });
 
   socket.on("leave_room", async function(callback) {

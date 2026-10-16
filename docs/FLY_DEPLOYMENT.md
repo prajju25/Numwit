@@ -294,7 +294,13 @@ to ~100K events/month):
 4. Commit, merge, deploy. Analytics only runs on `numwit.prajvex.com`, so
    local dev and `numwit.fly.dev` never count.
 
-Page views are automatic. The funnel is tracked with custom events (Umami →
+Page views are sent by the app, one per screen — the game is a single URL, so
+Umami's automatic tracking would count every game as a one-page bounce:
+`/`, `/leaderboard`, `/play/choose`, `/play/invite`, `/play/waiting`,
+`/play/game`, `/play/results` (Umami → Pages; room codes are never sent).
+Bounce rate and visit duration are only meaningful from 17 Oct 2026 on.
+
+The funnel is tracked with custom events (Umami →
 your site → **Events**; build a **Funnel** report from them):
 
 | Event | Fired when | Data |

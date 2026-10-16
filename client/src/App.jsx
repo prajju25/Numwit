@@ -18,6 +18,7 @@ import LeaderboardPage from "./components/LeaderboardPage";
 import BrandMark from "./components/BrandMark";
 import ProfileMenu from "./components/ProfileMenu";
 import usePageMeta from "./hooks/usePageMeta";
+import { trackView } from "./services/analytics";
 
 // Mute toggle button — reads from SoundContext
 function MuteButton() {
@@ -156,6 +157,16 @@ function AppInner() {
   // Landing page: only shown when nothing else is active and user chose to see it
   const showLandingPage = showLanding && showLogin && !isJoiningRoom;
 
+  // Analytics screens owned here; the room picker, invite form, game and
+  // results report themselves (see services/analytics.js for the list)
+  const analyticsView = showLeaderboard ? ["/leaderboard", "Leaderboard"]
+    : showWaiting ? ["/play/waiting", "Waiting room"]
+    : showLandingPage ? ["/", "Home"]
+    : null;
+  useEffect(() => {
+    if (analyticsView) trackView(analyticsView[0], analyticsView[1]);
+  }, [analyticsView?.[0]]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Tab title + canonical URL for the current view
   usePageMeta(
     showLeaderboard ? "Leaderboard"
@@ -260,10 +271,8 @@ function AppInner() {
                     🚪 Leave
                   </button>
                   <MuteButton />
-                  <div className="hidden sm:flex items-center gap-2 glass-card-sm px-3 h-11">
-                    <span className="text-lg">{user.avatar}</span>
-                    <span className="font-semibold text-white text-sm max-w-[120px] truncate">{user.name}</span>
-                  </div>
+                  {/* Rename works mid-game too (server updates the room) */}
+                  <ProfileMenu />
                 </>
               )}
             </div>

@@ -3,10 +3,13 @@ import PropTypes from "prop-types";
 import { twMerge } from "tailwind-merge";
 import { useUser } from "../contexts/UserContext";
 import { avatars } from "../constants/constants";
+import socket from "../socket";
+import { OPEN_PROFILE_EVENT } from "../services/profile";
 
 /**
- * Top-right profile chip for returning players. Opens a small flyout to change
- * nickname and avatar, so "Play now" can skip the profile form.
+ * Top-right profile chip. Opens a small flyout to change nickname and avatar —
+ * also mid-game: the server renames the player in their room for everyone.
+ * Players with an auto-generated name (quick start) get a "Set name" nudge.
  * Renders nothing until the player has a profile.
  */
 export default function ProfileMenu({ className }) {
@@ -16,6 +19,22 @@ export default function ProfileMenu({ className }) {
   const [avatar, setAvatar] = useState(avatars[0]);
   const [error, setError] = useState("");
   const rootRef = useRef(null);
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  // Other screens can open the menu (e.g. a "change name" hint)
+  useEffect(() => {
+    const onOpen = () => {
+      const u = userRef.current;
+      if (!u) return;
+      setName(u.name || "");
+      setAvatar(u.avatar || avatars[0]);
+      setError("");
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_PROFILE_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_PROFILE_EVENT, onOpen);
+  }, []);
 
   // Close on outside click or Escape
   useEffect(() => {
@@ -46,7 +65,10 @@ export default function ProfileMenu({ className }) {
   const save = (e) => {
     e.preventDefault();
     if (!name.trim()) { setError("Please enter a name."); return; }
-    setUser({ ...user, name: name.trim(), avatar });
+    const { autoNamed, ...rest } = user; // eslint-disable-line no-unused-vars
+    const next = { ...rest, name: name.trim(), avatar };
+    setUser(next);
+    socket.emit("update_profile", { name: next.name, avatar: next.avatar });
     setOpen(false);
   };
 
@@ -61,6 +83,11 @@ export default function ProfileMenu({ className }) {
       >
         <span className="text-lg" aria-hidden="true">{user.avatar}</span>
         <span className="hidden sm:inline font-semibold text-white text-sm max-w-[120px] truncate">{user.name}</span>
+        {user.autoNamed && (
+          <span className="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md text-amber-200 bg-amber-400/15 border border-amber-400/40">
+            Set name
+          </span>
+        )}
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="text-white/50" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
       </button>
 
