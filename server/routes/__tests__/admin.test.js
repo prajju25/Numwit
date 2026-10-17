@@ -17,11 +17,18 @@ jest.mock("../../db/userService", () => ({
 jest.mock("../../db/metricsService", () => ({
   getGrowthMetrics: jest.fn(),
 }));
+jest.mock("../../db/playerAdminService", () => ({
+  listPlayers: jest.fn(),
+  deletePreview: jest.fn(),
+  deletePlayer: jest.fn(),
+  mergePlayers: jest.fn(),
+}));
 
 const roomManager = require("../../utils/roomManager");
 const feedbackService = require("../../db/feedbackService");
 const userService = require("../../db/userService");
 const metricsService = require("../../db/metricsService");
+const playerAdminService = require("../../db/playerAdminService");
 const adminRoutes = require("../admin");
 
 function makeApp() {
@@ -200,6 +207,68 @@ describe("admin routes", () => {
 
       expect(res.status).toBe(500);
       expect(res.body).toEqual({ error: "update failed" });
+    });
+  });
+
+  describe("players", () => {
+    beforeEach(() => jest.spyOn(console, "error").mockImplementation(() => {}));
+    afterEach(() => console.error.mockRestore());
+
+    test("GET /players lists players (empty when there are none)", async () => {
+      playerAdminService.listPlayers.mockResolvedValueOnce([{ id: "u1", name: "Prajju" }]);
+      const res = await supertest(makeApp()).get("/api/admin/players");
+      expect(res.body).toEqual({ players: [{ id: "u1", name: "Prajju" }] });
+
+      playerAdminService.listPlayers.mockResolvedValueOnce(null);
+      expect((await supertest(makeApp()).get("/api/admin/players")).body).toEqual({ players: [] });
+    });
+
+    test("errors are shown, not hidden", async () => {
+      playerAdminService.listPlayers.mockRejectedValueOnce(new Error("Database unavailable"));
+      const res = await supertest(makeApp()).get("/api/admin/players");
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: "Database unavailable" });
+    });
+
+    test("GET /players/:id/delete-preview", async () => {
+      playerAdminService.deletePreview.mockResolvedValueOnce({ games: 3 });
+      expect((await supertest(makeApp()).get("/api/admin/players/u1/delete-preview")).body).toEqual({ games: 3 });
+      expect(playerAdminService.deletePreview).toHaveBeenCalledWith("u1");
+
+      playerAdminService.deletePreview.mockResolvedValueOnce(null);
+      expect((await supertest(makeApp()).get("/api/admin/players/nope/delete-preview")).status).toBe(404);
+
+      playerAdminService.deletePreview.mockRejectedValueOnce(new Error("boom"));
+      expect((await supertest(makeApp()).get("/api/admin/players/u1/delete-preview")).status).toBe(500);
+    });
+
+    test("DELETE /players/:id", async () => {
+      playerAdminService.deletePlayer.mockResolvedValueOnce({ deleted: "Tester" });
+      const res = await supertest(makeApp()).delete("/api/admin/players/u9");
+      expect(res.body).toEqual({ deleted: "Tester" });
+      expect(playerAdminService.deletePlayer).toHaveBeenCalledWith("u9");
+
+      playerAdminService.deletePlayer.mockResolvedValueOnce(null);
+      expect((await supertest(makeApp()).delete("/api/admin/players/u9")).status).toBe(404);
+
+      playerAdminService.deletePlayer.mockRejectedValueOnce(new Error("boom"));
+      expect((await supertest(makeApp()).delete("/api/admin/players/u9")).status).toBe(500);
+    });
+
+    test("POST /players/merge", async () => {
+      playerAdminService.mergePlayers.mockResolvedValueOnce({ merged: "Prajju", into: "Prajju" });
+      const res = await supertest(makeApp()).post("/api/admin/players/merge").send({ sourceId: "phone", targetId: "laptop" });
+      expect(res.body).toEqual({ merged: "Prajju", into: "Prajju" });
+      expect(playerAdminService.mergePlayers).toHaveBeenCalledWith("phone", "laptop");
+
+      expect((await supertest(makeApp()).post("/api/admin/players/merge").send({ sourceId: "a", targetId: "a" })).status).toBe(400);
+      expect((await supertest(makeApp()).post("/api/admin/players/merge")).status).toBe(400);
+
+      playerAdminService.mergePlayers.mockResolvedValueOnce(null);
+      expect((await supertest(makeApp()).post("/api/admin/players/merge").send({ sourceId: "a", targetId: "b" })).status).toBe(404);
+
+      playerAdminService.mergePlayers.mockRejectedValueOnce(new Error("boom"));
+      expect((await supertest(makeApp()).post("/api/admin/players/merge").send({ sourceId: "a", targetId: "b" })).status).toBe(500);
     });
   });
 });

@@ -16,6 +16,7 @@
  */
 
 const { db } = require("./prismaClient");
+const { canonicalDeviceId } = require("./deviceAlias");
 
 const XP_THRESHOLDS = [0, 100, 250, 500, 900, 1400, 2000, 3000, 4500, 6500];
 const MAX_LEVEL = XP_THRESHOLDS.length;
@@ -53,6 +54,7 @@ function levelProgress(xp) {
  * Returns the user record (or null if DB unavailable).
  */
 async function upsertUser(deviceId, name, avatar) {
+  deviceId = await canonicalDeviceId(deviceId); // merged devices play as their player
   return db((p) =>
     p.user.upsert({
       where: { deviceId },
@@ -69,6 +71,7 @@ async function upsertUser(deviceId, name, avatar) {
  * Returns updated { xp, level, levelUp } or null.
  */
 async function awardXp(deviceId, gains) {
+  deviceId = await canonicalDeviceId(deviceId); // merged devices play as their player
   const user = await db((p) => p.user.findUnique({ where: { deviceId } }));
   if (!user) return null;
 
@@ -97,6 +100,7 @@ async function awardXp(deviceId, gains) {
  * Get a user's public profile (level, xp) by deviceId.
  */
 async function getProfile(deviceId) {
+  deviceId = await canonicalDeviceId(deviceId); // merged devices play as their player
   return db((p) =>
     p.user.findUnique({
       where: { deviceId },
@@ -121,6 +125,7 @@ async function getTotalUsers() {
  * Returns the new consecutiveGameWins value (or 0 on failure).
  */
 async function updateConsecutiveGameWins(deviceId, survived) {
+  deviceId = await canonicalDeviceId(deviceId); // merged devices play as their player
   const user = await db((p) =>
     p.user.findUnique({ where: { deviceId }, select: { consecutiveGameWins: true, bestStreak: true } })
   );

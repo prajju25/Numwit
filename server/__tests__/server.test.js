@@ -216,6 +216,29 @@ describe("server.js", () => {
       expect(statsService.getWeeklyLeaderboard).not.toHaveBeenCalled();
     });
 
+    test("tells the asking browser which row is theirs", async () => {
+      statsService.getWeeklyLeaderboard.mockResolvedValueOnce([{ id: "u1", name: "Prajju" }, { id: "u2", name: "Prajju" }]);
+      userService.getProfile.mockResolvedValueOnce({ id: "u2" });
+
+      const res = await supertest(app).get("/api/leaderboard").set("X-Device-Id", "dev-phone");
+
+      expect(userService.getProfile).toHaveBeenCalledWith("dev-phone");
+      expect(res.body.myUserId).toBe("u2");
+    });
+
+    test("leaves myUserId out for unknown browsers or a lookup failure", async () => {
+      statsService.getWeeklyLeaderboard.mockResolvedValue([{ id: "u1" }]);
+      userService.getProfile.mockResolvedValueOnce(null);
+      const unknown = await supertest(app).get("/api/leaderboard").set("X-Device-Id", "dev-new");
+      expect(unknown.body).toEqual({ leaderboard: [{ id: "u1" }] });
+
+      userService.getProfile.mockRejectedValueOnce(new Error("db down"));
+      const failed = await supertest(app).get("/api/leaderboard").set("X-Device-Id", "dev-x");
+      expect(failed.status).toBe(200);
+      expect(failed.body).toEqual({ leaderboard: [{ id: "u1" }] });
+      statsService.getWeeklyLeaderboard.mockReset();
+    });
+
     test("returns an empty leaderboard when the service returns null", async () => {
       statsService.getWeeklyLeaderboard.mockResolvedValueOnce(null);
 

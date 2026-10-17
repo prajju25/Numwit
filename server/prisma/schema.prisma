@@ -29,6 +29,20 @@ model User {
 
   sessionStats     SessionStat[]
   userAchievements UserAchievement[]
+  deviceAliases    DeviceAlias[]
+}
+
+// ── DeviceAlias ───────────────────────────────────────────────────────────────
+// Extra browsers/devices that belong to a player. Created when the admin
+// merges two players: the merged player's device keeps playing as the
+// surviving one (see db/deviceAlias.js — every deviceId lookup resolves it).
+model DeviceAlias {
+  deviceId  String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ── SessionStat ───────────────────────────────────────────────────────────────

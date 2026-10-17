@@ -12,21 +12,29 @@ const LB_URL = {
   all:  "/api/leaderboard?limit=50&period=all",
 };
 
-/** Fetches each period's ranking once, on first view of its tab. */
-function useLB(period) {
+/**
+ * Fetches each period's ranking once, on first view of its tab. Sends this
+ * browser's device id so the server can say which row is "You".
+ */
+function useLB(period, deviceId) {
   const [boards, setBoards] = useState({});   // period → rows
   const [errors, setErrors] = useState({});   // period → message
+  const [myUserId, setMyUserId] = useState(null);
 
   useEffect(() => {
     if (boards[period] || errors[period]) return;
-    fetch(LB_URL[period])
+    fetch(LB_URL[period], deviceId ? { headers: { "X-Device-Id": deviceId } } : undefined)
       .then((r) => r.json())
-      .then((d) => setBoards((b) => ({ ...b, [period]: d.leaderboard || [] })))
+      .then((d) => {
+        setBoards((b) => ({ ...b, [period]: d.leaderboard || [] }));
+        if (d.myUserId) setMyUserId(d.myUserId);
+      })
       .catch(() => setErrors((e) => ({ ...e, [period]: "Couldn't load leaderboard. Try again." })));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   return {
+    myUserId,
     board: boards[period] || [],
     loading: !boards[period] && !errors[period],
     error: errors[period] || null,
@@ -65,8 +73,8 @@ const PODIUM = [
 
 export default function LeaderboardPage({ onBack, onPlay }) {
   const [period, setPeriod]       = useState("week");
-  const { board, loading, error } = useLB(period);
   const { user, deviceId }        = useUser();
+  const { board, loading, error, myUserId } = useLB(period, deviceId);
   const [page, setPage]           = useState(1);
   const isWeek = period === "week";
 
@@ -81,8 +89,8 @@ export default function LeaderboardPage({ onBack, onPlay }) {
   const podium     = page === 1 ? pageData.slice(0, 3) : [];
   const listRows   = page === 1 ? pageData.slice(3) : pageData;
 
-  const isMe = (entry) =>
-    user && entry.name === user.name && entry.avatar === user.avatar;
+  // By player id (from the server), never by name: names aren't unique
+  const isMe = (entry) => !!myUserId && entry.id === myUserId;
 
   const myIndex = board.findIndex(isMe);
   const myRank  = myIndex >= 0 ? myIndex + 1 : null;

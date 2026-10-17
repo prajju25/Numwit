@@ -149,7 +149,13 @@ app.get("/api/leaderboard", async (req, res) => {
     const board = req.query.period === "all"
       ? await statsService.getAllTimeLeaderboard(limit)
       : await statsService.getWeeklyLeaderboard(limit);
-    res.json({ leaderboard: board || [] });
+    // Which row is "You": matched by the asking browser's player (merged
+    // devices included), not by name — two players can share a name.
+    const deviceId = req.get("x-device-id");
+    const me = deviceId ? await userService.getProfile(deviceId).catch(() => null) : null;
+    const body = { leaderboard: board || [] };
+    if (me) body.myUserId = me.id;
+    res.json(body);
   } catch (err) {
     console.error("GET /api/leaderboard error:", err.message);
     res.status(500).json({ error: "leaderboard unavailable", leaderboard: [] });
