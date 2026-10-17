@@ -63,7 +63,7 @@ const PODIUM = [
   { rank: 3, card: "from-amber-700/20 to-amber-700/[0.03] border-amber-600/35 py-3", ring: "border-amber-600 w-[46px] h-[46px] text-[22px]", tag: "text-orange-300" },
 ];
 
-export default function LeaderboardPage({ onBack }) {
+export default function LeaderboardPage({ onBack, onPlay }) {
   const [period, setPeriod]       = useState("week");
   const { board, loading, error } = useLB(period);
   const { user, deviceId }        = useUser();
@@ -281,7 +281,7 @@ export default function LeaderboardPage({ onBack }) {
 
         {/* ── Footer CTA ────────────────────────────────────────────────── */}
         <div className="mt-8 mb-6 text-center flex flex-col items-center gap-2">
-          <button onClick={onBack} className="btn-primary h-12 px-8 rounded-2xl text-sm font-bold">
+          <button onClick={onPlay || onBack} className="btn-primary h-12 px-8 rounded-2xl text-sm font-bold">
             ▶ Play Now
           </button>
           <p className="text-xs text-[#6E749A] m-0">{isWeek ? "Rankings cover the last 7 days" : "All-time rankings by round wins"}</p>
@@ -322,4 +322,6 @@ export default function LeaderboardPage({ onBack }) {
 
 LeaderboardPage.propTypes = {
   onBack: PropTypes.func.isRequired,
+  // "Play Now" starts the play flow; falls back to onBack (home) when absent
+  onPlay: PropTypes.func,
 };

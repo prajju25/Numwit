@@ -311,3 +311,32 @@ describe("App analytics screens", () => {
     expect(urls()).toEqual(["/leaderboard"]);
   });
 });
+
+describe("App leaderboard", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useGame.mockReturnValue({ resetGame: jest.fn() });
+    useSound.mockReturnValue({ muted: false, toggleMute: jest.fn() });
+    global.fetch = jest.fn(() => new Promise(() => {}));
+  });
+
+  test.each([
+    ["a first-time visitor (would quick-start a game)", null],
+    ["a returning player (would open the room picker)", { name: "Prajju", avatar: "🐱" }],
+  ])("opening it never starts the play flow for %s", (_, user) => {
+    window.history.pushState({}, "", "/leaderboard");
+    useUser.mockReturnValue(baseUser({ user }));
+    render(<App />);
+    expect(screen.queryByTestId("login")).not.toBeInTheDocument();
+  });
+
+  test("its Play Now goes straight into the play flow", async () => {
+    window.history.pushState({}, "", "/leaderboard");
+    useUser.mockReturnValue(baseUser());
+    render(<App />);
+    fireEvent.click(screen.getByText("▶ Play Now"));
+    expect(screen.getByTestId("login")).toBeInTheDocument();
+    expect(screen.queryByTestId("landing-page")).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+});

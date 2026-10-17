@@ -207,6 +207,21 @@ describe("LeaderboardPage", () => {
     fireEvent.click(screen.getByText("▶ Play Now"));
     expect(onBack).toHaveBeenCalledTimes(2);
   });
+
+  test("Play Now starts playing when onPlay is given", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(1) }) })
+    );
+    const onBack = jest.fn();
+    const onPlay = jest.fn();
+
+    render(<LeaderboardPage onBack={onBack} onPlay={onPlay} />);
+    await act(async () => {});
+
+    fireEvent.click(screen.getByText("▶ Play Now"));
+    expect(onPlay).toHaveBeenCalledTimes(1);
+    expect(onBack).not.toHaveBeenCalled();
+  });
 });
 
 describe("LeaderboardPage period tabs and your-rank bar", () => {

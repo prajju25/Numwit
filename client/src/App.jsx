@@ -18,7 +18,7 @@ import LeaderboardPage from "./components/LeaderboardPage";
 import BrandMark from "./components/BrandMark";
 import ProfileMenu from "./components/ProfileMenu";
 import usePageMeta from "./hooks/usePageMeta";
-import { trackView } from "./services/analytics";
+import { track, trackView } from "./services/analytics";
 
 // Mute toggle button — reads from SoundContext
 function MuteButton() {
@@ -201,6 +201,14 @@ function AppInner() {
     window.history.pushState({}, "", "/");
   };
 
+  // Leaderboard "Play Now" — same as the home page's Play now
+  const playFromLeaderboard = () => {
+    track("play_click", { source: "leaderboard" });
+    setShowLeaderboard(false);
+    setShowLanding(false);
+    window.history.pushState({}, "", "/");
+  };
+
   return (
     <div className={twMerge(
       "min-h-screen w-full flex flex-col items-center",
@@ -224,7 +232,7 @@ function AppInner() {
 
       {/* Leaderboard page */}
       {showLeaderboard && (
-        <LeaderboardPage onBack={closeLeaderboard} />
+        <LeaderboardPage onBack={closeLeaderboard} onPlay={playFromLeaderboard} />
       )}
 
       {/* Landing page */}
@@ -283,7 +291,9 @@ function AppInner() {
             "flex items-start sm:items-center justify-center w-full mx-auto pt-20 sm:pt-24 pb-8 min-h-screen",
             showGame ? "max-w-6xl" : "max-w-2xl"
           )}>
-            {showLogin && <Login onCancel={goHome} />}
+            {/* Not while the leaderboard is open: Login *is* the play flow (quick
+                start begins a game, returning players get the room picker) */}
+            {showLogin && !showLeaderboard && <Login onCancel={goHome} />}
             {/* VoiceProvider and ChatProvider are single instances wrapping both
                 screens so peer connections and the chat log survive the
                 WaitingRoom → GameBoard transition. */}
