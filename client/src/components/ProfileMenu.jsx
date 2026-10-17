@@ -84,9 +84,13 @@ export default function ProfileMenu({ className }) {
         <span className="text-lg" aria-hidden="true">{user.avatar}</span>
         <span className="hidden sm:inline font-semibold text-white text-sm max-w-[120px] truncate">{user.name}</span>
         {user.autoNamed && (
-          <span className="text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md text-amber-200 bg-amber-400/15 border border-amber-400/40">
-            Set name
-          </span>
+          <>
+            {/* Phones: a dot — the full badge crowds the in-game header */}
+            <span className="sm:hidden w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.8)]" aria-label="Set name" />
+            <span className="hidden sm:inline text-[10px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md text-amber-200 bg-amber-400/15 border border-amber-400/40">
+              Set name
+            </span>
+          </>
         )}
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="text-white/50" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
       </button>

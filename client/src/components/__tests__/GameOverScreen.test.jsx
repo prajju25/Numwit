@@ -20,7 +20,7 @@ jest.mock("../../services/analytics", () => ({ track: jest.fn() }));
 jest.mock("../SessionStats", () => () => <div data-testid="session-stats" />);
 jest.mock("../LevelBadge", () => (props) => <div data-testid="level-badge">{props.level}</div>);
 jest.mock("../ShareCardModal", () => (props) => (
-  <div data-testid="share-card-modal" data-variant={props.variant}>
+  <div data-testid="share-card-modal" data-variant={props.variant} data-title={props.title?.name}>
     <button onClick={props.onClose}>close-share</button>
   </div>
 ));
@@ -319,5 +319,84 @@ describe("GameOverScreen text share and name nudge", () => {
   test("named players see no nudge", () => {
     render(<GameOverScreen data={data} players={players} />);
     expect(screen.queryByText("Choose name")).not.toBeInTheDocument();
+  });
+});
+
+describe("GameOverScreen titles and Challenge friends", () => {
+  // p0 picked lowest every round → The Contrarian; p1 won the game
+  const history = [
+    { target: 20, winnerIds: ["p1"], submissions: [{ socketId: "p0", number: 5 }, { socketId: "p1", number: 20 }, { socketId: "p2", number: 50 }], invalidSubmissions: [] },
+    { target: 15, winnerIds: ["p1"], submissions: [{ socketId: "p0", number: 4 }, { socketId: "p1", number: 15 }, { socketId: "p2", number: 40 }], invalidSubmissions: [] },
+    { target: 12, winnerIds: ["p1"], submissions: [{ socketId: "p0", number: 3 }, { socketId: "p1", number: 12 }, { socketId: "p2", number: 33 }], invalidSubmissions: [], newlyEliminated: ["p2"] },
+  ];
+  const data = { winnerSocketId: "p1", points: { p0: 3, p1: 0, p2: 5 } };
+  let ctx;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sessionStorage.clear();
+    useNumwit.mockReturnValue({ history, xpData: null, myLevel: null });
+    useGame.mockReturnValue({ hostSocketId: "p0", resetGame: jest.fn() });
+    ctx = {
+      roomId: "room1", deviceId: "dev1",
+      user: { socketId: "p0", name: "Alice", avatar: "🐱" },
+      setRoomId: jest.fn(), setRoomType: jest.fn(), setIsInGame: jest.fn(), setIsWaitingRoom: jest.fn(), setIsJoiningRoom: jest.fn(),
+    };
+    useUser.mockReturnValue(ctx);
+    Object.assign(navigator, { clipboard: { writeText: jest.fn(() => Promise.resolve()) } });
+  });
+
+  test("shows your title with the reason, and everyone's on the podium", () => {
+    render(<GameOverScreen data={data} players={players} />);
+    const card = screen.getByLabelText("Your title this game");
+    expect(card).toHaveTextContent("The Contrarian");
+    expect(card).toHaveTextContent("Lowest pick in 3 of 3 rounds");
+    expect(screen.getByText(/🧊 Contrarian/)).toBeInTheDocument();   // you, on the podium
+    expect(screen.getByText(/👑 Strategist/)).toBeInTheDocument();   // the winner
+  });
+
+  test("the text share carries your title", async () => {
+    render(<GameOverScreen data={data} players={players} />);
+    await act(async () => { fireEvent.click(screen.getByText("Share result as text")); });
+    expect(navigator.clipboard.writeText.mock.calls[0][0].split("\n")[1]).toBe("🧊 The Contrarian");
+  });
+
+  test("no title card before any round was played", () => {
+    useNumwit.mockReturnValue({ history: [], xpData: null, myLevel: null });
+    render(<GameOverScreen data={data} players={players} />);
+    expect(screen.queryByLabelText("Your title this game")).not.toBeInTheDocument();
+  });
+
+  test("Challenge friends leaves the game, opens a private room and readies the message", () => {
+    render(<GameOverScreen data={data} players={players} />);
+    fireEvent.click(screen.getByText("Challenge friends"));
+
+    expect(sessionStorage.getItem("numwit_challenge"))
+      .toBe("I just finished 🥈 2nd of 3 in Numwit as 🧊 The Contrarian. Think you can out-guess me? Join my room 👇");
+    const leave = socket.emit.mock.calls.find(([e]) => e === "leave_room");
+    act(() => leave[1]({ status: "ok" }));
+    expect(socket.emit).toHaveBeenCalledWith("join_room", expect.objectContaining({ roomId: null, roomType: "private" }));
+    expect(track).toHaveBeenCalledWith("challenge_start", { won: false, title: "contrarian" });
+  });
+
+  test("the winner's challenge brags", () => {
+    render(<GameOverScreen data={{ ...data, winnerSocketId: "p0" }} players={players} />);
+    fireEvent.click(screen.getByText("Challenge friends"));
+    expect(sessionStorage.getItem("numwit_challenge")).toMatch(/^I just won a game of Numwit as .+\. Think you can beat me\?/);
+  });
+
+  test("a player not in the standings still gets a sensible message", () => {
+    useUser.mockReturnValue({ ...ctx, user: { socketId: "ghost" } });
+    render(<GameOverScreen data={data} players={players} />);
+    fireEvent.click(screen.getByText("Challenge friends"));
+    expect(sessionStorage.getItem("numwit_challenge")).toBe("I just played Numwit. Think you can out-guess me? Join my room 👇");
+  });
+
+  test("the victory share card gets your title", async () => {
+    global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ name: "Alice", avatar: "🐱", level: 2 }) }));
+    useUser.mockReturnValue({ ...ctx, deviceId: "dev1" });
+    render(<GameOverScreen data={{ ...data, winnerSocketId: "p0" }} players={players} />);
+    await act(async () => { fireEvent.click(screen.getByText("Share your win")); });
+    expect(screen.getByTestId("share-card-modal")).toHaveAttribute("data-title", "The Contrarian"); // a distinctive style beats the plain "won" title
   });
 });
