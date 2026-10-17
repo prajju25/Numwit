@@ -50,9 +50,10 @@ async function writeSessionStat(deviceId, stats) {
  *   weekGamesPlayed, weekGamesWon, weekRoundWins,   ← 7-day
  *   allTimeGamesPlayed, allTimeGamesWon, allTimeRoundWins  ← all-time
  * }]
- * @param {number} limit  How many rows to return (default 10, max 100)
+ * @param {number} limit   How many rows to return (default 10, max 100)
+ * @param {number} offset  Rows to skip, for paging (default 0)
  */
-async function getWeeklyLeaderboard(limit = 10) {
+async function getWeeklyLeaderboard(limit = 10, offset = 0) {
   const take = Math.min(Math.max(1, Number(limit) || 10), 100);
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -63,7 +64,9 @@ async function getWeeklyLeaderboard(limit = 10) {
       where: { playedAt: { gte: since } },
       _sum:   { wins: true },
       _count: { id: true },
-      orderBy: { _sum: { wins: "desc" } },
+      // userId breaks ties so pages never overlap or skip anyone
+      orderBy: [{ _sum: { wins: "desc" } }, { userId: "asc" }],
+      skip: Math.max(0, Number(offset) || 0),
       take,
     })
   );
@@ -139,9 +142,10 @@ async function getWeeklyLeaderboard(limit = 10) {
  * All-time leaderboard — top N players by round wins across every game ever
  * recorded (not just players active this week). Same row shape as
  * getWeeklyLeaderboard, so the client can render either.
- * @param {number} limit  How many rows to return (default 10, max 100)
+ * @param {number} limit   How many rows to return (default 10, max 100)
+ * @param {number} offset  Rows to skip, for paging (default 0)
  */
-async function getAllTimeLeaderboard(limit = 10) {
+async function getAllTimeLeaderboard(limit = 10, offset = 0) {
   const take = Math.min(Math.max(1, Number(limit) || 10), 100);
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -151,7 +155,9 @@ async function getAllTimeLeaderboard(limit = 10) {
       by: ["userId"],
       _sum:   { wins: true },
       _count: { id: true },
-      orderBy: { _sum: { wins: "desc" } },
+      // userId breaks ties so pages never overlap or skip anyone
+      orderBy: [{ _sum: { wins: "desc" } }, { userId: "asc" }],
+      skip: Math.max(0, Number(offset) || 0),
       take,
     })
   );
@@ -278,4 +284,17 @@ async function getPlayerStats(deviceId) {
   };
 }
 
-module.exports = { writeSessionStat, getWeeklyLeaderboard, getAllTimeLeaderboard, getPlayerStats };
+/**
+ * How many players a leaderboard has in total ("week" = played in the last 7
+ * days, "all" = ever), for paging. Counted in the database, not by loading rows.
+ */
+async function countLeaderboardPlayers(period = "week") {
+  const rows = await db((p) => (period === "all"
+    ? p.$queryRaw`SELECT COUNT(DISTINCT "userId")::int AS n FROM "SessionStat"`
+    : p.$queryRaw`SELECT COUNT(DISTINCT "userId")::int AS n FROM "SessionStat" WHERE "playedAt" >= ${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)}`));
+  return rows && rows[0] ? Number(rows[0].n) : 0;
+}
+
+module.exports = {
+  writeSessionStat, getWeeklyLeaderboard, getAllTimeLeaderboard, countLeaderboardPlayers, getPlayerStats,
+};

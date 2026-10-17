@@ -5,7 +5,7 @@ jest.mock("../prismaClient", () => ({
 jest.mock("../deviceAlias", () => ({ canonicalDeviceId: jest.fn(async (d) => d) }));
 
 const { db } = require("../prismaClient");
-const { writeSessionStat, getWeeklyLeaderboard, getAllTimeLeaderboard, getPlayerStats } = require("../statsService");
+const { writeSessionStat, getWeeklyLeaderboard, getAllTimeLeaderboard, countLeaderboardPlayers, getPlayerStats } = require("../statsService");
 
 describe("statsService", () => {
   afterEach(() => {
@@ -323,5 +323,43 @@ describe("getAllTimeLeaderboard", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
     expect(await getAllTimeLeaderboard()).toEqual([]);
+  });
+});
+
+describe("leaderboard paging", () => {
+  afterEach(() => jest.clearAllMocks());
+
+  test.each([
+    ["weekly", getWeeklyLeaderboard],
+    ["all-time", getAllTimeLeaderboard],
+  ])("%s: skips to the page and breaks ties by player id", async (_, fn) => {
+    const groupBy = jest.fn().mockResolvedValue([]);
+    db.mockImplementation(async (q) => q({ sessionStat: { groupBy } }));
+
+    await fn(10, 20);
+    expect(groupBy.mock.calls[0][0]).toMatchObject({
+      orderBy: [{ _sum: { wins: "desc" } }, { userId: "asc" }],
+      skip: 20,
+      take: 10,
+    });
+
+    await fn(10);
+    expect(groupBy.mock.calls[1][0].skip).toBe(0);
+    await fn(10, -5);
+    expect(groupBy.mock.calls[2][0].skip).toBe(0);
+  });
+
+  test("countLeaderboardPlayers counts distinct players this week or ever", async () => {
+    const $queryRaw = jest.fn().mockResolvedValue([{ n: 37 }]);
+    db.mockImplementation(async (q) => q({ $queryRaw }));
+
+    await expect(countLeaderboardPlayers("week")).resolves.toBe(37);
+    expect($queryRaw.mock.calls[0][0].join("?")).toContain('WHERE "playedAt" >= ?');
+    await expect(countLeaderboardPlayers("all")).resolves.toBe(37);
+    expect($queryRaw.mock.calls[1][0].join("")).not.toContain("WHERE");
+    await expect(countLeaderboardPlayers()).resolves.toBe(37);
+
+    db.mockResolvedValueOnce(null);
+    await expect(countLeaderboardPlayers("all")).resolves.toBe(0);
   });
 });

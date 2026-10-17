@@ -242,20 +242,27 @@
     <p style="color:var(--text-dim);font-size:0.8rem;margin:0 0 12px">
       One player = one browser. The same person on a phone, a laptop or in incognito shows up more
       than once — <strong>merge</strong> those into one; <strong>delete</strong> test players.
-      Both are permanent. The green row is the browser you're using now.
+      Both are permanent. The green row is the browser you're using now. Search narrows the
+      merge lists too (e.g. type a name to see all its duplicates).
     </p>
     <div class="mergeBar">
       Merge <select id="mergeSource"></select> into <select id="mergeTarget"></select>
       <button id="mergeBtn">Merge</button>
     </div>
     <div id="playersContainer"><div class="loading">Loading players…</div></div>
+    <div id="playersPagination" class="pagination" style="display:none"></div>
   </div>
 
-  <!-- Weekly Leaderboard -->
+  <!-- Leaderboard (paged on the server) -->
   <div class="section">
     <h2>
-      Weekly Leaderboard
+      Leaderboard
       <span class="controls">
+        <label for="lbPeriod" style="color:var(--text-dim)">Ranked by:</label>
+        <select id="lbPeriod">
+          <option value="week">This week</option>
+          <option value="all">All time</option>
+        </select>
         <span id="leaderboardSummary" style="color:var(--text-dim)"></span>
       </span>
     </h2>
@@ -295,9 +302,9 @@
     let roomsPage       = 1;
     const ROOMS_PER_PAGE = 12;
 
-    let allLeaderboard  = [];
+    // Leaderboard pages come from the server (10 per page)
+    let lbData          = null;   // { leaderboard, page, pages, total, period }
     let lbPage          = 1;
-    const LB_PER_PAGE   = 10;
 
     // ── Utilities ────────────────────────────────────────────────────────────
     function escapeHtml(str) {
@@ -510,27 +517,23 @@
     function renderLeaderboardPage() {
       const container = document.getElementById("leaderboardContainer");
       const summary   = document.getElementById("leaderboardSummary");
+      const pager     = document.getElementById("leaderboardPagination");
+      const rowsData  = (lbData && lbData.leaderboard) || [];
 
-      if (!allLeaderboard.length) {
-        container.innerHTML = '<div class="empty">No leaderboard data yet.</div>';
-        document.getElementById("leaderboardPagination").style.display = "none";
+      if (!rowsData.length) {
+        container.innerHTML = '<div class="empty">' +
+          (lbData && lbData.period === "all" ? "No games played yet." : "No games played in the last 7 days.") + '</div>';
+        pager.style.display = "none";
         summary.textContent = "";
         return;
       }
 
-      const totalPages = Math.max(1, Math.ceil(allLeaderboard.length / LB_PER_PAGE));
-      if (lbPage > totalPages) lbPage = totalPages;
-
-      const start  = (lbPage - 1) * LB_PER_PAGE;
-      const page   = allLeaderboard.slice(start, start + LB_PER_PAGE);
-      const offset = start;
-
-      summary.textContent = allLeaderboard.length + " players";
+      const first = rowsData[0].rank;
+      summary.textContent = first + "–" + (first + rowsData.length - 1) + " of " + lbData.total + " players";
 
       const n = (v) => escapeHtml(v != null ? v : 0);
-
-      const rows = page.map((e, i) => {
-        const rank      = offset + i + 1;
+      const rows = rowsData.map((e) => {
+        const rank      = e.rank;
         const rankClass = rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "";
         const medal     = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank;
         return (
@@ -571,12 +574,26 @@
           '<tbody>' + rows + '</tbody>' +
         '</table>';
 
-      makePagination("leaderboardPagination", lbPage, totalPages, (p) => { lbPage = p; renderLeaderboardPage(); });
+      makePagination("leaderboardPagination", lbData.page, lbData.pages, (pg) => { lbPage = pg; loadLeaderboard(); });
+    }
+
+    async function loadLeaderboard() {
+      const period = document.getElementById("lbPeriod").value;
+      try {
+        lbData = await fetchJson(API_LEADERBOARD + "?period=" + period + "&page=" + lbPage);
+        lbPage = lbData.page; // the server clamps a page past the end
+        renderLeaderboardPage();
+      } catch (err) {
+        document.getElementById("leaderboardContainer").innerHTML =
+          '<div class="error">Failed to load leaderboard: ' + escapeHtml(err.message) + '</div>';
+      }
     }
 
     // ── Players (clean-up) ───────────────────────────────────────────────────
     const API_PLAYERS = "/api/admin/players";
-    let allPlayers = [];
+    let allPlayers = [];      // the page on screen
+    let playersPage = 1;
+    let playersMeta = { total: 0, page: 1, pages: 1 };
     // The game stores this browser's player id here (same origin as /admin)
     const thisDevice = (() => { try { return localStorage.getItem("80p-device-id"); } catch (_) { return null; } })();
     const isThisBrowser = (pl) => !!thisDevice && (pl.devices || []).includes(thisDevice);
@@ -589,10 +606,10 @@
     }
 
     function renderPlayers() {
-      const q = document.getElementById("playerSearch").value.trim().toLowerCase();
-      const shown = allPlayers.filter((pl) => !q || (pl.name || "").toLowerCase().includes(q));
+      const shown = allPlayers;
+      const q = document.getElementById("playerSearch").value.trim();
       document.getElementById("playersSummary").textContent =
-        shown.length === allPlayers.length ? allPlayers.length + " players" : shown.length + " of " + allPlayers.length;
+        playersMeta.total + (q ? " matching" : "") + " player" + (playersMeta.total === 1 ? "" : "s");
 
       const options = '<option value="">— pick —</option>' +
         allPlayers.map((pl) => '<option value="' + escapeHtml(pl.id) + '">' + escapeHtml(playerLabel(pl)) + '</option>').join("");
@@ -605,7 +622,9 @@
 
       const container = document.getElementById("playersContainer");
       if (!shown.length) {
-        container.innerHTML = '<div class="empty">' + (allPlayers.length ? "No players match." : "No players yet.") + '</div>';
+        container.innerHTML = '<div class="empty">' +
+          (document.getElementById("playerSearch").value.trim() ? "No players match." : "No players yet.") + '</div>';
+        document.getElementById("playersPagination").style.display = "none";
         return;
       }
       const rows = shown.map((pl) => {
@@ -630,11 +649,16 @@
           '<th style="text-align:center">Round wins</th><th>Last game</th><th>First seen</th>' +
           '<th style="text-align:center">Devices</th><th></th>' +
         '</tr></thead><tbody>' + rows + '</tbody></table>';
+      makePagination("playersPagination", playersMeta.page, playersMeta.pages, (pg) => { playersPage = pg; loadPlayers(); });
     }
 
     async function loadPlayers() {
       try {
-        allPlayers = (await fetchJson(API_PLAYERS)).players || [];
+        const q = document.getElementById("playerSearch").value.trim();
+        const data = await fetchJson(API_PLAYERS + "?page=" + playersPage + (q ? "&q=" + encodeURIComponent(q) : ""));
+        allPlayers = data.players || [];
+        playersMeta = { total: data.total || 0, page: data.page || 1, pages: data.pages || 1 };
+        playersPage = playersMeta.page;
         renderPlayers();
       } catch (err) {
         document.getElementById("playersContainer").innerHTML =
@@ -790,15 +814,8 @@
           '<div class="error">Failed to load health: ' + escapeHtml(err.message) + '</div>';
       }
 
-      try {
-        const data = await fetchJson(API_LEADERBOARD);
-        allLeaderboard = data.leaderboard || [];
-        lbPage = 1;
-        renderLeaderboardPage();
-      } catch (err) {
-        document.getElementById("leaderboardContainer").innerHTML =
-          '<div class="error">Failed to load leaderboard: ' + escapeHtml(err.message) + '</div>';
-      }
+      // Refreshes the page you're on (doesn't jump back to page 1)
+      await loadLeaderboard();
 
       try {
         const status = document.getElementById("statusFilter").value;
@@ -821,8 +838,13 @@
 
     // Players load on open and after each action — not on the 30s refresh,
     // which would reset a merge selection half-way.
+    document.getElementById("lbPeriod").addEventListener("change", () => { lbPage = 1; loadLeaderboard(); });
     document.getElementById("playersRefreshBtn").addEventListener("click", loadPlayers);
-    document.getElementById("playerSearch").addEventListener("input", renderPlayers);
+    let searchTimer = null;
+    document.getElementById("playerSearch").addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => { playersPage = 1; loadPlayers(); }, 300);
+    });
     document.getElementById("mergeBtn").addEventListener("click", mergeSelected);
     loadPlayers();
 

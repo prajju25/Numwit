@@ -27,46 +27,61 @@ function withPrisma(fn) {
   return fn(prisma);
 }
 
-/** All players with enough detail to tell duplicates apart. */
-async function listPlayers() {
-  const users = await withPrisma((p) =>
-    p.user.findMany({
-      orderBy: { createdAt: "desc" },
+/**
+ * One page of players (newest first) with enough detail to tell duplicates
+ * apart. `q` filters by name (case-insensitive).
+ * Returns { players, total, page, pageSize, pages }.
+ */
+async function listPlayers({ q = "", page = 1, pageSize = 20 } = {}) {
+  const size = Math.min(Math.max(1, Number(pageSize) || 20), 100);
+  const where = q ? { name: { contains: String(q).trim(), mode: "insensitive" } } : {};
+
+  return withPrisma(async (p) => {
+    const total = await p.user.count({ where });
+    const pages = Math.max(1, Math.ceil(total / size));
+    const current = Math.min(Math.max(1, Number(page) || 1), pages);
+
+    const users = await p.user.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      skip: (current - 1) * size,
+      take: size,
       select: {
         id: true, deviceId: true, name: true, avatar: true, level: true, xp: true,
         createdAt: true, updatedAt: true,
         deviceAliases: { select: { deviceId: true } },
       },
-    })
-  );
-  if (!users) return null;
+    });
 
-  const ids = users.map((u) => u.id);
-  const stats = await withPrisma((p) =>
-    p.sessionStat.groupBy({
-      by: ["userId"],
-      where: { userId: { in: ids } },
-      _count: { id: true },
-      _sum: { wins: true },
-      _max: { playedAt: true },
-    })
-  );
-  const byUser = {};
-  (stats || []).forEach((s) => { byUser[s.userId] = s; });
+    const stats = users.length
+      ? await p.sessionStat.groupBy({
+        by: ["userId"],
+        where: { userId: { in: users.map((u) => u.id) } },
+        _count: { id: true },
+        _sum: { wins: true },
+        _max: { playedAt: true },
+      })
+      : [];
+    const byUser = {};
+    stats.forEach((st) => { byUser[st.userId] = st; });
 
-  return users.map((u) => ({
-    id: u.id,
-    deviceId: u.deviceId,
-    devices: [u.deviceId, ...u.deviceAliases.map((a) => a.deviceId)],
-    name: u.name,
-    avatar: u.avatar,
-    level: u.level,
-    xp: u.xp,
-    games: byUser[u.id]?._count.id || 0,
-    roundWins: byUser[u.id]?._sum.wins || 0,
-    lastPlayed: byUser[u.id]?._max.playedAt || null,
-    createdAt: u.createdAt,
-  }));
+    return {
+      total, page: current, pageSize: size, pages,
+      players: users.map((u) => ({
+        id: u.id,
+        deviceId: u.deviceId,
+        devices: [u.deviceId, ...u.deviceAliases.map((a) => a.deviceId)],
+        name: u.name,
+        avatar: u.avatar,
+        level: u.level,
+        xp: u.xp,
+        games: byUser[u.id]?._count.id || 0,
+        roundWins: byUser[u.id]?._sum.wins || 0,
+        lastPlayed: byUser[u.id]?._max.playedAt || null,
+        createdAt: u.createdAt,
+      })),
+    };
+  });
 }
 
 async function devicesOf(p, userId) {
