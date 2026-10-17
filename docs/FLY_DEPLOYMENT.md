@@ -129,7 +129,7 @@ deployed yet).
 | `REDIS_URL` | yes | room/game state |
 | `DATABASE_URL` | for stats | Neon **pooled** URL — leave unset to run without persistence |
 | `DIRECT_URL` | with `DATABASE_URL` | Neon **direct** URL — used only for migrations |
-| `ADMIN_PASSWORD` | optional | enables `/admin` (Basic Auth, user `admin`); unset = admin disabled |
+| `ADMIN_PASSWORD` | optional | enables `/admin` (Basic Auth, user `admin`); unset = admin disabled. Use a long random one (e.g. `openssl rand -base64 24`), not one you use anywhere else. 10 wrong tries lock that IP out for 15 min (100 in total lock everyone out); admin changes are refused unless sent from the admin page itself |
 
 Do **not** set `REDIS_ADAPTER_URL` while running one Machine.
 
