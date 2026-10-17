@@ -1,5 +1,10 @@
 # Numwit Load Tests
 
+> **Current setup (Fly.io, Oct 2026):** use `hn-smoke-test.js`, `hn-test.js` and `breakpoint-test.js`
+> (shared player logic in `utils/game.js`) and follow **docs/LOAD_TEST_RUNBOOK.md**. `BASE_URL` is
+> required. The older scripts below were written for the June Render setup.
+
+
 3 tests, run them in order. Each one sends fake players to your live game.
 
 ---
