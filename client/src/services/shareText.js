@@ -4,6 +4,7 @@
  * WhatsApp, Discord or X with no image.
  *
  *   Numwit 🧠 🥈 2nd of 4 · won 3/7 rounds
+ *   🧊 The Contrarian
  *   🟩⬛🟨🟩🎯⬛🟩
  *   Closest: 0.4 off the target
  *   https://numwit.prajvex.com
@@ -45,7 +46,7 @@ export function playedRounds(history, mySocketId) {
  * history:     round_result payloads for this game, in order
  * placement:   1-based finishing position · playerCount: players in the game
  */
-export function buildShareText({ history, mySocketId, placement, playerCount, url = SITE_URL }) {
+export function buildShareText({ history, mySocketId, placement, playerCount, title, url = SITE_URL }) {
   const rounds = playedRounds(history, mySocketId);
   const won = rounds.filter((r) => (r.winnerIds || []).includes(mySocketId)).length;
 
@@ -71,5 +72,6 @@ export function buildShareText({ history, mySocketId, placement, playerCount, ur
     : closest < 0.05 ? "Closest: dead on the target 🎯"
     : `Closest: ${(Math.round(closest * 10) / 10).toFixed(1)} off the target`;
 
-  return [head, ...grid, closestLine, url].filter(Boolean).join("\n");
+  const titleLine = title ? `${title.icon} ${title.name}` : null;
+  return [head, titleLine, ...grid, closestLine, url].filter(Boolean).join("\n");
 }

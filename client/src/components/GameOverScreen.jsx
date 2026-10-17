@@ -12,9 +12,12 @@ import { useGame } from "../contexts/GameContext";
 import { track } from "../services/analytics";
 import { buildShareText, roundSquare, playedRounds } from "../services/shareText";
 import { rankPlayers } from "../services/standings";
+import { computeTitles } from "../services/titles";
+import useChallengeFriends from "../hooks/useChallengeFriends";
 import { openProfileMenu } from "../services/profile";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
+const ORDINAL = (n) => n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || "th");
 const CONFETTI = ["#FBBF24", "#8B5CF6", "#22D3EE", "#34D399", "#F472B6"];
 // Podium column order on screen: 2nd, 1st, 3rd
 const PODIUM_ORDER = [1, 0, 2];
@@ -83,9 +86,21 @@ export default function GameOverScreen({ data, players }) {
 
   const handleRestart = () => socket.emit("restart_game", { roomId });
 
+  // Challenge friends: new private room + a message naming this game's title
+  const challengeFriends = useChallengeFriends();
+  const handleChallenge = () => {
+    const as = myTitle ? ` as ${myTitle.icon} ${myTitle.name}` : "";
+    const message = iWon
+      ? `I just won a game of Numwit${as}. Think you can beat me? Join my room 👇`
+      : placement
+        ? `I just finished ${MEDALS[placement - 1] || "🏁"} ${ORDINAL(placement)} of ${sorted.length} in Numwit${as}. Think you can out-guess me? Join my room 👇`
+        : `I just played Numwit${as}. Think you can out-guess me? Join my room 👇`;
+    challengeFriends(message, { won: iWon, title: myTitle?.id });
+  };
+
   // Wordle-style text result: share sheet on phones, clipboard elsewhere
   const handleTextShare = async () => {
-    const text = buildShareText({ history, mySocketId, placement, playerCount: sorted.length });
+    const text = buildShareText({ history, mySocketId, placement, playerCount: sorted.length, title: myTitle });
     try {
       if (prefersShareSheet()) {
         await navigator.share({ text });
@@ -104,6 +119,9 @@ export default function GameOverScreen({ data, players }) {
   // Winner first, then who lasted longest (points break ties)
   const sorted = rankPlayers(players, data, history);
   const placement = sorted.findIndex((p) => p.socketId === mySocketId) + 1 || null;
+  // Everyone's title for this game (services/titles.js)
+  const titles = computeTitles(players, history, data);
+  const myTitle = titles[mySocketId] || null;
   const podium = sorted.slice(0, 3);
   const rest = sorted.slice(3);
 
@@ -168,6 +186,19 @@ export default function GameOverScreen({ data, players }) {
           <p className="text-sm text-[#8F95B8] m-0">A player disconnected — game ended early.</p>
         )}
       </section>
+
+      {/* ── Your title this game ─────────────────────────────────────────── */}
+      {myTitle && rounds > 0 && (
+        <section className="nw-pop flex items-center gap-3.5 px-4 py-3.5 rounded-[18px] border border-amber-300/40 bg-gradient-to-r from-amber-400/[0.12] to-violet-500/[0.10]"
+          style={{ animationDelay: "0.4s" }} aria-label="Your title this game">
+          <span className="text-[34px] leading-none" aria-hidden="true">{myTitle.icon}</span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[11px] font-extrabold uppercase tracking-[0.14em] text-amber-300/90">Your title</span>
+            <span className="block font-display text-[22px] font-bold leading-tight text-white">{myTitle.name}</span>
+            <span className="block text-[13px] text-[#C7CBE6]">{myTitle.reason}</span>
+          </span>
+        </section>
+      )}
 
       {/* ── XP ────────────────────────────────────────────────────────────── */}
       {xpData && (
@@ -249,6 +280,18 @@ export default function GameOverScreen({ data, players }) {
             </span>
           </button>
         )}
+
+        <button
+          onClick={handleChallenge}
+          className="min-h-[54px] px-4 rounded-2xl border border-violet-400/45 bg-violet-500/[0.14] hover:bg-violet-500/25 transition flex items-center gap-3 text-left"
+        >
+          <span className="text-2xl" aria-hidden="true">⚔️</span>
+          <span className="flex-1">
+            <span className="block text-[15px] font-extrabold text-white">Challenge friends</span>
+            <span className="block text-[12px] text-[#B4B9D6]">Opens a private room with your invite link ready to send</span>
+          </span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="text-violet-200" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </button>
       </section>
 
       {/* Quick-start players got a random name — invite them to pick one */}
@@ -298,6 +341,11 @@ export default function GameOverScreen({ data, players }) {
                   <span className={twMerge("text-[13px] truncate max-w-full", st.name)}>
                     {p.socketId === mySocketId ? "You" : p.name}
                   </span>
+                  {titles[p.socketId] && rounds > 0 && (
+                    <span className="text-[10px] font-semibold text-[#B4B9D6] truncate max-w-full -mt-1" title={titles[p.socketId].reason}>
+                      {titles[p.socketId].icon} {titles[p.socketId].name.replace(/^The /, "")}
+                    </span>
+                  )}
                   <div className={twMerge("w-full rounded-t-[14px] rounded-b-md border bg-gradient-to-b flex flex-col items-center justify-center", st.h, st.box)}>
                     <span className="text-xl leading-none">{MEDALS[idx]}</span>
                     <span className="nums text-[11px] text-[#C7CBE6] mt-1">{pts} pts</span>
@@ -313,7 +361,12 @@ export default function GameOverScreen({ data, players }) {
               <div key={p.socketId} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.07] text-[13px]">
                 <span className="nums w-4 text-[#8F95B8]">{i + 4}</span>
                 <span>{p.avatar}</span>
-                <span className="flex-1 text-[#B4B9D6] truncate">{p.name}</span>
+                <span className="flex-1 text-[#B4B9D6] truncate">
+                  {p.name}
+                  {titles[p.socketId] && rounds > 0 && (
+                    <span className="ml-2 text-[11px] text-[#8F95B8]">{titles[p.socketId].icon} {titles[p.socketId].name}</span>
+                  )}
+                </span>
                 <span className="nums text-[#8F95B8]">{data?.points?.[p.socketId] ?? 0} pts</span>
               </div>
             ))}
@@ -347,6 +400,7 @@ export default function GameOverScreen({ data, players }) {
         <ShareCardModal
           player={shareData}
           variant="victory"
+          title={myTitle}
           onClose={() => setShareData(null)}
         />
       )}

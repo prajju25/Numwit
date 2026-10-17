@@ -8,6 +8,7 @@ import RoomChat from "./RoomChat";
 import GameSettingsPanel from "./GameSettingsPanel";
 import VoicePanel from "./VoicePanel";
 import { track } from "../services/analytics";
+import { readChallenge, clearChallenge } from "../hooks/useChallengeFriends";
 
 const DEFAULT_SETTINGS = {
   timerDuration: 30,
@@ -35,6 +36,30 @@ export default function WaitingRoom() {
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   const startGame = () => socket.emit("start_game", { roomId, settings });
+
+  // "Challenge friends" from a game-over screen: the message waits here, to be
+  // sent with this room's link from a tap (phones only share after a tap).
+  const [challenge, setChallenge] = useState(readChallenge);
+  const [challengeStatus, setChallengeStatus] = useState(""); // "", "sent", "copied", "failed"
+  useEffect(() => () => clearChallenge(), []); // done once the game starts or they leave
+  const dismissChallenge = () => { clearChallenge(); setChallenge(null); };
+  const sendChallenge = async () => {
+    const sheet = canNativeShare && typeof window.matchMedia === "function"
+      && window.matchMedia("(pointer: coarse)").matches;
+    try {
+      if (sheet) {
+        await navigator.share({ title: "Numwit", text: challenge, url: inviteUrl });
+        track("invite", { method: "challenge_sheet" });
+        setChallengeStatus("sent");
+      } else {
+        await navigator.clipboard.writeText(challenge + "\n" + inviteUrl);
+        track("invite", { method: "challenge_copy" });
+        setChallengeStatus("copied");
+      }
+    } catch (err) {
+      if (err?.name !== "AbortError") setChallengeStatus("failed");
+    }
+  };
 
   const handleInvite = () => {
     track("invite", { method: "copy_link" });
@@ -84,6 +109,26 @@ export default function WaitingRoom() {
             {count}/{MIN_PLAYERS} minimum · {count} joined
           </span>
         </div>
+
+        {roomType === "private" && challenge && (
+          <div className="nw-pop rounded-2xl border border-violet-400/45 bg-violet-500/[0.12] p-4 flex flex-col gap-3" aria-label="Your challenge">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl" aria-hidden="true">⚔️</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-extrabold text-white m-0">Your challenge is ready</p>
+                <p className="text-[13px] text-[#C7CBE6] mt-1 mb-0">“{challenge}”</p>
+              </div>
+              <button onClick={dismissChallenge} aria-label="Dismiss challenge"
+                className="w-9 h-9 -mt-1.5 -mr-2 rounded-lg text-white/40 hover:text-white hover:bg-white/5 text-lg leading-none shrink-0">×</button>
+            </div>
+            <button onClick={sendChallenge} className="h-12 rounded-xl text-[15px] font-extrabold btn-primary flex items-center justify-center gap-2">
+              {challengeStatus === "copied" ? "✓ Copied — paste it to your friends"
+                : challengeStatus === "sent" ? "✓ Sent — send to more friends"
+                : challengeStatus === "failed" ? "Couldn't share — try again"
+                : "Send challenge"}
+            </button>
+          </div>
+        )}
 
         {roomType === "private" && (
           <>

@@ -92,3 +92,10 @@ describe("playedRounds", () => {
     expect(text.split("\n")[1]).toBe("🟩⬜");
   });
 });
+
+describe("buildShareText title", () => {
+  test("puts the game title on the second line", () => {
+    const text = buildShareText({ history: [round()], mySocketId: "me", placement: 2, playerCount: 3, title: { name: "The Anchor", icon: "⚓" } });
+    expect(text.split("\n")[1]).toBe("⚓ The Anchor");
+  });
+});

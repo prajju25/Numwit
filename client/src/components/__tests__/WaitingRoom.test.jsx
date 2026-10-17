@@ -166,3 +166,73 @@ describe("WaitingRoom", () => {
     expect(screen.getByText(`0/${MIN_PLAYERS} minimum · 0 joined`)).toBeInTheDocument();
   });
 });
+
+describe("WaitingRoom challenge from the game-over screen", () => {
+  const realShare = navigator.share;
+  const realMatch = window.matchMedia;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sessionStorage.setItem("numwit_challenge", "I just finished 🥈 2nd of 3. Join my room 👇");
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: jest.fn(() => Promise.resolve()) }, configurable: true });
+    useUser.mockReturnValue({ roomType: "private", roomId: "room123", user: { socketId: "p0" } });
+    useGame.mockReturnValue({ players: [{ socketId: "p0", name: "A", avatar: "🐱" }], hostSocketId: "p0", botFillAt: null });
+  });
+  afterEach(() => {
+    navigator.share = realShare;
+    window.matchMedia = realMatch;
+    sessionStorage.clear();
+  });
+
+  test("shows the waiting message; on desktop Send copies it with the room link", async () => {
+    render(<WaitingRoom />);
+    expect(screen.getByLabelText("Your challenge")).toHaveTextContent("I just finished 🥈 2nd of 3");
+    await act(async () => { fireEvent.click(screen.getByText("Send challenge")); });
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      "I just finished 🥈 2nd of 3. Join my room 👇\n" + window.location.origin + "/room123"
+    );
+    expect(screen.getByText("✓ Copied — paste it to your friends")).toBeInTheDocument();
+  });
+
+  test("on phones it opens the share sheet; closing the sheet is not an error", async () => {
+    window.matchMedia = jest.fn(() => ({ matches: true }));
+    navigator.share = jest.fn(() => Promise.resolve());
+    render(<WaitingRoom />);
+    await act(async () => { fireEvent.click(screen.getByText("Send challenge")); });
+    expect(navigator.share).toHaveBeenCalledWith({
+      title: "Numwit", text: "I just finished 🥈 2nd of 3. Join my room 👇", url: window.location.origin + "/room123",
+    });
+    expect(screen.getByText("✓ Sent — send to more friends")).toBeInTheDocument();
+
+    navigator.share = jest.fn(() => Promise.reject(Object.assign(new Error("x"), { name: "AbortError" })));
+    await act(async () => { fireEvent.click(screen.getByText("✓ Sent — send to more friends")); });
+    expect(screen.getByText("✓ Sent — send to more friends")).toBeInTheDocument();
+  });
+
+  test("a failed copy says so; dismiss removes the card and the message", async () => {
+    navigator.clipboard.writeText = jest.fn(() => Promise.reject(new Error("denied")));
+    render(<WaitingRoom />);
+    await act(async () => { fireEvent.click(screen.getByText("Send challenge")); });
+    expect(screen.getByText("Couldn't share — try again")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Dismiss challenge"));
+    expect(screen.queryByLabelText("Your challenge")).not.toBeInTheDocument();
+    expect(sessionStorage.getItem("numwit_challenge")).toBeNull();
+  });
+
+  test("the message is forgotten once the waiting room closes (game started or left)", () => {
+    const { unmount } = render(<WaitingRoom />);
+    unmount();
+    expect(sessionStorage.getItem("numwit_challenge")).toBeNull();
+  });
+
+  test("no card without a pending challenge, or in a public room", () => {
+    sessionStorage.clear();
+    const { unmount } = render(<WaitingRoom />);
+    expect(screen.queryByLabelText("Your challenge")).not.toBeInTheDocument();
+    unmount();
+    sessionStorage.setItem("numwit_challenge", "x");
+    useUser.mockReturnValue({ roomType: "public", roomId: "room123", user: { socketId: "p0" } });
+    render(<WaitingRoom />);
+    expect(screen.queryByLabelText("Your challenge")).not.toBeInTheDocument();
+  });
+});

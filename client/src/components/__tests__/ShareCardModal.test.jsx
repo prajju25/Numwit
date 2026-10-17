@@ -50,6 +50,14 @@ describe("ShareCardModal", () => {
     expect(url).toContain("text=");
   });
 
+  test("the victory share text names this game's title", () => {
+    render(<ShareCardModal player={player} variant="victory" title={{ name: "The Contrarian", icon: "🧊" }} onClose={onClose} />);
+    fireEvent.click(screen.getByText("Post on X"));
+    const text = new URL(window.open.mock.calls[0][0]).searchParams.get("text");
+    expect(text).toContain("as Alice — 🧊 The Contrarian!");
+    expect(screen.getByText("🧊 The Contrarian")).toBeInTheDocument(); // on the card too
+  });
+
   test("Facebook opens a sharer.php URL", () => {
     render(<ShareCardModal player={player} variant="leaderboard" onClose={onClose} />);
     fireEvent.click(screen.getByText("Facebook"));

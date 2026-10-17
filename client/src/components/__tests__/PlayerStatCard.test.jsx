@@ -115,3 +115,12 @@ describe("PlayerStatCard level ring and streak", () => {
     expect(screen.getByText("2-win streak")).toBeInTheDocument();
   });
 });
+
+describe("PlayerStatCard title", () => {
+  test("a game title replaces the level line (level stays on the avatar badge)", () => {
+    render(<PlayerStatCard name="Alice" avatar="🐱" level={3} stats={{}} variant="victory" title={{ name: "The Contrarian", icon: "🧊" }} />);
+    expect(screen.getByText("🧊 The Contrarian")).toBeInTheDocument();
+    expect(screen.queryByText(/^Level 3/)).not.toBeInTheDocument();
+    expect(screen.getByText("LV 3")).toBeInTheDocument();
+  });
+});

@@ -16,17 +16,18 @@ import { track } from "../services/analytics";
  * Only "Share via Device" (Web Share API with a file) and "Download Image"
  * can carry the actual rendered card image.
  */
-function buildShareText({ name, level, stats, variant }) {
+function buildShareText({ name, level, stats, variant, title }) {
   const s = stats || {};
   if (variant === "victory") {
-    return `🎉 Just won a game of Numwit as ${name}! Level ${level} · ${s.gamesWon ?? 0} wins · ${s.bestStreak ?? 0}-win best streak. Can you beat me?`;
+    const as = title ? `${name} — ${title.icon} ${title.name}` : name;
+    return `🎉 Just won a game of Numwit as ${as}! Level ${level} · ${s.gamesWon ?? 0} wins · ${s.bestStreak ?? 0}-win best streak. Can you beat me?`;
   }
   return `🧠 I'm Level ${level} on Numwit with ${s.gamesWon ?? 0} wins and a ${s.bestStreak ?? 0}-win best streak. Can you beat me?`;
 }
 
 const EXPORT_WIDTH = 1080;
 
-export default function ShareCardModal({ player, variant, rank, totalPlayers, onClose }) {
+export default function ShareCardModal({ player, variant, rank, totalPlayers, title, onClose }) {
   const cardRef = useRef(null);
   const [busyAction, setBusyAction] = useState(null); // "device" | "download" | null
   const [copied, setCopied] = useState(false);
@@ -35,7 +36,7 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
   const { name, avatar, level, stats } = player || {};
   // Always the canonical domain, even when played via numwit.fly.dev or localhost
   const shareUrl  = SITE_URL;
-  const shareText = buildShareText({ name, level, stats, variant });
+  const shareText = buildShareText({ name, level, stats, variant, title });
 
   const openShareWindow = (url) => {
     window.open(url, "_blank", "noopener,noreferrer,width=600,height=500");
@@ -134,6 +135,7 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, on
           variant={variant}
           rank={rank}
           totalPlayers={totalPlayers}
+          title={title}
         />
 
         <div className="w-full flex flex-col gap-2.5">
@@ -212,5 +214,7 @@ ShareCardModal.propTypes = {
   variant: PropTypes.oneOf(["leaderboard", "victory"]),
   rank: PropTypes.number,
   totalPlayers: PropTypes.number,
+  // This game's title, for the victory card (services/titles.js)
+  title: PropTypes.shape({ name: PropTypes.string, icon: PropTypes.string }),
   onClose: PropTypes.func.isRequired,
 };

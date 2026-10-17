@@ -88,7 +88,7 @@ Round 4: 🎯 27 → Target 26 🏆 WON
 Play: numwit.prajvex.com · Code: MNDK42
 ```
 
-**2. Personalized Post-Game Titles** — ⬜ *Roadmap Sprint 2*
+**2. Personalized Post-Game Titles** — ✅ *Shipped Oct 2026 (Sprint 2)*
 
 Award a title based on play style this session:
 - **"The Contrarian"** — consistently picked the lowest number
@@ -116,7 +116,7 @@ Let eliminated players — and anyone with the room link — watch the game in r
 - Content for streamers ("Watch me predict what these idiots will pick")
 - A reason to share the room link with people who aren't currently playing
 
-**6. Invite-to-Room Push from Winner Screen** — ⬜ *Roadmap Sprint 2 ("Challenge friends")*
+**6. Invite-to-Room Push from Winner Screen** — ✅ *Shipped Oct 2026 as "Challenge friends" (Sprint 2)*
 
 After game over, every player sees a button: "Challenge a friend — send them your room code." Pre-populate a shareable message with their personalized title. The winner sharing feels like bragging. The loser sharing feels like seeking revenge. Both are viral.
 
@@ -791,7 +791,7 @@ Two independent streams, both scaling with WAP — which is exactly why growth a
 | Action | Effort | Impact | Week | Status (Oct 2026) |
 |---|---|---|---|---|
 | Upgrade share results card | Low | Very High | 1 | ✅ Done (image card) |
-| Add personalized titles | Medium | Very High | 1-2 | ⬜ Sprint 2 |
+| Add personalized titles | Medium | Very High | 1-2 | ✅ Done (Sprint 2) |
 | Post Show HN | Very Low | High | 1 | ⬜ After Sprints 1–2 |
 | Post r/WebGames | Very Low | High | 1 | ⬜ After Sprints 1–2 |
 | 5 individual outreach DMs | Very Low | Medium | 1 | ⬜ Now |

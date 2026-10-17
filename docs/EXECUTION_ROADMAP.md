@@ -105,15 +105,24 @@ the old game for 60s; bots dueling each other could void the same round over and
 (quick start sends `profile_done` with `auto: true`); `share` events per finished game —
 `method: text_copy / text_sheet` for the text share vs the image card.
 
-### Sprint 2 — Identity + invites ⬜
+### Sprint 2 — Identity + invites ✅ *(shipped 17 Oct 2026)*
 🔧 Section 2 #2, #6
-1. **Personalized titles** — "The Contrarian", "The Anchor", "The Mind Reader", "The Comeback
-   Kid"… from the game's picks; on the game-over screen, the stat card and the text share.
-2. **"Challenge friends"** on game over — one tap creates a private room and opens the share
-   sheet with the invite link and the player's title.
+1. ✅ **Personalized titles** — every player gets one per game, from their real picks, with a
+   reason ("🧊 The Contrarian — lowest pick in 6 of 7 rounds"). Eleven titles, first match
+   wins: Mind Reader (exact hit), Lone Wolf (won the final duel from behind), Mathematician
+   (most round wins, lost the game), Contrarian, Last Romantic (100 ×3), Anchor (~50 ×3),
+   Chaos Agent (2 duplicate picks), Comeback Kid, Strategist (won), Wildcard, Steady Hand.
+   Shown as a card on the game-over screen, under every name on the podium, in the text share
+   and on the victory stat card (and its share text). Logic: `client/src/services/titles.js`.
+2. ✅ **"Challenge friends"** on game over (every player) — leaves the finished game, opens a
+   private room, and its waiting room offers the message — "I just finished 🥈 2nd of 3 in
+   Numwit as 🧊 The Contrarian. Think you can out-guess me? Join my room 👇" + link — as a
+   **Send challenge** button (share sheet on phones, copy on desktop; phones only open the
+   sheet from a tap, so it isn't opened automatically).
 
-**Success metric:** `invite` + `share` events per finished game; new players arriving via
-invite links (`room_join` with type `invite`).
+**Success metric:** `invite` + `share` events per finished game (`challenge_start`, then
+`invite` with method `challenge_sheet` / `challenge_copy`); new players arriving via invite
+links (`room_join` with type `invite`).
 
 ### Sprint 3 — Keep groups playing ⬜
 🔧 Section 2 #4, Section 8

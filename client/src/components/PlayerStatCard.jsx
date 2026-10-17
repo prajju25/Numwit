@@ -42,7 +42,7 @@ const BADGES = {
 };
 
 const PlayerStatCard = forwardRef(function PlayerStatCard(
-  { name, avatar, level, stats, variant = "leaderboard", rank, totalPlayers },
+  { name, avatar, level, stats, variant = "leaderboard", rank, totalPlayers, title },
   ref
 ) {
   const s = stats || {};
@@ -127,10 +127,15 @@ const PlayerStatCard = forwardRef(function PlayerStatCard(
         </div>
         <div className="min-w-0">
           <p className="font-display text-[26px] font-bold leading-none tracking-[-0.03em] truncate m-0">{name || "Player"}</p>
-          <p className="text-[12px] font-semibold text-[#C4B5FD] mt-1.5 mb-0">
-            Level {level ?? 1}
-            {rank ? ` · #${rank}${totalPlayers ? ` of ${totalPlayers} this week` : ""}` : ""}
-          </p>
+          {title ? (
+            // This game's title (victory card) — level is on the avatar badge
+            <p className="text-[12px] font-extrabold text-amber-200 mt-1.5 mb-0 truncate">{title.icon} {title.name}</p>
+          ) : (
+            <p className="text-[12px] font-semibold text-[#C4B5FD] mt-1.5 mb-0">
+              Level {level ?? 1}
+              {rank ? ` · #${rank}${totalPlayers ? ` of ${totalPlayers} this week` : ""}` : ""}
+            </p>
+          )}
         </div>
       </div>
 
@@ -186,6 +191,8 @@ const PlayerStatCard = forwardRef(function PlayerStatCard(
 });
 
 PlayerStatCard.propTypes = {
+  // This game's title (services/titles.js), shown on the victory card
+  title: PropTypes.shape({ name: PropTypes.string, icon: PropTypes.string }),
   name: PropTypes.string,
   avatar: PropTypes.string,
   level: PropTypes.number,
