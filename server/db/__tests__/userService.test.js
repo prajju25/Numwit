@@ -1,6 +1,8 @@
 jest.mock("../prismaClient", () => ({
   db: jest.fn(),
 }));
+// Alias resolution is tested in deviceAlias.test.js
+jest.mock("../deviceAlias", () => ({ canonicalDeviceId: jest.fn(async (d) => d) }));
 
 const { db } = require("../prismaClient");
 const {

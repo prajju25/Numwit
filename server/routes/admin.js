@@ -1,5 +1,6 @@
 // server/routes/admin.js
-// Read-only-ish admin API: live room stats + feedback inbox management.
+// Admin API: live room stats, feedback inbox, and player clean-up
+// (delete test players, merge duplicates).
 // All routes here are mounted under /api/admin and gated by adminAuth
 // (HTTP Basic Auth, see ../middleware/adminAuth.js).
 
@@ -11,6 +12,7 @@ const timerService = require("../services/timerService");
 const botService = require("../services/botService");
 const statsService = require("../db/statsService");
 const metricsService = require("../db/metricsService");
+const playerAdminService = require("../db/playerAdminService");
 
 const router = express.Router();
 
@@ -126,6 +128,60 @@ router.patch("/feedback/:id", async (req, res) => {
   } catch (err) {
     console.error(`PATCH /api/admin/feedback/${req.params.id} error:`, err.message);
     res.status(500).json({ error: "update failed" });
+  }
+});
+
+// -- Players (clean-up) --------------------------------------------------------------
+// One player = one browser (deviceId), so the same person on two devices or
+// in incognito shows up more than once. Errors are reported, never hidden.
+const fail = (res, where, err) => {
+  console.error(where + " error:", err.message);
+  res.status(500).json({ error: err.message });
+};
+
+// GET /api/admin/players — every player, newest first
+router.get("/players", async (req, res) => {
+  try {
+    res.json({ players: (await playerAdminService.listPlayers()) || [] });
+  } catch (err) {
+    fail(res, "GET /api/admin/players", err);
+  }
+});
+
+// GET /api/admin/players/:id/delete-preview — what a delete would remove
+router.get("/players/:id/delete-preview", async (req, res) => {
+  try {
+    const preview = await playerAdminService.deletePreview(req.params.id);
+    if (!preview) return res.status(404).json({ error: "Player not found" });
+    res.json(preview);
+  } catch (err) {
+    fail(res, "GET delete-preview", err);
+  }
+});
+
+// DELETE /api/admin/players/:id — permanently delete a player and their records
+router.delete("/players/:id", async (req, res) => {
+  try {
+    const result = await playerAdminService.deletePlayer(req.params.id);
+    if (!result) return res.status(404).json({ error: "Player not found" });
+    res.json(result);
+  } catch (err) {
+    fail(res, "DELETE /api/admin/players", err);
+  }
+});
+
+// POST /api/admin/players/merge  { sourceId, targetId } — source is folded into target
+router.post("/players/merge", async (req, res) => {
+  const { sourceId, targetId } = req.body || {};
+  if (!sourceId || !targetId || sourceId === targetId) {
+    return res.status(400).json({ error: "Pick two different players" });
+  }
+  try {
+    const result = await playerAdminService.mergePlayers(sourceId, targetId);
+    if (!result) return res.status(404).json({ error: "Player not found" });
+    res.json(result);
+  } catch (err) {
+    fail(res, "POST /api/admin/players/merge", err);
   }
 });
 

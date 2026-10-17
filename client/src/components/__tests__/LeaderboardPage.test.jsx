@@ -44,7 +44,7 @@ describe("LeaderboardPage", () => {
 
   test("shows a loading state then renders rows", async () => {
     global.fetch = jest.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(2) }) })
+      Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(2) }) })
     );
 
     render(<LeaderboardPage onBack={jest.fn()} />);
@@ -76,7 +76,7 @@ describe("LeaderboardPage", () => {
 
   test("highlights the current user's row with a You badge and Share button", async () => {
     global.fetch = jest.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(3) }) })
+      Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(3) }) })
     );
 
     render(<LeaderboardPage onBack={jest.fn()} />);
@@ -100,10 +100,37 @@ describe("LeaderboardPage", () => {
     expect(screen.queryByText("Share")).not.toBeInTheDocument();
   });
 
+  test("players with the same name and avatar: only this browser's player is You", async () => {
+    const twins = boardOf(3).map((e) => ({ ...e, name: "Prajju", avatar: "😎" }));
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ json: () => Promise.resolve({ myUserId: 2, leaderboard: twins }) })
+    );
+    useUser.mockReturnValue({ user: { name: "Prajju", avatar: "😎" }, deviceId: "dev1" });
+
+    render(<LeaderboardPage onBack={jest.fn()} />);
+    await act(async () => {});
+
+    expect(screen.getAllByText("You")).toHaveLength(1);
+    expect(screen.getAllByText("Share")).toHaveLength(1);
+  });
+
+  test("without a device id it asks without the header and marks no one", async () => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(3) }) })
+    );
+    useUser.mockReturnValue({ user: me, deviceId: null });
+
+    render(<LeaderboardPage onBack={jest.fn()} />);
+    await act(async () => {});
+
+    expect(global.fetch).toHaveBeenCalledWith("/api/leaderboard?limit=50", undefined);
+    expect(screen.queryByText("You")).not.toBeInTheDocument();
+  });
+
   test("clicking Share fetches the player card and opens the modal with rank/totalPlayers", async () => {
     global.fetch = jest.fn((url) => {
       if (url.startsWith("/api/leaderboard")) {
-        return Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(5) }) });
+        return Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(5) }) });
       }
       return Promise.resolve({
         ok: true,
@@ -127,7 +154,7 @@ describe("LeaderboardPage", () => {
   test("omits totalPlayers when the fetched board is at the 50-row cap", async () => {
     global.fetch = jest.fn((url) => {
       if (url.startsWith("/api/leaderboard")) {
-        return Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(50) }) });
+        return Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(50) }) });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: "Alice" }) });
     });
@@ -143,7 +170,7 @@ describe("LeaderboardPage", () => {
 
   test("does not fetch the card when deviceId is missing", async () => {
     global.fetch = jest.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(2) }) })
+      Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(2) }) })
     );
     useUser.mockReturnValue({ user: me, deviceId: null });
 
@@ -159,7 +186,7 @@ describe("LeaderboardPage", () => {
   test("closing the share modal clears it", async () => {
     global.fetch = jest.fn((url) => {
       if (url.startsWith("/api/leaderboard")) {
-        return Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(2) }) });
+        return Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(2) }) });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: "Alice" }) });
     });
@@ -177,7 +204,7 @@ describe("LeaderboardPage", () => {
 
   test("paginates rows in pages of 10", async () => {
     global.fetch = jest.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(15) }) })
+      Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(15) }) })
     );
 
     render(<LeaderboardPage onBack={jest.fn()} />);
@@ -194,7 +221,7 @@ describe("LeaderboardPage", () => {
 
   test("calls onBack from the back button and the Play Now CTA", async () => {
     global.fetch = jest.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(1) }) })
+      Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(1) }) })
     );
     const onBack = jest.fn();
 
@@ -210,7 +237,7 @@ describe("LeaderboardPage", () => {
 
   test("Play Now starts playing when onPlay is given", async () => {
     global.fetch = jest.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({ leaderboard: boardOf(1) }) })
+      Promise.resolve({ json: () => Promise.resolve({ myUserId: 1, leaderboard: boardOf(1) }) })
     );
     const onBack = jest.fn();
     const onPlay = jest.fn();
@@ -238,13 +265,13 @@ describe("LeaderboardPage period tabs and your-rank bar", () => {
     render(<LeaderboardPage onBack={jest.fn()} />);
     await act(async () => {});
 
-    expect(global.fetch).toHaveBeenCalledWith("/api/leaderboard?limit=50");
+    expect(global.fetch).toHaveBeenCalledWith("/api/leaderboard?limit=50", { headers: { "X-Device-Id": "dev1" } });
     expect(screen.getByText("No games played this week yet. Be the first!")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "All time" }));
     await act(async () => {});
 
-    expect(global.fetch).toHaveBeenCalledWith("/api/leaderboard?limit=50&period=all");
+    expect(global.fetch).toHaveBeenCalledWith("/api/leaderboard?limit=50&period=all", { headers: { "X-Device-Id": "dev1" } });
     expect(screen.getByRole("tab", { name: "All time" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Jon")).toBeInTheDocument();
     expect(screen.getByText("Every game ever played")).toBeInTheDocument();
@@ -268,7 +295,7 @@ describe("LeaderboardPage period tabs and your-rank bar", () => {
     board[11] = { ...board[11], name: "Alice", avatar: "🐱" };
     global.fetch = jest.fn((url) => {
       if (url.startsWith("/api/leaderboard")) {
-        return Promise.resolve({ json: () => Promise.resolve({ leaderboard: board }) });
+        return Promise.resolve({ json: () => Promise.resolve({ myUserId: 12, leaderboard: board }) });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: "Alice" }) });
     });

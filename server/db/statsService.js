@@ -5,6 +5,7 @@
  */
 
 const { db } = require("./prismaClient");
+const { canonicalDeviceId } = require("./deviceAlias");
 
 /**
  * Write one session stat row for a user.
@@ -15,6 +16,7 @@ const { db } = require("./prismaClient");
  * }
  */
 async function writeSessionStat(deviceId, stats) {
+  deviceId = await canonicalDeviceId(deviceId); // merged devices play as their player
   // Resolve userId from deviceId
   const user = await db((p) => p.user.findUnique({
     where: { deviceId },
@@ -222,6 +224,7 @@ async function getAllTimeLeaderboard(limit = 10) {
  * Includes duelWins and soloWins for achievement checks.
  */
 async function getPlayerStats(deviceId) {
+  deviceId = await canonicalDeviceId(deviceId); // merged devices play as their player
   const user = await db((p) => p.user.findUnique({
     where: { deviceId },
     select: { id: true, consecutiveGameWins: true, bestStreak: true },

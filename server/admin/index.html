@@ -168,6 +168,10 @@
     text-align: center;
   }
   /* rank medal colours */
+  .badge.thisBrowser { background: rgba(52,211,153,0.15); color: var(--ok); }
+  tr.thisBrowser td { background: rgba(52,211,153,0.06); }
+  .mergeBar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; font-size: 0.85rem; }
+  .mergeBar select { max-width: 320px; }
   .rank-1 { color: #fbbf24; font-weight: 800; }
   .rank-2 { color: #94a3b8; font-weight: 700; }
   .rank-3 { color: #c97c3a; font-weight: 700; }
@@ -223,6 +227,28 @@
   <div class="section">
     <h2>Server Health &amp; Live Stats</h2>
     <div class="healthGrid" id="healthContainer"><div class="loading">Loading health…</div></div>
+  </div>
+
+  <!-- Players (clean-up) -->
+  <div class="section">
+    <h2>
+      Players
+      <span class="controls">
+        <input id="playerSearch" type="search" placeholder="Filter by name…" />
+        <span id="playersSummary" style="color:var(--text-dim)"></span>
+        <button id="playersRefreshBtn">↻ Refresh</button>
+      </span>
+    </h2>
+    <p style="color:var(--text-dim);font-size:0.8rem;margin:0 0 12px">
+      One player = one browser. The same person on a phone, a laptop or in incognito shows up more
+      than once — <strong>merge</strong> those into one; <strong>delete</strong> test players.
+      Both are permanent. The green row is the browser you're using now.
+    </p>
+    <div class="mergeBar">
+      Merge <select id="mergeSource"></select> into <select id="mergeTarget"></select>
+      <button id="mergeBtn">Merge</button>
+    </div>
+    <div id="playersContainer"><div class="loading">Loading players…</div></div>
   </div>
 
   <!-- Weekly Leaderboard -->
@@ -548,6 +574,123 @@
       makePagination("leaderboardPagination", lbPage, totalPages, (p) => { lbPage = p; renderLeaderboardPage(); });
     }
 
+    // ── Players (clean-up) ───────────────────────────────────────────────────
+    const API_PLAYERS = "/api/admin/players";
+    let allPlayers = [];
+    // The game stores this browser's player id here (same origin as /admin)
+    const thisDevice = (() => { try { return localStorage.getItem("80p-device-id"); } catch (_) { return null; } })();
+    const isThisBrowser = (pl) => !!thisDevice && (pl.devices || []).includes(thisDevice);
+
+    function playerLabel(pl) {
+      return (pl.avatar ? pl.avatar + " " : "") + pl.name +
+        " · " + pl.games + " game" + (pl.games === 1 ? "" : "s") +
+        " · since " + formatDate(pl.createdAt) +
+        (isThisBrowser(pl) ? " · this browser" : "");
+    }
+
+    function renderPlayers() {
+      const q = document.getElementById("playerSearch").value.trim().toLowerCase();
+      const shown = allPlayers.filter((pl) => !q || (pl.name || "").toLowerCase().includes(q));
+      document.getElementById("playersSummary").textContent =
+        shown.length === allPlayers.length ? allPlayers.length + " players" : shown.length + " of " + allPlayers.length;
+
+      const options = '<option value="">— pick —</option>' +
+        allPlayers.map((pl) => '<option value="' + escapeHtml(pl.id) + '">' + escapeHtml(playerLabel(pl)) + '</option>').join("");
+      ["mergeSource", "mergeTarget"].forEach((id) => {
+        const sel = document.getElementById(id);
+        const keep = sel.value;
+        sel.innerHTML = options;
+        if (allPlayers.some((pl) => pl.id === keep)) sel.value = keep;
+      });
+
+      const container = document.getElementById("playersContainer");
+      if (!shown.length) {
+        container.innerHTML = '<div class="empty">' + (allPlayers.length ? "No players match." : "No players yet.") + '</div>';
+        return;
+      }
+      const rows = shown.map((pl) => {
+        const here = isThisBrowser(pl);
+        return (
+          '<tr class="' + (here ? "thisBrowser" : "") + '">' +
+            '<td>' + escapeHtml((pl.avatar ? pl.avatar + " " : "") + pl.name) +
+              (here ? ' <span class="badge thisBrowser">this browser</span>' : "") + '</td>' +
+            '<td style="text-align:center">' + escapeHtml(pl.level) + '</td>' +
+            '<td style="text-align:center">' + escapeHtml(pl.games) + '</td>' +
+            '<td style="text-align:center">' + escapeHtml(pl.roundWins) + '</td>' +
+            '<td>' + (pl.lastPlayed ? escapeHtml(formatDate(pl.lastPlayed)) : '<span style="color:var(--text-dim)">never</span>') + '</td>' +
+            '<td>' + escapeHtml(formatDate(pl.createdAt)) + '</td>' +
+            '<td style="text-align:center">' + escapeHtml((pl.devices || []).length) + '</td>' +
+            '<td><button class="btn-danger" data-delete="' + escapeHtml(pl.id) + '">Delete</button></td>' +
+          '</tr>'
+        );
+      }).join("");
+      container.innerHTML =
+        '<table><thead><tr>' +
+          '<th>Player</th><th style="text-align:center">Level</th><th style="text-align:center">Games</th>' +
+          '<th style="text-align:center">Round wins</th><th>Last game</th><th>First seen</th>' +
+          '<th style="text-align:center">Devices</th><th></th>' +
+        '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    async function loadPlayers() {
+      try {
+        allPlayers = (await fetchJson(API_PLAYERS)).players || [];
+        renderPlayers();
+      } catch (err) {
+        document.getElementById("playersContainer").innerHTML =
+          '<div class="error">Failed to load players: ' + escapeHtml(err.message) + '</div>';
+      }
+    }
+
+    async function deletePlayer(id) {
+      try {
+        const pv = await fetchJson(API_PLAYERS + "/" + encodeURIComponent(id) + "/delete-preview");
+        const mine = isThisBrowser(allPlayers.find((pl) => pl.id === id) || {});
+        const msg = "Permanently delete " + pv.player.avatar + " " + pv.player.name + "?\n\n" +
+          "This removes " + pv.games + " game(s), " + pv.achievements + " achievement(s), " +
+          pv.feedback + " feedback message(s) and " + pv.devices + " device(s).\n\n" +
+          (mine ? "⚠️ This is the player of the browser you're using now.\n\n" : "") +
+          "This cannot be undone.";
+        if (!confirm(msg)) return;
+        await fetchJson(API_PLAYERS + "/" + encodeURIComponent(id), { method: "DELETE" });
+        await loadPlayers();
+      } catch (err) {
+        alert("Delete failed: " + err.message);
+      }
+    }
+
+    async function mergeSelected() {
+      const sourceId = document.getElementById("mergeSource").value;
+      const targetId = document.getElementById("mergeTarget").value;
+      if (!sourceId || !targetId) return alert("Pick both players.");
+      if (sourceId === targetId) return alert("Pick two different players.");
+      const src = allPlayers.find((pl) => pl.id === sourceId);
+      const dst = allPlayers.find((pl) => pl.id === targetId);
+      const msg = "Merge  " + playerLabel(src) + "\ninto     " + playerLabel(dst) + " ?\n\n" +
+        "• " + src.games + " game(s), achievements and XP move to the second player\n" +
+        "• it keeps its name and avatar; level is recalculated\n" +
+        "• the first player's " + src.devices.length + " device(s) will play as the second from now on\n" +
+        "• the first player is removed\n\nThis cannot be undone.";
+      if (!confirm(msg)) return;
+      try {
+        const r = await fetchJson(API_PLAYERS + "/merge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceId, targetId }),
+        });
+        alert("Merged: " + r.games + " game(s) and " + r.achievements + " new achievement(s) moved. XP now " + r.xp + ".");
+        document.getElementById("mergeSource").value = "";
+        await loadPlayers();
+      } catch (err) {
+        alert("Merge failed: " + err.message);
+      }
+    }
+
+    document.getElementById("playersContainer").addEventListener("click", (e) => {
+      const id = e.target.getAttribute && e.target.getAttribute("data-delete");
+      if (id) deletePlayer(id);
+    });
+
     // ── Feedback ─────────────────────────────────────────────────────────────
     function statusOptions(current) {
       return ["open", "in_review", "resolved"].map((s) =>
@@ -675,6 +818,13 @@
     // Room filters re-render immediately without re-fetching
     document.getElementById("roomTypeFilter").addEventListener("change", () => { roomsPage = 1; renderRoomsPage(); });
     document.getElementById("roomStatusFilter").addEventListener("change", () => { roomsPage = 1; renderRoomsPage(); });
+
+    // Players load on open and after each action — not on the 30s refresh,
+    // which would reset a merge selection half-way.
+    document.getElementById("playersRefreshBtn").addEventListener("click", loadPlayers);
+    document.getElementById("playerSearch").addEventListener("input", renderPlayers);
+    document.getElementById("mergeBtn").addEventListener("click", mergeSelected);
+    loadPlayers();
 
     loadAll();
     setInterval(loadAll, 30000);
