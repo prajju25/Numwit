@@ -304,6 +304,22 @@ describe("server.js", () => {
       expect(res.headers["x-content-type-options"]).toBe("nosniff");
       expect(res.headers["x-dns-prefetch-control"]).toBeDefined();
     });
+
+    test("public images can be shown by other sites (link previews); everything else stays same-origin", async () => {
+      for (const p of ["/og-image.jpg", "/icons/icon-192.png", "/screenshots/game.JPG", "/favicon.ico"]) {
+        const res = await supertest(app).get(p);
+        expect(res.headers["cross-origin-resource-policy"]).toBe("cross-origin");
+      }
+      const head = await supertest(app).head("/og-image.jpg");
+      expect(head.headers["cross-origin-resource-policy"]).toBe("cross-origin");
+
+      for (const p of ["/api/health", "/", "/main.js", "/admin/logo.png"]) {
+        const res = await supertest(app).get(p);
+        expect(res.headers["cross-origin-resource-policy"]).toBe("same-origin");
+      }
+      const post = await supertest(app).post("/og-image.jpg");
+      expect(post.headers["cross-origin-resource-policy"]).toBe("same-origin");
+    });
   });
 
   describe("SPA fallback", () => {

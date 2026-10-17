@@ -32,6 +32,19 @@ const server = http.createServer(app);
 // revisit once the production origin is finalized.
 app.use(helmet({ contentSecurityPolicy: false }));
 
+// Public images (link-preview image, icons, install screenshots) must be
+// loadable by other sites: Reddit's post editor, Discord, Slack etc. show
+// og-image.jpg straight from here, and helmet's default
+// Cross-Origin-Resource-Policy: same-origin makes browsers refuse that.
+// Everything else (pages, API, admin) keeps same-origin.
+const PUBLIC_IMAGE = /\.(?:png|jpe?g|webp|gif|svg|ico)$/i;
+app.use((req, res, next) => {
+  if ((req.method === "GET" || req.method === "HEAD") && PUBLIC_IMAGE.test(req.path) && !req.path.startsWith("/admin")) {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  }
+  next();
+});
+
 // gzip responses (mainly the ~535 KB client bundle) — cuts egress, which is
 // billed per GB on the host. Socket.IO traffic is unaffected.
 app.use(compression());
