@@ -99,13 +99,24 @@ router.delete("/rooms/:id", async (req, res) => {
   }
 });
 
-// -- GET /api/admin/leaderboard -------------------------------------------------------
-// Weekly leaderboard with configurable limit (default 50, max 100) for the admin UI.
+// -- GET /api/admin/leaderboard?period=week|all&page=1&pageSize=10 ---------------------
+// One page of the leaderboard plus the total, so the admin can page through
+// every player without loading them all. Rank = position in the full list.
 router.get("/leaderboard", async (req, res) => {
   try {
-    const limit = Math.min(Number(req.query.limit) || 50, 100);
-    const board = await statsService.getWeeklyLeaderboard(limit);
-    res.json({ leaderboard: board || [] });
+    const period   = req.query.period === "all" ? "all" : "week";
+    const pageSize = Math.min(Math.max(1, Number(req.query.pageSize) || 10), 100);
+    const total    = await statsService.countLeaderboardPlayers(period);
+    const pages    = Math.max(1, Math.ceil(total / pageSize));
+    const page     = Math.min(Math.max(1, Number(req.query.page) || 1), pages);
+    const offset   = (page - 1) * pageSize;
+    const board    = period === "all"
+      ? await statsService.getAllTimeLeaderboard(pageSize, offset)
+      : await statsService.getWeeklyLeaderboard(pageSize, offset);
+    res.json({
+      leaderboard: (board || []).map((e, i) => ({ ...e, rank: offset + i + 1 })),
+      period, page, pageSize, total, pages,
+    });
   } catch (err) {
     console.error("GET /api/admin/leaderboard error:", err.message);
     res.status(500).json({ error: "leaderboard unavailable", leaderboard: [] });
@@ -139,10 +150,11 @@ const fail = (res, where, err) => {
   res.status(500).json({ error: err.message });
 };
 
-// GET /api/admin/players — every player, newest first
+// GET /api/admin/players?q=&page=1 — one page of players, newest first
 router.get("/players", async (req, res) => {
   try {
-    res.json({ players: (await playerAdminService.listPlayers()) || [] });
+    const result = await playerAdminService.listPlayers({ q: req.query.q, page: req.query.page });
+    res.json(result || { players: [], total: 0, page: 1, pages: 1 });
   } catch (err) {
     fail(res, "GET /api/admin/players", err);
   }

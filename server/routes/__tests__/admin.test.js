@@ -17,6 +17,11 @@ jest.mock("../../db/userService", () => ({
 jest.mock("../../db/metricsService", () => ({
   getGrowthMetrics: jest.fn(),
 }));
+jest.mock("../../db/statsService", () => ({
+  getWeeklyLeaderboard: jest.fn(),
+  getAllTimeLeaderboard: jest.fn(),
+  countLeaderboardPlayers: jest.fn(),
+}));
 jest.mock("../../db/playerAdminService", () => ({
   listPlayers: jest.fn(),
   deletePreview: jest.fn(),
@@ -29,6 +34,7 @@ const feedbackService = require("../../db/feedbackService");
 const userService = require("../../db/userService");
 const metricsService = require("../../db/metricsService");
 const playerAdminService = require("../../db/playerAdminService");
+const statsService = require("../../db/statsService");
 const adminRoutes = require("../admin");
 
 function makeApp() {
@@ -214,13 +220,15 @@ describe("admin routes", () => {
     beforeEach(() => jest.spyOn(console, "error").mockImplementation(() => {}));
     afterEach(() => console.error.mockRestore());
 
-    test("GET /players lists players (empty when there are none)", async () => {
-      playerAdminService.listPlayers.mockResolvedValueOnce([{ id: "u1", name: "Prajju" }]);
-      const res = await supertest(makeApp()).get("/api/admin/players");
-      expect(res.body).toEqual({ players: [{ id: "u1", name: "Prajju" }] });
+    test("GET /players passes search and page through", async () => {
+      const page = { players: [{ id: "u1", name: "Prajju" }], total: 1, page: 1, pages: 1 };
+      playerAdminService.listPlayers.mockResolvedValueOnce(page);
+      const res = await supertest(makeApp()).get("/api/admin/players?q=praj&page=2");
+      expect(playerAdminService.listPlayers).toHaveBeenCalledWith({ q: "praj", page: "2" });
+      expect(res.body).toEqual(page);
 
       playerAdminService.listPlayers.mockResolvedValueOnce(null);
-      expect((await supertest(makeApp()).get("/api/admin/players")).body).toEqual({ players: [] });
+      expect((await supertest(makeApp()).get("/api/admin/players")).body).toEqual({ players: [], total: 0, page: 1, pages: 1 });
     });
 
     test("errors are shown, not hidden", async () => {
@@ -269,6 +277,46 @@ describe("admin routes", () => {
 
       playerAdminService.mergePlayers.mockRejectedValueOnce(new Error("boom"));
       expect((await supertest(makeApp()).post("/api/admin/players/merge").send({ sourceId: "a", targetId: "b" })).status).toBe(500);
+    });
+  });
+
+  describe("GET /leaderboard (paged)", () => {
+    const rows = (n) => Array.from({ length: n }, (_, i) => ({ id: "u" + i, name: "P" + i }));
+
+    test("page 2 of the weekly board, ranked from 11", async () => {
+      statsService.countLeaderboardPlayers.mockResolvedValueOnce(23);
+      statsService.getWeeklyLeaderboard.mockResolvedValueOnce(rows(10));
+      const res = await supertest(makeApp()).get("/api/admin/leaderboard?page=2");
+
+      expect(statsService.countLeaderboardPlayers).toHaveBeenCalledWith("week");
+      expect(statsService.getWeeklyLeaderboard).toHaveBeenCalledWith(10, 10);
+      expect(res.body).toMatchObject({ period: "week", page: 2, pageSize: 10, total: 23, pages: 3 });
+      expect(res.body.leaderboard[0]).toEqual({ id: "u0", name: "P0", rank: 11 });
+    });
+
+    test("all time, with a page past the end clamped to the last page", async () => {
+      statsService.countLeaderboardPlayers.mockResolvedValueOnce(23);
+      statsService.getAllTimeLeaderboard.mockResolvedValueOnce(rows(3));
+      const res = await supertest(makeApp()).get("/api/admin/leaderboard?period=all&page=99");
+
+      expect(statsService.getAllTimeLeaderboard).toHaveBeenCalledWith(10, 20);
+      expect(res.body).toMatchObject({ period: "all", page: 3, pages: 3 });
+      expect(res.body.leaderboard.map((e) => e.rank)).toEqual([21, 22, 23]);
+    });
+
+    test("no players yet → one empty page; bad input falls back to defaults", async () => {
+      statsService.countLeaderboardPlayers.mockResolvedValueOnce(0);
+      statsService.getWeeklyLeaderboard.mockResolvedValueOnce(null);
+      const res = await supertest(makeApp()).get("/api/admin/leaderboard?page=abc&pageSize=0&period=nope");
+      expect(res.body).toEqual({ leaderboard: [], period: "week", page: 1, pageSize: 10, total: 0, pages: 1 });
+    });
+
+    test("500 when the database query fails", async () => {
+      jest.spyOn(console, "error").mockImplementation(() => {});
+      statsService.countLeaderboardPlayers.mockRejectedValueOnce(new Error("db down"));
+      const res = await supertest(makeApp()).get("/api/admin/leaderboard");
+      expect(res.status).toBe(500);
+      console.error.mockRestore();
     });
   });
 });

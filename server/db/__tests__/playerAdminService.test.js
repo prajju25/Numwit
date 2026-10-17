@@ -28,6 +28,10 @@ function fakeDb() {
     deviceAliases: aliasesOf(u.id),
     ...(include?.userAchievements ? { userAchievements: state.achievements.filter((a) => a.userId === u.id) } : {}),
   };
+  // newest first, optional case-insensitive name filter
+  const matching = (where) => Object.values(state.users)
+    .filter((u) => !where?.name || u.name.toLowerCase().includes(where.name.contains.toLowerCase()))
+    .sort((a, b) => b.createdAt - a.createdAt);
   const removeUser = (id) => {
     delete state.users[id];
     state.stats = state.stats.filter((s) => s.userId !== id);
@@ -37,7 +41,8 @@ function fakeDb() {
 
   const p = {
     user: {
-      findMany: jest.fn(async () => Object.values(state.users).map((u) => withRelations(u))),
+      count: jest.fn(async ({ where }) => matching(where).length),
+      findMany: jest.fn(async ({ where, skip, take }) => matching(where).slice(skip, skip + take).map((u) => withRelations(u))),
       findUnique: jest.fn(async ({ where, include }) => withRelations(state.users[where.id], include) || null),
       update: jest.fn(async ({ where, data }) => Object.assign(state.users[where.id], data)),
       delete: jest.fn(async ({ where }) => removeUser(where.id)),
@@ -83,11 +88,35 @@ describe("playerAdminService", () => {
 
   test("listPlayers shows each player's devices, games and last game", async () => {
     fakeDb();
-    const players = await listPlayers();
+    const { players, total, page, pages } = await listPlayers();
+    expect({ total, page, pages }).toEqual({ total: 2, page: 1, pages: 1 });
+    expect(players.map((x) => x.id)).toEqual(["phone", "laptop"]); // newest first
     const laptop = players.find((x) => x.id === "laptop");
     const phone = players.find((x) => x.id === "phone");
     expect(laptop).toMatchObject({ devices: ["dev-laptop"], games: 1, roundWins: 4, lastPlayed: new Date("2026-10-16") });
     expect(phone).toMatchObject({ devices: ["dev-phone", "dev-old-phone"], games: 0, roundWins: 0, lastPlayed: null });
+  });
+
+  test("listPlayers pages and searches on the server", async () => {
+    const { state, p } = fakeDb();
+    for (let i = 0; i < 25; i++) {
+      state.users["t" + i] = { id: "t" + i, deviceId: "dev-t" + i, name: "Tester" + i, avatar: "🐸", xp: 0, level: 1, createdAt: new Date(2026, 9, 10, 0, i) };
+    }
+    const page2 = await listPlayers({ page: 2 });
+    expect(page2).toMatchObject({ total: 27, page: 2, pageSize: 20, pages: 2 });
+    expect(page2.players).toHaveLength(7);
+    expect(p.user.findMany.mock.calls[0][0]).toMatchObject({ skip: 20, take: 20 });
+
+    const prajju = await listPlayers({ q: " prajju " });
+    expect(prajju.total).toBe(2);
+    expect(p.user.count.mock.calls[1][0]).toEqual({ where: { name: { contains: "prajju", mode: "insensitive" } } });
+
+    // past the end → last page; nothing found → no stats query
+    expect((await listPlayers({ page: 99 })).page).toBe(2);
+    p.sessionStat.groupBy.mockClear();
+    const none = await listPlayers({ q: "nobody" });
+    expect(none).toMatchObject({ total: 0, page: 1, pages: 1, players: [] });
+    expect(p.sessionStat.groupBy).not.toHaveBeenCalled();
   });
 
   test("deletePreview counts what would go, across all of the player's devices", async () => {
