@@ -7,7 +7,7 @@ const {
   saveRoom,
 } = require("../utils/roomManager");
 const constants = require("../constants/constants");
-const { MIN_PLAYERS, BOT_FILL_DELAY_MS } = constants;
+const { MIN_PLAYERS, MAX_PLAYERS, BOT_FILL_DELAY_MS } = constants;
 const { clear: clearRateLimit } = require("../utils/rateLimiter");
 const { upsertUser } = require("../db/userService");
 const timerService = require("../services/timerService");
@@ -208,6 +208,14 @@ module.exports = function handleLobbyEvents(io, socket) {
 
       io.to(roomNo).emit("room_update", room);
 
+      // A public room that just filled up has nobody left to wait for:
+      // start now instead of at the end of the countdown.
+      if (roomType === "public" && !room.game && room.users.length >= MAX_PLAYERS) {
+        botService.clearFillTimer(roomNo);
+        await fillRoomWithBotsAndStart(io, roomNo);
+        return;
+      }
+
       // If a game is already in progress, send a snapshot so the player lands
       // directly on the GameBoard (a new joiner was queued for the next round
       // above; a reconnecting player is back in the current one).
@@ -393,25 +401,21 @@ async function cleanupIfBotsOnly(io, room) {
 }
 
 // ── fillRoomWithBotsAndStart ──────────────────────────────────────────────────
-// Fired BOT_FILL_DELAY_MS after a brand-new public room was created. Re-reads
-// the room — if real players already brought it up to MIN_PLAYERS (or the
-// room/game state changed in the meantime), this is a no-op.
+// Fired BOT_FILL_DELAY_MS after a brand-new public room was created (or as
+// soon as it fills up). Re-reads the room — a no-op if it was deleted or a
+// game already started in the meantime; otherwise the game starts now.
 async function fillRoomWithBotsAndStart(io, roomId) {
   const room = await getRoomById(roomId);
   if (!room) return; // room was deleted in the meantime
   if (room.game) return; // already started by someone else
 
-  if (room.users.length >= MIN_PLAYERS) {
-    // Enough real players joined in time — just clear the pending-fill flag.
-    if (room.botFillAt) {
-      room.botFillAt = null;
-      await saveRoom(room);
-      io.to(roomId).emit("room_update", room);
-    }
-    return;
-  }
-
-  const addedBots = botService.fillRoomWithBots(room, MIN_PLAYERS);
+  // The countdown is over, so the game starts either way: padded with bots if
+  // too few people came, otherwise with whoever is here. (Waiting for a host
+  // to press Start doesn't work in matchmaking — strangers don't know it's
+  // up to them, and the room would sit idle until it's deleted.)
+  const addedBots = room.users.length < MIN_PLAYERS
+    ? botService.fillRoomWithBots(room, MIN_PLAYERS)
+    : [];
   room.botFillAt = null;
   await saveRoom(room);
 

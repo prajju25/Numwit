@@ -23,6 +23,7 @@ jest.mock("../../services/botService", () => ({
   hasOnlyBots: jest.fn(),
   removeRoom: jest.fn(),
   clearSubmissionTimers: jest.fn(),
+  clearFillTimer: jest.fn(),
 }));
 jest.mock("../game", () => ({
   startGameForRoom: jest.fn(() => Promise.resolve()),
@@ -556,7 +557,7 @@ describe("lobby socket handler", () => {
       expect(gameHandlers.startGameForRoom).not.toHaveBeenCalled();
     });
 
-    test("clears botFillAt when enough real players already joined", async () => {
+    test("starts the game with no bots when enough real players joined", async () => {
       roomManager.getPublicRooms.mockResolvedValue(null);
       roomManager.addUserToRoom.mockResolvedValue({ id: "roomBF3", users: [{ socketId: "s1" }], game: null });
       const fullRoom = {
@@ -581,6 +582,40 @@ describe("lobby socket handler", () => {
       expect(fullRoom.botFillAt).toBeNull();
       expect(roomManager.saveRoom).toHaveBeenCalledWith(fullRoom);
       expect(io._emit).toHaveBeenCalledWith("room_update", fullRoom);
+      expect(botService.fillRoomWithBots).not.toHaveBeenCalled();
+      expect(io._emit).not.toHaveBeenCalledWith("bots_added", expect.anything());
+      expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, "roomBF3", {});
+    });
+
+    test("a public room that fills up starts at once, without waiting for the countdown", async () => {
+      const users = Array.from({ length: 8 }, (_, i) => ({ socketId: "p" + i }));
+      const room = { id: "roomFull", users, game: null, botFillAt: 99999 };
+      roomManager.getPublicRooms.mockResolvedValue({ id: "roomFull" });
+      roomManager.addUserToRoom.mockResolvedValue(room);
+      roomManager.getRoomById.mockResolvedValue(room);
+
+      const io = makeIo();
+      const socket = makeSocket("p7");
+      handleLobbyEvents(io, socket);
+      await getHandler(socket, "join_room")({ roomId: null, user: { name: "H" }, roomType: "public" });
+      await flush();
+
+      expect(botService.clearFillTimer).toHaveBeenCalledWith("roomFull");
+      expect(room.botFillAt).toBeNull();
+      expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, "roomFull", {});
+    });
+
+    test("a public room below full keeps counting down", async () => {
+      const room = { id: "roomHalf", users: [{ socketId: "p0" }, { socketId: "p1" }, { socketId: "p2" }], game: null, botFillAt: 99999 };
+      roomManager.getPublicRooms.mockResolvedValue({ id: "roomHalf" });
+      roomManager.addUserToRoom.mockResolvedValue(room);
+
+      const io = makeIo();
+      const socket = makeSocket("p2");
+      handleLobbyEvents(io, socket);
+      await getHandler(socket, "join_room")({ roomId: null, user: { name: "H" }, roomType: "public" });
+
+      expect(botService.clearFillTimer).not.toHaveBeenCalled();
       expect(gameHandlers.startGameForRoom).not.toHaveBeenCalled();
     });
 
