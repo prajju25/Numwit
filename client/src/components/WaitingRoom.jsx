@@ -161,11 +161,14 @@ export default function WaitingRoom() {
           </>
         )}
 
-        {/* Public room: server will auto-fill with bots if no one else joins */}
-        {roomType === "public" && !canStart && fillCountdown !== null && (
+        {/* Public room: the server starts the game when the countdown ends —
+            topped up with bots if too few people came */}
+        {roomType === "public" && fillCountdown !== null && (
           <div className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm text-cyan-200 border border-cyan-400/25 bg-cyan-400/10">
             <span className="nw-typing shrink-0" aria-hidden="true"><span /><span /><span /></span>
-            Looking for players… adding bots in <span className="nums font-bold">{fillCountdown}s</span>
+            {canStart
+              ? <>Game starts in <span className="nums font-bold">{fillCountdown}s</span></>
+              : <>Looking for players… adding bots in <span className="nums font-bold">{fillCountdown}s</span></>}
           </div>
         )}
       </section>

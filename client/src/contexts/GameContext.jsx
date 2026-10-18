@@ -42,10 +42,12 @@ export const GameProvider = ({ children }) => {
       if (room.hostSocketId) setHostSocketId(room.hostSocketId);
       setBotFillAt(room.botFillAt || null);
 
-      if (room.users.length >= MIN_PLAYERS && (roomType === "public" || roomType === "solo")) {
-        // Public auto-fill and solo "Play vs Computer" both pad the room with
-        // bots and call startGameForRoom immediately server-side — skip the
-        // waiting room and go straight to GameBoard; next_round follows shortly.
+      if (room.users.length >= MIN_PLAYERS && roomType === "solo") {
+        // "Play vs Computer" pads the room with bots and starts at once
+        // server-side — skip the waiting room; next_round follows shortly.
+        // Public rooms stay in the waiting room (with its countdown) until
+        // the server actually starts the game (game_started): having enough
+        // players doesn't mean a game is running yet.
         setIsInGame(true);
         setIsWaitingRoom(false);
       } else {

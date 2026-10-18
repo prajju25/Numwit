@@ -72,7 +72,7 @@ describe("GameContext", () => {
     expect(userCtx.setIsInGame).not.toHaveBeenCalledWith(true);
   });
 
-  test("room_update with >= MIN_PLAYERS and roomType=public goes straight to game", () => {
+  test("room_update with >= MIN_PLAYERS and roomType=public stays in the waiting room until game_started", () => {
     const userCtx = {
       setIsInGame: jest.fn(),
       setIsWaitingRoom: jest.fn(),
@@ -95,9 +95,15 @@ describe("GameContext", () => {
       __mockSocket.__trigger("room_update", room);
     });
 
+    expect(userCtx.setIsInGame).not.toHaveBeenCalledWith(true);
+    expect(userCtx.setIsWaitingRoom).toHaveBeenCalledWith(true);
+    expect(result.current.botFillAt).toBe(123456);
+
+    act(() => {
+      __mockSocket.__trigger("game_started");
+    });
     expect(userCtx.setIsInGame).toHaveBeenCalledWith(true);
     expect(userCtx.setIsWaitingRoom).toHaveBeenCalledWith(false);
-    expect(result.current.botFillAt).toBe(123456);
   });
 
   test("room_update with >= MIN_PLAYERS and roomType=solo goes straight to game", () => {

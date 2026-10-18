@@ -113,6 +113,14 @@ describe("WaitingRoom", () => {
     expect(screen.getByText(/Looking for players… adding bots in/)).toBeInTheDocument();
   });
 
+  test("public rooms with enough people count down to the game starting", () => {
+    setup({ roomType: "public", players: makePlayers(3), botFillAt: Date.now() + 5000 });
+    render(<WaitingRoom />);
+
+    expect(screen.getByText(/Game starts in/)).toBeInTheDocument();
+    expect(screen.queryByText(/adding bots/)).not.toBeInTheDocument();
+  });
+
   test("public rooms without a pending bot fill show no countdown", () => {
     setup({ roomType: "public", players: makePlayers(2), botFillAt: null });
     render(<WaitingRoom />);
