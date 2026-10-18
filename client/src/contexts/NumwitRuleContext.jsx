@@ -29,18 +29,34 @@ export const NumwitRuleProvider = ({ children }) => {
   const [xpData,            setXpData]            = useState(null);
   const [newAchievements,   setNewAchievements]   = useState([]);
 
-  // If this provider mounted because the user rejoined mid-game, GameContext
-  // will have stored a snapshot in spectatorSnapshot before the mount happened.
-  // Read it once on mount so the board renders with the current game state.
+  // A snapshot of the running game arrives when the user joins mid-game —
+  // either before this provider mounts (joining from the home screen) or while
+  // it is already showing the board (the connection dropped and came back:
+  // the player has a new socket id, so the old turn order no longer lists
+  // them). Apply it whenever it arrives.
   useEffect(() => {
     if (!spectatorSnapshot) return;
     setGameData(spectatorSnapshot);
     if (spectatorSnapshot.eliminatedPlayers) setEliminatedPlayers(spectatorSnapshot.eliminatedPlayers);
     if (spectatorSnapshot.hostSocketId)      setHostSocketId(spectatorSnapshot.hostSocketId);
+    if (spectatorSnapshot.resumed) {
+      // Back in the same game: show this round as the server has it — our
+      // own pick if it got through (if not, we can pick again), and who else
+      // has picked.
+      const mine = spectatorSnapshot.myNumber;
+      const hasPick = mine !== null && mine !== undefined;
+      setSubmitted(hasPick);
+      setSelectedNumber(hasPick ? mine : null);
+      const ids = spectatorSnapshot.submittedIds || [];
+      const eliminated = spectatorSnapshot.eliminatedPlayers || [];
+      const total = (spectatorSnapshot.turnOrder || []).filter((id) => !eliminated.includes(id)).length;
+      setWaitingCount(ids.length ? { submitted: ids.length, total, submittedIds: ids } : null);
+    }
+    if (spectatorSnapshot.timerDuration > 0) setTimerExpired(false);
     setTimerKey((k) => k + 1);
     clearSpectatorSnapshot();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [spectatorSnapshot]);
 
   useEffect(() => {
     const onNextRound = (data) => {

@@ -17,6 +17,7 @@ const gameHandlers = require("./game");
 const startGameForRoom = gameHandlers.startGameForRoom;
 const normalizeDifficulty = require("../services/botBrain").normalizeDifficulty;
 const withRoomLock = require("../utils/roomLock").withRoomLock;
+const replaceSocketId = require("../utils/gameManager").replaceSocketId;
 
 // ── Reconnection grace-period state ───────────────────────────────────────────
 // When a user disconnects (e.g. mobile switching apps) we wait 60 s before
@@ -114,18 +115,58 @@ module.exports = function handleLobbyEvents(io, socket) {
       // (e.g. a page refresh, which gets a brand-new socket.id) instead of
       // leaving a duplicate row behind.
       if (deviceId) user.deviceId = deviceId;
-      const room = await addUserToRoom(roomNo, user, roomType, !roomId);
+
+      // Locked like game updates: joining saves the room, and a reconnecting
+      // player's game state is moved to their new socket.id in the same step.
+      const joined = await withRoomLock(roomNo, async function() {
+        // Coming back to a room this device is already in (a dropped
+        // connection, or a second tab): note its previous socket.id so the
+        // game can continue as the same player. Only when the client asked
+        // for this room — matchmaking never resumes an old seat.
+        let previousSocketId = null;
+        if (roomId && deviceId) {
+          const before = await getRoomById(roomNo);
+          const prev = before && before.users.find(function(u) {
+            return u.deviceId === deviceId && u.socketId !== socket.id;
+          });
+          if (prev) previousSocketId = prev.socketId;
+        }
+
+        const room = await addUserToRoom(roomNo, user, roomType, !roomId);
+        let changed = false;
+
+        // Clear any stale disconnected flag left by a previous grace period
+        const rejoiningUser = room.users.find(function(u) { return u.socketId === socket.id; });
+        if (rejoiningUser?.disconnected) {
+          rejoiningUser.disconnected = false;
+          changed = true;
+        }
+
+        // A game is running: the same player carries on (same points, back
+        // into the current round); anyone new waits for the next round.
+        let resumed = false;
+        if (room.game) {
+          resumed = replaceSocketId(room.game, previousSocketId, socket.id);
+          if (resumed) {
+            console.log(`Reconnect: ${previousSocketId} → ${socket.id} resumes in room ${roomNo}`);
+          } else {
+            room.game.pendingJoiners = room.game.pendingJoiners || [];
+            // Avoid duplicates (e.g. rapid reconnect)
+            if (room.game.pendingJoiners.indexOf(socket.id) === -1) {
+              room.game.pendingJoiners.push(socket.id);
+            }
+          }
+          changed = true;
+        }
+
+        if (changed) await saveRoom(room);
+        return { room: room, resumed: resumed };
+      }, "join");
+      const room = joined.room;
 
       // Track socket → device/room for grace-period reconnection
       if (deviceId) socketToDevice[socket.id] = deviceId;
       socketToRoom[socket.id] = roomNo;
-
-      // Clear any stale disconnected flag left by a previous grace period
-      const rejoiningUser = room.users.find(function(u) { return u.socketId === socket.id; });
-      if (rejoiningUser?.disconnected) {
-        rejoiningUser.disconnected = false;
-        await saveRoom(room);
-      }
 
       // Schedule idle-delete for new public/private waiting rooms.
       // Solo rooms start immediately so no idle timer is needed for them.
@@ -167,25 +208,25 @@ module.exports = function handleLobbyEvents(io, socket) {
 
       io.to(roomNo).emit("room_update", room);
 
-      // If a game is already in progress, queue this player for the next round
-      // and send them a snapshot so they land directly on the GameBoard.
+      // If a game is already in progress, send a snapshot so the player lands
+      // directly on the GameBoard (a new joiner was queued for the next round
+      // above; a reconnecting player is back in the current one).
       if (room.game) {
-        room.game.pendingJoiners = room.game.pendingJoiners || [];
-        // Avoid duplicates (e.g. rapid reconnect)
-        if (room.game.pendingJoiners.indexOf(socket.id) === -1) {
-          room.game.pendingJoiners.push(socket.id);
-        }
-        await saveRoom(room);
-
+        const game = room.game;
         const timeLeft = timerService.getTimeLeft(roomNo);
         socket.emit("game_in_progress", {
-          round:             room.game.round,
-          points:            room.game.points,
-          turnOrder:         room.game.turnOrder,
-          eliminatedPlayers: room.game.eliminatedPlayers,
+          round:             game.round,
+          points:            game.points,
+          turnOrder:         game.turnOrder,
+          eliminatedPlayers: game.eliminatedPlayers,
           hostSocketId:      room.hostSocketId,
           timerDuration:     timeLeft !== null ? timeLeft : 0,
-          gameSettings:      room.game.settings,
+          gameSettings:      game.settings,
+          // So a reconnecting player's board shows what's already been picked
+          // this round — including their own pick, if it got through.
+          resumed:           joined.resumed,
+          myNumber:          (game.numbers || {})[socket.id] !== undefined ? game.numbers[socket.id] : null,
+          submittedIds:      Object.keys(game.numbers || {}),
         });
       }
     } catch (err) {
