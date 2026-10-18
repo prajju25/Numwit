@@ -230,8 +230,46 @@ function evaluateRound(game, activePlayers) {
   };
 }
 
+// ── replaceSocketId ────────────────────────────────────────────────────────────
+// A reconnecting player gets a new socket.id. Game state is keyed by socket.id,
+// so move everything from the old id to the new one — otherwise the player is
+// treated as a mid-game joiner: they sit out the round and restart at 0 points.
+// Returns true if the old id was in the game (and was replaced).
+const ID_LISTS = ["turnOrder", "eliminatedPlayers", "winnerIds", "pendingJoiners"];
+const ID_MAPS = [
+  "numbers", "points", "winHistory", "exactMatchHistory",
+  "consecWinHistory", "maxConsecWinHistory", "wasLastPlaceSet",
+];
+
+function renameKey(obj, oldId, newId) {
+  if (!obj || !Object.prototype.hasOwnProperty.call(obj, oldId)) return;
+  obj[newId] = obj[oldId];
+  delete obj[oldId];
+}
+
+function replaceSocketId(game, oldId, newId) {
+  if (!game || !oldId || !newId || oldId === newId) return false;
+  const inGame = (game.turnOrder || []).indexOf(oldId) !== -1
+    || (game.pendingJoiners || []).indexOf(oldId) !== -1;
+  if (!inGame) return false;
+
+  ID_LISTS.forEach(function(key) {
+    if (!Array.isArray(game[key])) return;
+    // Drop the new id first (e.g. already queued as a pending joiner), so it
+    // isn't listed twice once the old id is renamed.
+    game[key] = game[key]
+      .filter(function(id) { return id !== newId; })
+      .map(function(id) { return id === oldId ? newId : id; });
+  });
+  ID_MAPS.forEach(function(key) { renameKey(game[key], oldId, newId); });
+  if (game.winnerSocketId === oldId) game.winnerSocketId = newId;
+  (game.pickHistory || []).forEach(function(entry) { renameKey(entry.picks, oldId, newId); });
+  return true;
+}
+
 module.exports = {
   createGameData: createGameData,
   evaluateRound: evaluateRound,
   sanitizeSettings: sanitizeSettings,
+  replaceSocketId: replaceSocketId,
 };

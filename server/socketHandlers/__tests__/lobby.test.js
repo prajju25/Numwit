@@ -706,4 +706,81 @@ describe("lobby socket handler", () => {
       expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, newRoom, { botDifficulty: "adaptive" });
     });
   });
+  describe("reconnecting mid-game continues as the same player", () => {
+    // A room in Redis (shared object), with addUserToRoom replacing the
+    // device's old entry like the real one does.
+    function gameRoom(id) {
+      const room = {
+        id,
+        hostSocketId: "old-me",
+        users: [
+          { socketId: "old-me", deviceId: "dev-me", name: "Me" },
+          { socketId: "bot-1", isBot: true, name: "Bot" },
+        ],
+        game: {
+          round: 3,
+          turnOrder: ["old-me", "bot-1"],
+          points: { "old-me": 2, "bot-1": 1 },
+          numbers: { "bot-1": 40 },
+          eliminatedPlayers: [],
+          winHistory: { "old-me": 1 },
+          settings: { timerDuration: 30 },
+          pendingJoiners: [],
+        },
+      };
+      roomManager.getRoomById.mockImplementation(async () => room);
+      roomManager.addUserToRoom.mockImplementation(async (_id, user) => {
+        room.users = room.users.filter((u) => u.deviceId !== user.deviceId);
+        room.users.push(user);
+        return room;
+      });
+      return room;
+    }
+
+    test("the new connection takes over the old seat: same points, back in this round", async () => {
+      const room = gameRoom("roomRe1");
+      timerService.getTimeLeft.mockReturnValue(12);
+      const socket = makeSocket("new-me");
+      handleLobbyEvents(makeIo(), socket);
+
+      await getHandler(socket, "join_room")({ roomId: "roomRe1", user: { name: "Me" }, roomType: "private", deviceId: "dev-me" });
+
+      expect(room.game.turnOrder).toEqual(["new-me", "bot-1"]);
+      expect(room.game.points).toEqual({ "new-me": 2, "bot-1": 1 });
+      expect(room.game.winHistory).toEqual({ "new-me": 1 });
+      expect(room.game.pendingJoiners).toEqual([]);
+      expect(roomManager.saveRoom).toHaveBeenCalledWith(room);
+      expect(socket.emit).toHaveBeenCalledWith("game_in_progress", expect.objectContaining({
+        resumed: true,
+        turnOrder: ["new-me", "bot-1"],
+        timerDuration: 12,
+        myNumber: null,
+        submittedIds: ["bot-1"],
+      }));
+    });
+
+    test("a pick made before the drop still counts, and the board is told about it", async () => {
+      const room = gameRoom("roomRe2");
+      room.game.numbers["old-me"] = 55;
+      const socket = makeSocket("new-me");
+      handleLobbyEvents(makeIo(), socket);
+
+      await getHandler(socket, "join_room")({ roomId: "roomRe2", user: { name: "Me" }, roomType: "private", deviceId: "dev-me" });
+
+      expect(room.game.numbers).toEqual({ "bot-1": 40, "new-me": 55 });
+      expect(socket.emit).toHaveBeenCalledWith("game_in_progress", expect.objectContaining({ myNumber: 55 }));
+    });
+
+    test("someone new joining the same game still waits for the next round", async () => {
+      const room = gameRoom("roomRe3");
+      const socket = makeSocket("stranger");
+      handleLobbyEvents(makeIo(), socket);
+
+      await getHandler(socket, "join_room")({ roomId: "roomRe3", user: { name: "Zed" }, roomType: "private", deviceId: "dev-other" });
+
+      expect(room.game.turnOrder).toEqual(["old-me", "bot-1"]);
+      expect(room.game.pendingJoiners).toEqual(["stranger"]);
+      expect(socket.emit).toHaveBeenCalledWith("game_in_progress", expect.objectContaining({ resumed: false }));
+    });
+  });
 });

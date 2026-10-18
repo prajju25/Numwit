@@ -3,7 +3,7 @@ jest.mock("../roomManager", () => ({
 }));
 
 const { saveRoom } = require("../roomManager");
-const { createGameData, evaluateRound, sanitizeSettings } = require("../gameManager");
+const { createGameData, evaluateRound, sanitizeSettings, replaceSocketId } = require("../gameManager");
 const { NUMWIT_GAME_STATUS } = require("../../constants/constants");
 
 describe("gameManager", () => {
@@ -210,5 +210,72 @@ describe("gameManager", () => {
     function RULES_EXACT_MATCH_PENALTY() {
       return require("../gameRules").RULES.EXACT_MATCH_PENALTY;
     }
+  });
+  describe("replaceSocketId", () => {
+    function game() {
+      return {
+        turnOrder: ["a", "b", "c"],
+        eliminatedPlayers: ["a"],
+        winnerIds: ["a"],
+        winnerSocketId: "a",
+        pendingJoiners: [],
+        numbers: { a: 10, b: 20 },
+        points: { a: 4, b: 1, c: 0 },
+        winHistory: { a: 2 },
+        exactMatchHistory: { a: 1 },
+        consecWinHistory: { a: 1 },
+        maxConsecWinHistory: { a: 2 },
+        wasLastPlaceSet: { a: true },
+        pickHistory: [{ picks: { a: 30, b: 40 } }, { picks: { b: 50 } }],
+      };
+    }
+
+    test("moves every per-player field from the old id to the new one", () => {
+      const g = game();
+      expect(replaceSocketId(g, "a", "a2")).toBe(true);
+      expect(g.turnOrder).toEqual(["a2", "b", "c"]);
+      expect(g.eliminatedPlayers).toEqual(["a2"]);
+      expect(g.winnerIds).toEqual(["a2"]);
+      expect(g.winnerSocketId).toBe("a2");
+      expect(g.numbers).toEqual({ b: 20, a2: 10 });
+      expect(g.points).toEqual({ b: 1, c: 0, a2: 4 });
+      expect(g.winHistory).toEqual({ a2: 2 });
+      expect(g.exactMatchHistory).toEqual({ a2: 1 });
+      expect(g.consecWinHistory).toEqual({ a2: 1 });
+      expect(g.maxConsecWinHistory).toEqual({ a2: 2 });
+      expect(g.wasLastPlaceSet).toEqual({ a2: true });
+      expect(g.pickHistory).toEqual([{ picks: { b: 40, a2: 30 } }, { picks: { b: 50 } }]);
+    });
+
+    test("does not list the new id twice if it was already queued as a joiner", () => {
+      const g = game();
+      g.pendingJoiners = ["a2"];
+      replaceSocketId(g, "a", "a2");
+      expect(g.pendingJoiners).toEqual([]);
+      expect(g.turnOrder).toEqual(["a2", "b", "c"]);
+    });
+
+    test("a player who was still waiting to join keeps waiting, under the new id", () => {
+      const g = game();
+      g.pendingJoiners = ["d"];
+      expect(replaceSocketId(g, "d", "d2")).toBe(true);
+      expect(g.pendingJoiners).toEqual(["d2"]);
+    });
+
+    test("returns false and changes nothing when the old id is not in the game", () => {
+      const g = game();
+      const before = JSON.stringify(g);
+      expect(replaceSocketId(g, "zzz", "new")).toBe(false);
+      expect(replaceSocketId(g, null, "new")).toBe(false);
+      expect(replaceSocketId(g, "a", "a")).toBe(false);
+      expect(replaceSocketId(null, "a", "b")).toBe(false);
+      expect(JSON.stringify(g)).toBe(before);
+    });
+
+    test("copes with games missing optional fields", () => {
+      const g = { turnOrder: ["a"], points: { a: 1 } };
+      expect(replaceSocketId(g, "a", "b")).toBe(true);
+      expect(g).toEqual({ turnOrder: ["b"], points: { b: 1 } });
+    });
   });
 });

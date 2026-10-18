@@ -63,6 +63,45 @@ describe("NumwitRuleContext", () => {
     expect(clearSpectatorSnapshot).toHaveBeenCalled();
   });
 
+  test("applies a snapshot that arrives while the board is already showing (reconnect)", () => {
+    mockGameContext();
+    const { result, rerender } = renderHook(() => useNumwit(), { wrapper });
+    act(() => {
+      __mockSocket.__trigger("next_round", { round: 3, turnOrder: ["old-me", "bot"], eliminatedPlayers: [] });
+    });
+
+    const clearSpectatorSnapshot = jest.fn();
+    mockGameContext({
+      spectatorSnapshot: {
+        round: 3, turnOrder: ["new-me", "bot"], eliminatedPlayers: [], timerDuration: 12,
+        resumed: true, myNumber: 55, submittedIds: ["bot", "new-me"],
+      },
+      clearSpectatorSnapshot,
+    });
+    rerender();
+
+    expect(result.current.gameData.turnOrder).toEqual(["new-me", "bot"]);
+    expect(result.current.submitted).toBe(true);
+    expect(result.current.selectedNumber).toBe(55);
+    expect(result.current.waitingCount).toEqual({ submitted: 2, total: 2, submittedIds: ["bot", "new-me"] });
+    expect(clearSpectatorSnapshot).toHaveBeenCalled();
+  });
+
+  test("after a reconnect where the pick didn't get through, the player can pick again", () => {
+    mockGameContext();
+    const { result, rerender } = renderHook(() => useNumwit(), { wrapper });
+    act(() => { result.current.setSubmitted(true); });
+
+    mockGameContext({
+      spectatorSnapshot: { round: 3, turnOrder: ["new-me", "bot"], eliminatedPlayers: [], timerDuration: 9, resumed: true, myNumber: null, submittedIds: [] },
+    });
+    rerender();
+
+    expect(result.current.submitted).toBe(false);
+    expect(result.current.selectedNumber).toBeNull();
+    expect(result.current.waitingCount).toBeNull();
+  });
+
   test("next_round resets round state and applies new data", () => {
     mockGameContext();
     const { result } = renderHook(() => useNumwit(), { wrapper });
