@@ -106,7 +106,7 @@ export function playGame(BASE, { kind = 'solo', label = 'load', thinkMin = 3, th
           waitingAck = true;
           lastToPick = pickTotal > 0 && pickedIds.length === pickTotal - 1 && pickedIds.indexOf(mySocketId) === -1;
           pickSentAt = Date.now();
-          socket.send(encodeEvent('send_number', { roomId, no: Math.floor(rand(0, 60)) }));
+          socket.send(encodeEvent('send_number', { roomId, user, no: Math.floor(rand(0, 60)) }));
         }, rand(thinkMin, thinkMax) * 1000);
       }
 

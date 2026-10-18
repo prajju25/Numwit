@@ -37,6 +37,7 @@ jest.mock("../redisClient", () => ({
   ping: jest.fn().mockResolvedValue("PONG"),
   keys: jest.fn().mockResolvedValue([]),
   get: jest.fn(),
+  mGet: jest.fn(),
 }));
 
 const supertest = require("supertest");
@@ -168,20 +169,18 @@ describe("server.js", () => {
   describe("GET /api/stats", () => {
     test("aggregates active rooms, players, and games in progress", async () => {
       redisClient.keys.mockResolvedValueOnce(["room:1", "room:2", "room:3"]);
-      redisClient.get.mockImplementation((key) => {
-        if (key === "room:1") {
-          return Promise.resolve(JSON.stringify({ users: [{ socketId: "a" }, { socketId: "b" }], game: { round: 1 } }));
-        }
-        if (key === "room:2") {
-          return Promise.resolve(JSON.stringify({ users: [{ socketId: "c" }], game: null }));
-        }
-        return Promise.resolve(null);
-      });
+      redisClient.mGet.mockResolvedValueOnce([
+        JSON.stringify({ users: [{ socketId: "a" }, { socketId: "b" }], game: { round: 1 } }),
+        JSON.stringify({ users: [{ socketId: "c" }], game: null }),
+        null, // expired between KEYS and MGET
+      ]);
 
       const res = await supertest(app).get("/api/stats");
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ activeRooms: 2, activePlayers: 3, gamesInProgress: 1 });
+      // One MGET for all rooms, not a GET per room
+      expect(redisClient.mGet).toHaveBeenCalledWith(["room:1", "room:2", "room:3"]);
     });
 
     test("returns 500 when redis throws", async () => {
@@ -567,7 +566,7 @@ describe("server.js /api/stats cache", () => {
       redis = require("../redisClient");
     });
     redis.keys.mockResolvedValue(["room:1"]);
-    redis.get.mockResolvedValue(JSON.stringify({ users: [{ socketId: "a" }], game: null }));
+    redis.mGet.mockResolvedValue([JSON.stringify({ users: [{ socketId: "a" }], game: null })]);
 
     const first = await supertest(mod.app).get("/api/stats");
     const second = await supertest(mod.app).get("/api/stats");

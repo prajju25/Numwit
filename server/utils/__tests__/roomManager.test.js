@@ -205,6 +205,37 @@ describe("roomManager", () => {
       const updated = await getRoom("room1");
       expect(updated.users.map((u) => u.socketId)).toEqual(["s1", "s2"]);
     });
+
+    test("with a known room, looks only that room up (no scan of every room)", async () => {
+      await addUserToRoom("roomA", { socketId: "a1", name: "Ann" }, "public", true);
+      await addUserToRoom("roomA", { socketId: "a2", name: "Abe" }, "public");
+      await addUserToRoom("roomB", { socketId: "b1", name: "Ben" }, "public", true);
+      const keysBefore = redisClient.keys.mock ? redisClient.keys.mock.calls.length : 0;
+
+      const result = await removeUserFromRoom("a2", "roomA");
+
+      expect(result.users.map((u) => u.socketId)).toEqual(["a1"]);
+      expect(redisClient.keys.mock ? redisClient.keys.mock.calls.length : 0).toBe(keysBefore);
+    });
+
+    test("falls back to a scan if the user isn't in the room it was given", async () => {
+      await addUserToRoom("roomA", { socketId: "a1", name: "Ann" }, "public", true);
+      await addUserToRoom("roomB", { socketId: "b1", name: "Ben" }, "public", true);
+      await addUserToRoom("roomB", { socketId: "b2", name: "Bea" }, "public");
+
+      const result = await removeUserFromRoom("b2", "roomA");
+
+      expect(result.id).toBe("roomB");
+      expect(result.users.map((u) => u.socketId)).toEqual(["b1"]);
+      expect((await getRoom("roomA")).users).toHaveLength(1);
+    });
+
+    test("with a known room that no longer exists, falls back to a scan", async () => {
+      await addUserToRoom("roomB", { socketId: "b1", name: "Ben" }, "public", true);
+      await addUserToRoom("roomB", { socketId: "b2", name: "Bea" }, "public");
+      const result = await removeUserFromRoom("b2", "gone");
+      expect(result.id).toBe("roomB");
+    });
   });
 
   describe("getPublicRooms", () => {

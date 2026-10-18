@@ -702,7 +702,7 @@ describe("lobby socket handler", () => {
 
       const newRoom = roomManager.addUserToRoom.mock.calls[0][0];
       expect(newRoom).not.toBe("roomR2");
-      expect(roomManager.removeUserFromRoom).toHaveBeenCalledWith("old-devR2");
+      expect(roomManager.removeUserFromRoom).toHaveBeenCalledWith("old-devR2", "roomR2");
       expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, newRoom, { botDifficulty: "adaptive" });
     });
   });
