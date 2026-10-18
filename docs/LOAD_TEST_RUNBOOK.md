@@ -38,11 +38,11 @@ games never touch the real leaderboard, admin numbers or the anonymous round log
 
 ## 2. Point production at the test copies (~2 min, restarts the app)
 
+One line, so it works in PowerShell and bash alike. First run `fly secrets list -a numwit`:
+if `REDIS_ADAPTER_URL` is listed, add it to the command too (same test URL).
+
 ```bash
-fly secrets set -a numwit \
-  DATABASE_URL="<loadtest pooled URL>" \
-  DIRECT_URL="<loadtest direct URL>" \
-  REDIS_URL="<numwit-loadtest rediss URL>"
+fly secrets set -a numwit DATABASE_URL="<loadtest pooled URL>" DIRECT_URL="<loadtest direct URL>" REDIS_URL="<numwit-loadtest rediss URL>"
 ```
 
 Wait for `fly status -a numwit` to show the machine **started**, then open
@@ -88,10 +88,7 @@ compare with the smoke test's numbers; what matters is how much worse it gets un
 ## 4. Switch back to production (~2 min, restarts the app) — don't skip
 
 ```bash
-fly secrets set -a numwit \
-  DATABASE_URL="<production pooled URL>" \
-  DIRECT_URL="<production direct URL>" \
-  REDIS_URL="<production rediss URL>"
+fly secrets set -a numwit DATABASE_URL="<production pooled URL>" DIRECT_URL="<production direct URL>" REDIS_URL="<production rediss URL>"
 ```
 
 Check: the site loads; **/admin → Players** has **no `k6-…` players**; the leaderboard shows
