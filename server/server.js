@@ -122,9 +122,10 @@ app.get("/api/health", async (req, res) => {
 });
 
 // -- REST: GET /api/stats -----------------------------------------------------------
-// The landing page polls this every 10s per visitor, and each computation is a
-// KEYS scan plus a GET per room — so successful results are cached briefly and
-// shared across all pollers.
+// The landing page polls this every 10s per visitor, so successful results are
+// cached briefly and shared across all pollers. Each computation is a KEYS
+// scan plus one MGET for all rooms (one round trip and one command, instead of
+// a GET per room — that was slow and costly with hundreds of rooms).
 const STATS_CACHE_MS = Number(process.env.STATS_CACHE_MS ?? 10000);
 let statsCache = { at: 0, body: null };
 
@@ -135,11 +136,11 @@ app.get("/api/stats", async (req, res) => {
   try {
     const redis = require("./redisClient");
     const keys = await redis.keys("room:*");
+    const values = keys.length ? await redis.mGet(keys) : [];
     let activeRooms = 0,
       activePlayers = 0,
       gamesInProgress = 0;
-    for (const key of keys) {
-      const raw = await redis.get(key);
+    for (const raw of values) {
       if (!raw) continue;
       const room = JSON.parse(raw);
       activeRooms++;

@@ -76,42 +76,59 @@ async function addUserToRoom(roomId, user, roomType, isCreator) {
 }
 
 // ── removeUserFromRoom ─────────────────────────────────────────────────────────
-async function removeUserFromRoom(socketId) {
-  const keys = await redis.keys(`${ROOM_PREFIX}*`);
+// Pass roomId when it's known (the lobby tracks socket → room): that's one
+// GET. Without it — or if the user isn't in that room after all — every room
+// is scanned, which costs a Redis round trip per room.
+async function removeUserFromRoom(socketId, roomId) {
+  if (roomId) {
+    const key = getRoomKey(roomId);
+    const raw = await redis.get(key);
+    const result = raw ? await removeFromRoomData(key, JSON.parse(raw), socketId) : NOT_HERE;
+    if (result !== NOT_HERE) return result;
+  }
 
+  const keys = await redis.keys(`${ROOM_PREFIX}*`);
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
+    if (roomId && key === getRoomKey(roomId)) continue; // already checked
     const raw = await redis.get(key);
     if (!raw) continue;
-    const room = JSON.parse(raw);
-    const updatedUsers = room.users.filter(function(u) { return u.socketId !== socketId; });
-
-    if (updatedUsers.length === room.users.length) continue; // not in this room
-
-    if (updatedUsers.length === 0) {
-      await redis.del(key);
-      await redis.sRem(PUBLIC_ROOMS_SET, room.id);
-      return null;
-    }
-
-    room.users = updatedUsers;
-
-    // Transfer host if the host left
-    if (room.hostSocketId === socketId) {
-      room.hostSocketId = updatedUsers[0].socketId;
-    }
-
-    await redis.set(key, JSON.stringify(room), { EX: ROOM_TTL_SECONDS });
-
-    // Re-add to public SET if it has space again
-    if (room.type === "public" && !room.game) {
-      await redis.sAdd(PUBLIC_ROOMS_SET, room.id);
-    }
-
-    return room;
+    const result = await removeFromRoomData(key, JSON.parse(raw), socketId);
+    if (result !== NOT_HERE) return result;
   }
 
   return null;
+}
+
+const NOT_HERE = Symbol("not in this room");
+
+// Removes socketId from one room. Returns the updated room, null if the room
+// was deleted (last user left), or NOT_HERE if the user wasn't in it.
+async function removeFromRoomData(key, room, socketId) {
+  const updatedUsers = room.users.filter(function(u) { return u.socketId !== socketId; });
+  if (updatedUsers.length === room.users.length) return NOT_HERE;
+
+  if (updatedUsers.length === 0) {
+    await redis.del(key);
+    await redis.sRem(PUBLIC_ROOMS_SET, room.id);
+    return null;
+  }
+
+  room.users = updatedUsers;
+
+  // Transfer host if the host left
+  if (room.hostSocketId === socketId) {
+    room.hostSocketId = updatedUsers[0].socketId;
+  }
+
+  await redis.set(key, JSON.stringify(room), { EX: ROOM_TTL_SECONDS });
+
+  // Re-add to public SET if it has space again
+  if (room.type === "public" && !room.game) {
+    await redis.sAdd(PUBLIC_ROOMS_SET, room.id);
+  }
+
+  return room;
 }
 
 // ── getPublicRooms ─────────────────────────────────────────────────────────────

@@ -39,3 +39,23 @@ describe("withRoomLock", () => {
     await expect(next).resolves.toBe("still runs");
   });
 });
+
+describe("withRoomLock slow-work warning", () => {
+  test("logs a warning with the room and label when work holds the lock too long", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const now = jest.spyOn(Date, "now");
+    let t = 1000;
+    now.mockImplementation(() => t);
+    await withRoomLock("slow1", async () => { t += 5000; }, "send_number");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("slow send_number in room slow1"));
+    now.mockRestore();
+    warn.mockRestore();
+  });
+
+  test("stays quiet for fast work", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    await withRoomLock("fast1", async () => "ok", "send_number");
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});

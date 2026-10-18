@@ -100,7 +100,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     // ghost "disconnected" user entry forever and cleanupIfBotsOnly never fires.
     if (cancelledPending && cancelledPending.roomId !== roomNo) {
       console.log(`Joining different room — cleaning up old room ${cancelledPending.roomId}`);
-      const abandonedRoom = await removeUserFromRoom(cancelledPending.oldSocketId);
+      const abandonedRoom = await removeUserLocked(cancelledPending.oldSocketId, cancelledPending.roomId);
       if (abandonedRoom) {
         await handlePostRemove(io, abandonedRoom);
       }
@@ -217,7 +217,7 @@ module.exports = function handleLobbyEvents(io, socket) {
       me.avatar = avatar;
       await saveRoom(room);
       io.to(roomId).emit("room_update", room);
-    });
+    }, "update_profile");
   });
 
   socket.on("leave_room", async function(callback) {
@@ -229,10 +229,11 @@ module.exports = function handleLobbyEvents(io, socket) {
       clearTimeout(pendingDisconnects[dId].timer);
       delete pendingDisconnects[dId];
     }
+    const leftRoomId = socketToRoom[socket.id];
     delete socketToDevice[socket.id];
     delete socketToRoom[socket.id];
 
-    const room = await removeUserFromRoom(socket.id);
+    const room = await removeUserLocked(socket.id, leftRoomId);
     if (room) {
       socket.leave(room.id);
       roomCleanup.cancelPostGameDelete(room.id);
@@ -257,8 +258,11 @@ module.exports = function handleLobbyEvents(io, socket) {
     // Grace period: if we know the device, hold the room slot for 60 s so a
     // mobile user switching apps (or a brief network drop) can come back.
     if (deviceId && roomId) {
-      const room = await getRoomById(roomId);
-      if (room) {
+      // Locked like game updates: this save must not overwrite a pick or
+      // next-round write landing at the same moment.
+      const roomExists = await withRoomLock(roomId, async function() {
+        const room = await getRoomById(roomId);
+        if (!room) return false;
         // Mark user as temporarily disconnected so the client can show it
         const disconnectedUser = room.users.find(function(u) { return u.socketId === socket.id; });
         if (disconnectedUser) {
@@ -266,7 +270,9 @@ module.exports = function handleLobbyEvents(io, socket) {
           await saveRoom(room);
           io.to(room.id).emit("room_update", room);
         }
-
+        return true;
+      }, "disconnect");
+      if (roomExists) {
         const oldSocketId = socket.id;
         pendingDisconnects[deviceId] = {
           oldSocketId: oldSocketId,
@@ -274,7 +280,7 @@ module.exports = function handleLobbyEvents(io, socket) {
           timer: setTimeout(async function() {
             delete pendingDisconnects[deviceId];
             console.log(`Grace period expired for deviceId ${deviceId} — removing from room`);
-            const r = await removeUserFromRoom(oldSocketId);
+            const r = await removeUserLocked(oldSocketId, roomId);
             if (r) {
               await handlePostRemove(io, r);
             }
@@ -287,13 +293,24 @@ module.exports = function handleLobbyEvents(io, socket) {
     }
 
     // No deviceId (anonymous) or room already gone — immediate cleanup
-    const r = await removeUserFromRoom(socket.id);
+    const r = await removeUserLocked(socket.id, roomId);
     if (r) {
       await handlePostRemove(io, r);
     }
     console.log("User disconnected (immediate):", socket.id);
   });
 };
+
+// ── removeUserLocked ─────────────────────────────────────────────────────────
+// Removes a user, queued behind other work for that room when the room is
+// known (so the write can't overwrite a pick saved at the same moment), and
+// looks the room up directly instead of scanning every room in Redis.
+function removeUserLocked(socketId, roomId) {
+  if (!roomId) return removeUserFromRoom(socketId);
+  return withRoomLock(roomId, function() {
+    return removeUserFromRoom(socketId, roomId);
+  }, "leave");
+}
 
 // ── handlePostRemove ──────────────────────────────────────────────────────────
 // Called after a user is fully removed from a room (grace period expired or

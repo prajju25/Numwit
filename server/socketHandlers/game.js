@@ -85,7 +85,7 @@ module.exports = function handleGameEvents(io, socket) {
 
       socket.emit("number_received", { no: number });
       await submitNumber(io, room, socket.id, number);
-    });
+    }, "send_number");
   });
 
   // ── restart_game ────────────────────────────────────────────────────────────
@@ -225,7 +225,7 @@ async function submitNumber(io, room, socketId, number) {
 async function submitBotNumber(io, roomId, botSocketId, number) {
   return withRoomLock(roomId, function() {
     return submitBotNumberLocked(io, roomId, botSocketId, number);
-  });
+  }, "bot_number");
 }
 
 async function submitBotNumberLocked(io, roomId, botSocketId, number) {
@@ -435,7 +435,14 @@ function clearRoundAdvance(roomId) {
 async function advanceToNextRound(io, roomId) {
   // Defensive: ensure no stale timeout remains tracked for this room.
   delete pendingRoundAdvance[roomId];
+  // Locked like picks: this saves the room and must not overwrite a write
+  // that lands at the same moment (e.g. a player leaving).
+  return withRoomLock(roomId, function() {
+    return advanceToNextRoundLocked(io, roomId);
+  }, "next_round");
+}
 
+async function advanceToNextRoundLocked(io, roomId) {
   // Re-fetch from Redis to guard against restart_game firing in the meantime —
   // it nulls game on a freshly-fetched room object.
   const room = await getRoomById(roomId);
@@ -589,7 +596,7 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer) {
 async function handleTimerExpiry(io, roomId) {
   return withRoomLock(roomId, function() {
     return handleTimerExpiryLocked(io, roomId);
-  });
+  }, "timer_expiry");
 }
 
 async function handleTimerExpiryLocked(io, roomId) {
