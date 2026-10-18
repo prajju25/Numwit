@@ -1,4 +1,9 @@
 # Numwit — Complete Load Testing Strategy
+
+> **Oct 2026:** the app now runs on Fly.io + Upstash + Neon. To actually run a load test, follow
+> **[LOAD_TEST_RUNBOOK.md](LOAD_TEST_RUNBOOK.md)** (scripts: `load-tests/hn-*.js`). The analysis below still
+> applies; the capacity numbers and Render-specific advice are from the June Render setup.
+
 > **Role:** Senior Performance Test Engineer  
 > **Production URL:** https://numwit.onrender.com/  
 > **Stack:** Node.js/Express 5 + Socket.IO + Redis (Render) + PostgreSQL (Neon) + React 19  
