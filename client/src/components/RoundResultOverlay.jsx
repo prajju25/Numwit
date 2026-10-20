@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { twMerge } from "tailwind-merge";
 import socket from "../socket";
 import { useUser } from "../contexts/UserContext";
+import { withYou } from "../services/profile";
 import {
   explainFirstRound, explainerGamesSeen, markExplainerSeen, EXPLAINER_GAMES,
 } from "../services/roundInsights";
@@ -159,7 +160,7 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
                 const player = findPlayer(s.socketId);
                 return (
                   <div key={s.socketId} className="nw-rise flex justify-between items-center px-4 py-2.5 border-t border-white/5 text-sm" style={{ animationDelay: `${0.1 + i * 0.06}s` }}>
-                    <span className="text-white/80">{player ? `${player.avatar} ${player.name}` : s.socketId}</span>
+                    <span className="text-white/80">{player ? `${player.avatar} ${withYou(player.name, s.socketId === mySocketId)}` : s.socketId}</span>
                     <span className="nums font-bold text-white">{s.number}</span>
                   </div>
                 );
@@ -377,7 +378,7 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
                 style={{ transitionDelay: `${i * 0.08}s` }}
               >
                 <span className={twMerge("flex-1 min-w-0 truncate", isWinner ? "font-extrabold text-amber-100" : "text-white/80")}>
-                  {player ? `${player.avatar} ${player.name}` : s.socketId}
+                  {player ? `${player.avatar} ${withYou(player.name, s.socketId === mySocketId)}` : s.socketId}
                   {isInvalid && <span className="text-xs ml-1 text-red-300">(duplicate)</span>}
                 </span>
                 <span className={twMerge("nums font-extrabold w-8 text-right", isInvalid ? "text-red-300 line-through" : isWinner ? "text-amber-200" : "text-white")}>
@@ -411,7 +412,7 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
               ☠️ Eliminated:{" "}
               {result.newlyEliminated.map((id) => {
                 const p = findPlayer(id);
-                return p ? `${p.avatar} ${p.name}` : id;
+                return p ? `${p.avatar} ${withYou(p.name, id === mySocketId)}` : id;
               }).join(", ")}
             </div>
           ) : (

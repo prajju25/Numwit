@@ -14,7 +14,7 @@ import { buildShareText, roundSquare, playedRounds } from "../services/shareText
 import { rankPlayers } from "../services/standings";
 import { computeTitles } from "../services/titles";
 import useChallengeFriends from "../hooks/useChallengeFriends";
-import { openProfileMenu } from "../services/profile";
+import { openProfileMenu, withYou } from "../services/profile";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 const ORDINAL = (n) => n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || "th");
@@ -362,7 +362,7 @@ export default function GameOverScreen({ data, players }) {
                 <span className="nums w-4 text-[#8F95B8]">{i + 4}</span>
                 <span>{p.avatar}</span>
                 <span className="flex-1 text-[#B4B9D6] truncate">
-                  {p.name}
+                  {withYou(p.name, p.socketId === mySocketId)}
                   {titles[p.socketId] && rounds > 0 && (
                     <span className="ml-2 text-[11px] text-[#8F95B8]">{titles[p.socketId].icon} {titles[p.socketId].name}</span>
                   )}

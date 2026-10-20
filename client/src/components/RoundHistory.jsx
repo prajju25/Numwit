@@ -3,6 +3,8 @@ import PropTypes from "prop-types";
 import { useNumwit } from "../contexts/NumwitRuleContext";
 import { useUser } from "../contexts/UserContext";
 import { useGame } from "../contexts/GameContext";
+import socket from "../socket";
+import { withYou } from "../services/profile";
 
 export default function RoundHistory() {
   const { history } = useNumwit();
@@ -11,7 +13,7 @@ export default function RoundHistory() {
 
   if (!history || history.length === 0) return null;
 
-  const mySocketId = user?.socketId;
+  const mySocketId = user?.socketId ?? socket.id;
 
   return (
     <div className="w-full">
@@ -34,7 +36,7 @@ export default function RoundHistory() {
 
               const winnerNames = (r.winnerIds || []).map((wid) => {
                 const p = players?.find((pl) => pl.socketId === wid);
-                return p ? `${p.avatar}${p.name}` : "?";
+                return p ? `${p.avatar}${withYou(p.name, wid === mySocketId)}` : "?";
               }).join(", ");
 
               return (
@@ -54,7 +56,7 @@ export default function RoundHistory() {
                         return (
                           <span
                             key={s.socketId}
-                            title={p ? `${p.avatar} ${p.name}` : s.socketId}
+                            title={p ? `${p.avatar} ${withYou(p.name, isMe)}` : s.socketId}
                             className={[
                               "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded font-mono font-bold text-[10px] border",
                               isWin

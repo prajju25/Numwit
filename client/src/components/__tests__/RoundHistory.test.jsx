@@ -50,7 +50,7 @@ describe("RoundHistory", () => {
     expect(screen.getByText("40.5")).toBeInTheDocument();
     expect(screen.getByText("🐱40")).toBeInTheDocument();
     expect(screen.getByText("🐶60")).toBeInTheDocument();
-    expect(screen.getByText("🐱Alice")).toBeInTheDocument();
+    expect(screen.getByText("🐱Alice (you)")).toBeInTheDocument();
   });
 
   test("shows '—' when no target or winner", () => {
@@ -109,7 +109,7 @@ describe("RoundHistory", () => {
       ],
     });
     render(<RoundHistory />);
-    const winnerCell = screen.getByText("🐱Alice").closest("td");
+    const winnerCell = screen.getByText("🐱Alice (you)").closest("td");
     expect(winnerCell.className).toMatch(/text-emerald-400/);
   });
 });

@@ -48,7 +48,7 @@ describe("Login", () => {
 
       expect(ctx.setUser).toHaveBeenCalledTimes(1);
       const profile = ctx.setUser.mock.calls[0][0];
-      expect(profile.name).toMatch(/^Player\d{3}$/);
+      expect(profile.name).toMatch(/^[A-Z][a-z]+[A-Z][a-z]+\d{1,2}$/);
       expect(avatars).toContain(profile.avatar);
       expect(profile.autoNamed).toBe(true);
 
@@ -82,6 +82,14 @@ describe("Login", () => {
       expect(screen.queryByLabelText("Your Nickname")).not.toBeInTheDocument();
       expect(socket.emit).not.toHaveBeenCalled();
       expect(trackView).toHaveBeenCalledWith("/play/choose", "Choose room");
+    });
+
+    test("a player with an old-style PlayerNNN name keeps it", () => {
+      mockUser({ user: { name: "Player230", avatar: avatars[2] } });
+      render(<Login />);
+      expect(ctx.setUser).not.toHaveBeenCalled();
+      expect(socket.emit).not.toHaveBeenCalled();
+      expect(screen.getByTestId("room-type-overlay")).toBeInTheDocument();
     });
 
     test("Cancel goes back via onCancel", () => {
@@ -149,7 +157,7 @@ describe("Login", () => {
       render(<Login />);
       fireEvent.click(screen.getByText(/Start Game/));
       fireEvent.click(screen.getByText(/Randomize/));
-      expect(screen.getByLabelText("Your Nickname").value).toMatch(/^Player\d{3}$/);
+      expect(screen.getByLabelText("Your Nickname").value).toMatch(/^[A-Z][a-z]+[A-Z][a-z]+\d{1,2}$/);
       expect(screen.queryByText("Please enter a name.")).not.toBeInTheDocument();
     });
 
