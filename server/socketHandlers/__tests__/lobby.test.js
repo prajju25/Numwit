@@ -818,4 +818,56 @@ describe("lobby socket handler", () => {
       expect(socket.emit).toHaveBeenCalledWith("game_in_progress", expect.objectContaining({ resumed: false }));
     });
   });
+  describe("start_now (skip the public countdown)", () => {
+    async function waitingIn(room, socketId) {
+      roomManager.getPublicRooms.mockResolvedValue({ id: room.id });
+      roomManager.addUserToRoom.mockResolvedValue(room);
+      roomManager.getRoomById.mockResolvedValue(room);
+      const io = makeIo();
+      const socket = makeSocket(socketId);
+      handleLobbyEvents(io, socket);
+      await getHandler(socket, "join_room")({ roomId: null, user: { name: "P" }, roomType: room.type });
+      gameHandlers.startGameForRoom.mockClear();
+      return { io, socket };
+    }
+
+    test("starts the game now, topped up with bots", async () => {
+      const room = { id: "roomSN1", type: "public", users: [{ socketId: "s1" }], game: null, botFillAt: 99999 };
+      const { io, socket } = await waitingIn(room, "s1");
+      botService.fillRoomWithBots.mockReturnValue([{ socketId: "bot-1" }, { socketId: "bot-2" }]);
+
+      await getHandler(socket, "start_now")();
+
+      expect(botService.clearFillTimer).toHaveBeenCalledWith("roomSN1");
+      expect(botService.fillRoomWithBots).toHaveBeenCalledWith(room, MIN_PLAYERS);
+      expect(room.botFillAt).toBeNull();
+      expect(gameHandlers.startGameForRoom).toHaveBeenCalledWith(io, "roomSN1", {});
+    });
+
+    test("two taps at once start one game", async () => {
+      const room = { id: "roomSN2", type: "public", users: [{ socketId: "s1" }, { socketId: "s2" }], game: null };
+      const { socket } = await waitingIn(room, "s1");
+      botService.fillRoomWithBots.mockReturnValue([]);
+
+      await Promise.all([getHandler(socket, "start_now")(), getHandler(socket, "start_now")()]);
+
+      expect(gameHandlers.startGameForRoom).toHaveBeenCalledTimes(1);
+    });
+
+    test("does nothing in a private room, once a game is running, or for someone not in the room", async () => {
+      const priv = { id: "roomSN3", type: "private", users: [{ socketId: "s1" }], game: null };
+      const a = await waitingIn(priv, "s1");
+      await getHandler(a.socket, "start_now")();
+
+      const running = { id: "roomSN4", type: "public", users: [{ socketId: "s2" }], game: { round: 1 } };
+      const b = await waitingIn(running, "s2");
+      await getHandler(b.socket, "start_now")();
+
+      const stranger = makeSocket("nobody");
+      handleLobbyEvents(makeIo(), stranger);
+      await getHandler(stranger, "start_now")();
+
+      expect(gameHandlers.startGameForRoom).not.toHaveBeenCalled();
+    });
+  });
 });

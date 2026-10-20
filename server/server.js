@@ -137,17 +137,23 @@ app.get("/api/stats", async (req, res) => {
     const redis = require("./redisClient");
     const keys = await redis.keys("room:*");
     const values = keys.length ? await redis.mGet(keys) : [];
+    // activePlayers counts people only — a solo game is 1 person + 3 bots.
+    // waitingPublic: people in a public room that hasn't started yet (shown
+    // in the room picker, so a public game with strangers is visible).
     let activeRooms = 0,
       activePlayers = 0,
-      gamesInProgress = 0;
+      gamesInProgress = 0,
+      waitingPublic = 0;
     for (const raw of values) {
       if (!raw) continue;
       const room = JSON.parse(raw);
+      const people = (room.users || []).filter((u) => !u.isBot).length;
       activeRooms++;
-      activePlayers += (room.users || []).length;
+      activePlayers += people;
       if (room.game) gamesInProgress++;
+      else if (room.type === "public") waitingPublic += people;
     }
-    statsCache = { at: Date.now(), body: { activeRooms, activePlayers, gamesInProgress } };
+    statsCache = { at: Date.now(), body: { activeRooms, activePlayers, gamesInProgress, waitingPublic } };
     res.json(statsCache.body);
   } catch (err) {
     console.error("GET /api/stats error:", err.message);

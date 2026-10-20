@@ -124,9 +124,10 @@ in the production branch, and **/admin → Players** has **no `k6-…` players**
 - In the `--summary-export` JSON, `"thresholds": { "p(95)<800": false }` means the
   threshold was **not** crossed (passed). For rates, `passes` counts *true* values — so
   `connect_fail_rate: passes 0` means zero failed connections.
-- Public rooms start when their 60 s countdown ends (topped up with bots only if fewer than
-  3 people came), or at once when they fill up — so public k6 players wait up to a minute
-  for their first round. (Before 19 Oct 2026, rooms that got 3+ people never started.)
+- Public rooms start when their countdown ends (20 s by default, `BOT_FILL_DELAY_MS`;
+  topped up with bots only if fewer than 3 people came), at once when they fill up, or when
+  someone taps *Start now* — so public k6 players wait up to the countdown for their first
+  round. (Before 19 Oct 2026, rooms that got 3+ people never started.)
 
 ---
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import PropTypes from "prop-types";
 import { useUser } from "../contexts/UserContext";
@@ -18,10 +18,35 @@ function loadDifficulty() {
   return "adaptive";
 }
 
+// What a public game will be like right now, from the live stats: is anyone
+// waiting to be matched, or is anyone online at all?
+function publicHint(stats) {
+  if (!stats) return null;
+  if (stats.waitingPublic > 0) {
+    return `${stats.waitingPublic} waiting for a public game — join them`;
+  }
+  if (stats.activePlayers > 0) {
+    return `${stats.activePlayers} playing now · bots fill empty seats after a few seconds`;
+  }
+  return "Quiet right now · bots fill empty seats after a few seconds";
+}
+
 export default function RoomTypeOverlay({ onClose, onCancel }) {
   const { user, deviceId, setRoomType, setIsJoiningRoom, roomId } = useUser();
   const [pickingDifficulty, setPickingDifficulty] = useState(false);
   const [difficulty, setDifficulty] = useState(loadDifficulty);
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    if (typeof fetch !== "function") return undefined;
+    let cancelled = false;
+    fetch("/api/stats")
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled && d && typeof d.activePlayers === "number") setStats(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const hint = publicHint(stats);
 
   const handleRoomSelection = (type, extra) => {
     track("room_join", { type, ...extra });
@@ -113,6 +138,11 @@ export default function RoomTypeOverlay({ onClose, onCancel }) {
           🔒 Private Room
         </button>
       </div>
+      {hint && (
+        <p className="-mt-3 text-xs text-emerald-300/80" data-testid="public-hint">
+          🌍 {hint}
+        </p>
+      )}
 
       <button
         onClick={() => setPickingDifficulty(true)}

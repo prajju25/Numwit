@@ -17,7 +17,8 @@
  * dashboards depend on them:
  *   play_click → profile_done → room_join → first_pick → game_finished
  *   → share_card_open / share / invite
- *   plus install_click, app_installed.
+ *   plus install_click, app_installed, and start_now (skipped the public-room
+ *   countdown; { withBots, players }).
  * "Came back within 7 days" is measured server-side from real games
  * (admin dashboard → Growth → Returning from last week).
  *

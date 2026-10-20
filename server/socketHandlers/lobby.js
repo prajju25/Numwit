@@ -243,6 +243,22 @@ module.exports = function handleLobbyEvents(io, socket) {
     }
   });
 
+  // ── start_now ───────────────────────────────────────────────────────────────
+  // Anyone waiting in a public room can skip the rest of the countdown: the
+  // game starts now, topped up with bots if fewer than MIN_PLAYERS are here.
+  // (Strangers have no host to wait for, so this isn't host-only.)
+  socket.on("start_now", async function() {
+    const roomId = socketToRoom[socket.id];
+    console.debug(`Socket: "start_now" ${socket.id} Room=${roomId}`);
+    if (!roomId) return;
+    const room = await getRoomById(roomId);
+    if (!room || room.type !== "public" || room.game) return;
+    const me = room.users.find(function(u) { return u.socketId === socket.id; });
+    if (!me || me.isBot) return;
+    botService.clearFillTimer(roomId);
+    await fillRoomWithBotsAndStart(io, roomId);
+  });
+
   // ── update_profile ──────────────────────────────────────────────────────────
   // Rename / change avatar from the profile menu, including mid-game, so other
   // players see the change straight away. Locked like game updates: saving the
@@ -404,7 +420,21 @@ async function cleanupIfBotsOnly(io, room) {
 // Fired BOT_FILL_DELAY_MS after a brand-new public room was created (or as
 // soon as it fills up). Re-reads the room — a no-op if it was deleted or a
 // game already started in the meantime; otherwise the game starts now.
+// Rooms being started right now: two "Start now" taps (or a tap and the
+// countdown) arriving together must start one game, not two.
+const startingRooms = new Set();
+
 async function fillRoomWithBotsAndStart(io, roomId) {
+  if (startingRooms.has(roomId)) return;
+  startingRooms.add(roomId);
+  try {
+    await fillRoomWithBotsAndStartOnce(io, roomId);
+  } finally {
+    startingRooms.delete(roomId);
+  }
+}
+
+async function fillRoomWithBotsAndStartOnce(io, roomId) {
   const room = await getRoomById(roomId);
   if (!room) return; // room was deleted in the meantime
   if (room.game) return; // already started by someone else

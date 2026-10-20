@@ -7,7 +7,7 @@ describe("constants", () => {
     expect(constants.MIN_PLAYERS).toBe(3);
     expect(constants.ELIMINATION_THRESHOLD).toBe(5);
     expect(constants.TOTAL_ROUNDS_DEFAULT).toBe(3);
-    expect(constants.BOT_FILL_DELAY_MS).toBe(60000);
+    expect(constants.BOT_FILL_DELAY_MS).toBe(20000);
   });
 
   test("exports NUMWIT_GAME_STATUS enum", () => {

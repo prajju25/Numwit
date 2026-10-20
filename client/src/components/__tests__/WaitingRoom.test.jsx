@@ -121,6 +121,20 @@ describe("WaitingRoom", () => {
     expect(screen.queryByText(/adding bots/)).not.toBeInTheDocument();
   });
 
+  test("anyone in a waiting public room can start now with bots", () => {
+    setup({ roomType: "public", players: makePlayers(1), botFillAt: Date.now() + 15000 });
+    render(<WaitingRoom />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start now with bots" }));
+    expect(socket.emit).toHaveBeenCalledWith("start_now");
+  });
+
+  test("with enough people the button just says Start now", () => {
+    setup({ roomType: "public", players: makePlayers(3), botFillAt: Date.now() + 15000 });
+    render(<WaitingRoom />);
+    expect(screen.getByRole("button", { name: "Start now" })).toBeInTheDocument();
+  });
+
   test("public rooms without a pending bot fill show no countdown", () => {
     setup({ roomType: "public", players: makePlayers(2), botFillAt: null });
     render(<WaitingRoom />);
