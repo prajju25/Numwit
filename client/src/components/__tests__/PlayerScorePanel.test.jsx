@@ -64,4 +64,10 @@ describe("PlayerScorePanel", () => {
     render(<PlayerScorePanel players={[]} points={{}} eliminatedPlayers={[]} />);
     expect(screen.getByText("Standings")).toBeInTheDocument();
   });
+
+  test("marks the player's own row with (you), and only theirs", () => {
+    render(<PlayerScorePanel players={players} points={{}} eliminatedPlayers={[]} mySocketId="c" />);
+    expect(screen.getAllByText("(you)")).toHaveLength(1);
+    expect(screen.getByText("(you)").closest("li")).toHaveTextContent("Charlie");
+  });
 });

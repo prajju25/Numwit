@@ -19,6 +19,7 @@ import VoicePanel from "./VoicePanel";
 import GameChat from "./GameChat";
 import { track, trackView } from "../services/analytics";
 import { BOT_DIFFICULTIES } from "../constants/constants";
+import { withYou } from "../services/profile";
 
 function GameBoard() {
   const { roomId, user } = useUser();
@@ -160,7 +161,7 @@ function GameBoard() {
           return (
             <span
               key={p.socketId}
-              title={`${p.name}${locked ? " — locked in" : ""}`}
+              title={`${withYou(p.name, p.socketId === mySocketId)}${locked ? " — locked in" : ""}`}
               className={twMerge(
                 "relative -mr-1.5 w-8 h-8 rounded-full bg-[#1A1E38] border-2 flex items-center justify-center text-[15px] transition-colors duration-300",
                 locked ? "nw-ring-pop border-emerald-500" : "border-white/20"

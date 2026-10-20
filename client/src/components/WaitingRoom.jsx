@@ -226,6 +226,7 @@ export default function WaitingRoom() {
                   {player.avatar}
                 </span>
                 <span className="text-xs font-semibold max-w-full truncate px-1">{player.name}</span>
+                {isMe && <span className="-mt-1 text-[10px] font-bold text-violet-300">(you)</span>}
                 {player.isBot && (
                   <span className="text-[10px] font-bold text-sky-300 bg-sky-500/15 border border-sky-500/30 rounded-full px-1.5">Bot</span>
                 )}

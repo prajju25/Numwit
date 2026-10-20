@@ -43,6 +43,14 @@ export function randomProfile(rng = Math.random) {
   };
 }
 
+/**
+ * A player's name as shown to them: "(you)" after their own, so they can spot
+ * themselves even when several players have similar default names.
+ */
+export function withYou(name, isMe) {
+  return isMe ? `${name} (you)` : name;
+}
+
 // Lets any screen open the top-right profile menu (e.g. "change name" hints)
 export const OPEN_PROFILE_EVENT = "numwit:open-profile";
 

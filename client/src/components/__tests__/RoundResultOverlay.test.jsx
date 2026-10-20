@@ -214,6 +214,23 @@ describe("RoundResultOverlay", () => {
       expect(screen.getByText("Next round starting in 10s…")).toBeInTheDocument();
     });
   });
+  test("the player's own submission row says (you)", () => {
+    __mockSocket.id = "me";
+    render(<RoundResultOverlay result={baseResult} voidData={null} players={players} onDismiss={() => {}} />);
+    expect(screen.getAllByText("🐱 Alice (you)")).toHaveLength(2); // winner heading + submissions row
+    expect(screen.getByText("🐶 Bob")).toBeInTheDocument();
+    __mockSocket.id = "mock-socket-id";
+  });
+
+  test("a void round lists the player's own pick as (you)", () => {
+    __mockSocket.id = "me";
+    const voidData = { round: 2, reason: "Everyone picked the same", submissions: [{ socketId: "me", number: 5 }, { socketId: "bob", number: 5 }] };
+    render(<RoundResultOverlay result={null} voidData={voidData} players={players} onDismiss={() => {}} />);
+    expect(screen.getByText("🐱 Alice (you)")).toBeInTheDocument();
+    expect(screen.getByText("🐶 Bob")).toBeInTheDocument();
+    __mockSocket.id = "mock-socket-id";
+  });
+
 });
 
 describe("RoundResultOverlay reveal choreography", () => {

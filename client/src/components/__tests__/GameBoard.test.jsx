@@ -306,13 +306,13 @@ describe("GameBoard", () => {
     });
     render(<GameBoard />);
     expect(screen.getByTitle("Bob — locked in")).toBeInTheDocument();
-    expect(screen.getByTitle("Alice")).toBeInTheDocument();
+    expect(screen.getByTitle("Alice (you)")).toBeInTheDocument();
   });
 
   test("counts my own pick as locked once submitted", () => {
     useNumwit.mockReturnValue({ ...baseNumwit(), submitted: true, selectedNumber: 12 });
     render(<GameBoard />);
-    expect(screen.getByTitle("Alice — locked in")).toBeInTheDocument();
+    expect(screen.getByTitle("Alice (you) — locked in")).toBeInTheDocument();
   });
 
   test("passes the previous round's target to the number input", () => {

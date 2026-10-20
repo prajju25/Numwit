@@ -1,5 +1,5 @@
 import {
-  randomProfile, randomName, openProfileMenu, OPEN_PROFILE_EVENT, NAME_ADJECTIVES, NAME_NOUNS,
+  randomProfile, randomName, withYou, openProfileMenu, OPEN_PROFILE_EVENT, NAME_ADJECTIVES, NAME_NOUNS,
 } from "../profile";
 import { avatars } from "../../constants/constants";
 
@@ -36,5 +36,10 @@ describe("profile helpers", () => {
     openProfileMenu();
     expect(listener).toHaveBeenCalledTimes(1);
     window.removeEventListener(OPEN_PROFILE_EVENT, listener);
+  });
+
+  test("withYou adds (you) only to the player's own name", () => {
+    expect(withYou("SwiftOtter42", true)).toBe("SwiftOtter42 (you)");
+    expect(withYou("SwiftOtter42", false)).toBe("SwiftOtter42");
   });
 });

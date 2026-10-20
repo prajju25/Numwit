@@ -187,6 +187,13 @@ describe("WaitingRoom", () => {
     render(<WaitingRoom />);
     expect(screen.getByText(`0/${MIN_PLAYERS} minimum · 0 joined`)).toBeInTheDocument();
   });
+  test("the player's own seat says (you)", () => {
+    setup({ players: makePlayers(3), user: { socketId: "p1" } });
+    render(<WaitingRoom />);
+    expect(screen.getAllByText("(you)")).toHaveLength(1);
+    expect(screen.getByText("(you)").closest("li")).toHaveTextContent("Player1");
+  });
+
 });
 
 describe("WaitingRoom challenge from the game-over screen", () => {

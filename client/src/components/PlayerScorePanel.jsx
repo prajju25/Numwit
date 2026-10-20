@@ -43,7 +43,9 @@ export default function PlayerScorePanel({ players, points, eliminatedPlayers, l
                   "block truncate text-[13px] font-semibold",
                   isMe ? "text-violet-200" : danger ? "text-red-300" : "text-white/85"
                 )}>
-                  {p.name}{p.isBot ? " 🤖" : ""}
+                  {p.name}
+                  {isMe && <span className="ml-1 font-normal text-violet-300/80">(you)</span>}
+                  {p.isBot ? " 🤖" : ""}
                 </span>
                 <span className="flex gap-[3px] mt-1" aria-hidden="true">
                   {Array.from({ length: ELIMINATION_THRESHOLD }, (_, i) => (
