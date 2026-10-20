@@ -36,6 +36,11 @@ export default function WaitingRoom() {
   const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   const startGame = () => socket.emit("start_game", { roomId, settings });
+  // Public rooms: anyone can skip the countdown (bots fill any empty seats)
+  const startNow = () => {
+    track("start_now", { withBots: !canStart, players: count });
+    socket.emit("start_now");
+  };
 
   // "Challenge friends" from a game-over screen: the message waits here, to be
   // sent with this room's link from a tap (phones only share after a tap).
@@ -166,9 +171,17 @@ export default function WaitingRoom() {
         {roomType === "public" && fillCountdown !== null && (
           <div className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm text-cyan-200 border border-cyan-400/25 bg-cyan-400/10">
             <span className="nw-typing shrink-0" aria-hidden="true"><span /><span /><span /></span>
-            {canStart
-              ? <>Game starts in <span className="nums font-bold">{fillCountdown}s</span></>
-              : <>Looking for players… adding bots in <span className="nums font-bold">{fillCountdown}s</span></>}
+            <span className="flex-1">
+              {canStart
+                ? <>Game starts in <span className="nums font-bold">{fillCountdown}s</span></>
+                : <>Looking for players… adding bots in <span className="nums font-bold">{fillCountdown}s</span></>}
+            </span>
+            <button
+              onClick={startNow}
+              className="shrink-0 h-9 px-3 rounded-lg text-xs font-bold text-white bg-cyan-500/25 border border-cyan-300/40 hover:bg-cyan-500/35 transition active:scale-95"
+            >
+              {canStart ? "Start now" : "Start now with bots"}
+            </button>
           </div>
         )}
       </section>

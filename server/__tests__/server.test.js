@@ -178,9 +178,25 @@ describe("server.js", () => {
       const res = await supertest(app).get("/api/stats");
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ activeRooms: 2, activePlayers: 3, gamesInProgress: 1 });
+      expect(res.body).toEqual({ activeRooms: 2, activePlayers: 3, gamesInProgress: 1, waitingPublic: 0 });
       // One MGET for all rooms, not a GET per room
       expect(redisClient.mGet).toHaveBeenCalledWith(["room:1", "room:2", "room:3"]);
+    });
+
+    test("counts people only (not bots), and people waiting in public rooms", async () => {
+      redisClient.keys.mockResolvedValueOnce(["room:solo", "room:pub", "room:priv"]);
+      redisClient.mGet.mockResolvedValueOnce([
+        // a solo game: 1 person + 3 bots
+        JSON.stringify({ type: "solo", users: [{ socketId: "me" }, { socketId: "b1", isBot: true }, { socketId: "b2", isBot: true }, { socketId: "b3", isBot: true }], game: { round: 2 } }),
+        // a public room still waiting
+        JSON.stringify({ type: "public", users: [{ socketId: "p1" }, { socketId: "p2" }], game: null }),
+        // a private room still waiting (not public, so not "waiting for strangers")
+        JSON.stringify({ type: "private", users: [{ socketId: "f1" }], game: null }),
+      ]);
+
+      const res = await supertest(app).get("/api/stats");
+
+      expect(res.body).toEqual({ activeRooms: 3, activePlayers: 4, gamesInProgress: 1, waitingPublic: 2 });
     });
 
     test("returns 500 when redis throws", async () => {
@@ -571,7 +587,7 @@ describe("server.js /api/stats cache", () => {
     const first = await supertest(mod.app).get("/api/stats");
     const second = await supertest(mod.app).get("/api/stats");
 
-    expect(first.body).toEqual({ activeRooms: 1, activePlayers: 1, gamesInProgress: 0 });
+    expect(first.body).toEqual({ activeRooms: 1, activePlayers: 1, gamesInProgress: 0, waitingPublic: 0 });
     expect(second.body).toEqual(first.body);
     expect(redis.keys).toHaveBeenCalledTimes(1);
     if (mod.server?.listening) {

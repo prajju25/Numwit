@@ -25,6 +25,40 @@ describe("RoomTypeOverlay", () => {
     });
   });
 
+  describe("who's around for a public game", () => {
+    const realFetch = global.fetch;
+    afterEach(() => { global.fetch = realFetch; });
+    const stats = (body) => {
+      global.fetch = jest.fn(() => Promise.resolve({ json: () => Promise.resolve(body) }));
+    };
+
+    test("says how many people are waiting for a public game", async () => {
+      stats({ activePlayers: 3, waitingPublic: 2 });
+      render(<RoomTypeOverlay onClose={onClose} />);
+      expect(await screen.findByText(/2 waiting for a public game — join them/)).toBeInTheDocument();
+      expect(global.fetch).toHaveBeenCalledWith("/api/stats");
+    });
+
+    test("otherwise says how many are playing, and that bots fill empty seats", async () => {
+      stats({ activePlayers: 4, waitingPublic: 0 });
+      render(<RoomTypeOverlay onClose={onClose} />);
+      expect(await screen.findByText(/4 playing now · bots fill empty seats/)).toBeInTheDocument();
+    });
+
+    test("when nobody is on, says it's quiet", async () => {
+      stats({ activePlayers: 0, waitingPublic: 0 });
+      render(<RoomTypeOverlay onClose={onClose} />);
+      expect(await screen.findByText(/Quiet right now/)).toBeInTheDocument();
+    });
+
+    test("shows nothing if the stats can't be loaded", async () => {
+      global.fetch = jest.fn(() => Promise.reject(new Error("offline")));
+      render(<RoomTypeOverlay onClose={onClose} />);
+      await Promise.resolve();
+      expect(screen.queryByTestId("public-hint")).not.toBeInTheDocument();
+    });
+  });
+
   test("renders all three room type options and a cancel button", () => {
     render(<RoomTypeOverlay onClose={onClose} />);
 

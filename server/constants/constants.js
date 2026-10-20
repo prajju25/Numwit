@@ -18,7 +18,10 @@ const BOT_FILL_ENABLED = process.env.BOT_FILL_ENABLED !== "false";
 
 // How long a brand-new public room waits for real players before the server
 // fills the remaining seats (up to MIN_PLAYERS) with bots and starts the game.
-const BOT_FILL_DELAY_MS = 60000;
+// Short while few people are online — a long wait mostly loses the one person
+// waiting. Raise it with the BOT_FILL_DELAY_MS env var once matchmaking has
+// enough traffic to be worth waiting for.
+const BOT_FILL_DELAY_MS = Number(process.env.BOT_FILL_DELAY_MS) || 20000;
 
 // Bot identity pools (cycled with modulo if more bots are needed than entries).
 const BOT_NAMES = ["Bot Ada", "Bot Theo", "Bot Lin", "Bot Max", "Bot Nia", "Bot Vex"];
