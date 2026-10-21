@@ -374,3 +374,39 @@ describe("GameBoard analytics screens", () => {
     expect(urls()).toEqual(["/play/game", "/play/results", "/play/game"]);
   });
 });
+
+describe("GameBoard drop-off events", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetAnalytics();
+    window.umami = { track: jest.fn() };
+    useUser.mockReturnValue({ roomId: "room1", user: { socketId: "p0" } });
+    useGame.mockReturnValue({ players: [{ socketId: "p0", name: "Alice", avatar: "🐱" }, { socketId: "p1", name: "Bob", avatar: "🐶" }] });
+  });
+  afterEach(() => { delete window.umami; });
+
+  const result = (overrides) => ({
+    round: 3, submissions: [{ socketId: "p0", number: 20 }, { socketId: "p1", number: 40 }],
+    newlyEliminated: [], winnerIds: ["p1"], points: {}, ...overrides,
+  });
+  const events = () => window.umami.track.mock.calls.map((c) => c.slice(0, 2));
+
+  test("sends round_done with the round number for a round the player was in", () => {
+    useNumwit.mockReturnValue({ ...baseNumwit(), roundResult: result() });
+    render(<GameBoard />);
+    expect(events()).toContainEqual(["round_done", { round: 3 }]);
+    expect(events().some(([name]) => name === "knocked_out")).toBe(false);
+  });
+
+  test("also sends knocked_out when the player is eliminated that round", () => {
+    useNumwit.mockReturnValue({ ...baseNumwit(), roundResult: result({ newlyEliminated: ["p0"] }) });
+    render(<GameBoard />);
+    expect(events()).toContainEqual(["knocked_out", { round: 3 }]);
+  });
+
+  test("sends nothing for rounds the player only watched", () => {
+    useNumwit.mockReturnValue({ ...baseNumwit(), roundResult: result({ submissions: [{ socketId: "p1", number: 40 }] }) });
+    render(<GameBoard />);
+    expect(events().some(([name]) => name === "round_done")).toBe(false);
+  });
+});

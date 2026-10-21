@@ -570,6 +570,49 @@ describe("game socket handler", () => {
         expect(room.game.pendingJoiners).toEqual([]);
       });
 
+      test("when the only person is knocked out, the game ends at once (bots don't play on) and is saved", async () => {
+        const room = makeRoom({
+          users: [
+            { socketId: "p1", deviceId: "dev1" },
+            { socketId: "b1", isBot: true },
+            { socketId: "b2", isBot: true },
+          ],
+        });
+        Object.assign(room.game, {
+          turnOrder: ["p1", "b1", "b2"],
+          numbers: { b1: 40, b2: 10 },
+          points: { p1: 4, b1: 2, b2: 1 },
+        });
+        roomManager.getRoomById.mockResolvedValue(room);
+        gameManager.evaluateRound.mockReturnValue(makeNormalResult({
+          winnerIds: ["b1"],
+          winnerSocketId: "b1",
+          newlyEliminated: ["p1"],
+          points: { p1: 5, b1: 3, b2: 1 },
+          updatedGame: Object.assign({}, makeNormalResult().updatedGame, {
+            eliminatedPlayers: ["p1"],
+            winnerIds: ["b1"],
+            winnerSocketId: "b1",
+          }),
+        }));
+        userService.getProfile.mockResolvedValue({ id: "userId1" });
+        achievementService.checkAndAward.mockResolvedValue([]);
+
+        const io = makeIo({ sockets: { sockets: { get: jest.fn(() => null) } } });
+        const socket = makeSocket("p1");
+        handleGameEvents(io, socket);
+        await getHandler(socket, "send_number")({ roomId: "r1", user: { name: "P" }, no: 50 });
+
+        // b2 has the fewest points, so it is the winner
+        expect(io._emit).toHaveBeenCalledWith("game_over", {
+          winnerSocketId: "b2",
+          points: { p1: 5, b1: 3, b2: 1 },
+          reason: "no_people_left",
+        });
+        await flush();
+        expect(statsService.writeSessionStat).toHaveBeenCalledWith("dev1", expect.objectContaining({ survived: false }));
+      });
+
       test("when only one player remains, emits game_over and persists stats/achievements", async () => {
         const room = makeRoom({
           users: [

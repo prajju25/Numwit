@@ -15,7 +15,8 @@
  *
  * Funnel steps are custom events sent with track() — keep names stable,
  * dashboards depend on them:
- *   play_click → profile_done → room_join → first_pick → game_finished
+ *   play_click → profile_done → room_join → first_pick → round_done ×N
+ *   ({ round }) → knocked_out ({ round }) / game_finished
  *   → share_card_open / share / invite
  *   plus install_click, app_installed, start_now (skipped the public-room
  *   countdown; { withBots, players }) and client_error ({ where, message },

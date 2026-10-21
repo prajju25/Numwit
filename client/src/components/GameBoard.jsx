@@ -40,6 +40,18 @@ function GameBoard() {
     if (roundResult || roundVoid) setShowOverlay(true);
   }, [roundResult, roundVoid]);
 
+  // Drop-off funnel: first_pick → round_done (one per round played, with its
+  // number) → knocked_out / game_finished, so Umami shows the round people
+  // leave at. Only for rounds this player was in (not watching after being
+  // knocked out, not waiting to join).
+  useEffect(() => {
+    if (!roundResult) return;
+    const me = user?.socketId ?? socket.id;
+    if (!roundResult.submissions?.some((s) => s.socketId === me)) return;
+    track("round_done", { round: roundResult.round });
+    if (roundResult.newlyEliminated?.includes(me)) track("knocked_out", { round: roundResult.round });
+  }, [roundResult]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Analytics screen: playing vs the game-over results (and back on "Play again")
   useEffect(() => {
     if (gameOver) trackView("/play/results", "Results");
