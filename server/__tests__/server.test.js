@@ -294,6 +294,30 @@ describe("server.js", () => {
     });
   });
 
+  describe("failed-request log", () => {
+    test("logs status, method and path (no query string) for a 4xx", async () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      codeService.resolveCode.mockReturnValueOnce(null);
+
+      await supertest(app).get("/api/room/zzzzzz?secret=abc");
+
+      const line = warn.mock.calls.map((c) => c[0]).find((m) => String(m).startsWith("HTTP "));
+      expect(line).toMatch(/^HTTP 404 GET \/api\/room\/zzzzzz \d+ms$/);
+      expect(line).not.toContain("secret");
+      warn.mockRestore();
+    });
+
+    test("does not log successful requests", async () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      codeService.resolveCode.mockReturnValueOnce("room42");
+
+      await supertest(app).get("/api/room/ABC123");
+
+      expect(warn.mock.calls.some((c) => String(c[0]).startsWith("HTTP "))).toBe(false);
+      warn.mockRestore();
+    });
+  });
+
   describe("POST /api/room/code", () => {
     test("creates or returns a code for a roomId", async () => {
       codeService.getOrCreateCode.mockReturnValueOnce("abc123");

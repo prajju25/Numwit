@@ -5,8 +5,11 @@ import "./index.css";
 import { UserProvider } from "./contexts/UserContext";
 import { GameProvider } from "./contexts/GameContext";
 import { initAnalytics } from "./services/analytics";
+import { initErrorReporting, reportError } from "./services/errorReporting";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 initAnalytics();
+initErrorReporting();
 
 const root = document.getElementById("root");
 
@@ -14,14 +17,16 @@ const root = document.getElementById("root");
 // interferes with webpack-dev-server).
 if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").catch((err) => reportError("service_worker", err));
   });
 }
 
 createRoot(root).render(
-  <UserProvider>
-    <GameProvider>
-      <App />
-    </GameProvider>
-  </UserProvider>
+  <ErrorBoundary>
+    <UserProvider>
+      <GameProvider>
+        <App />
+      </GameProvider>
+    </UserProvider>
+  </ErrorBoundary>
 );

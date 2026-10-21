@@ -8,6 +8,9 @@ const redisClient = createClient({
 // Upstash closes idle ones) and reconnects on its own. Without a listener the
 // unhandled "error" event would crash the whole process — and every game in it.
 redisClient.on("error", (err) => console.error("Redis client error:", err.message));
+// Connection state, so a Redis outage (and recovery) shows up in the logs
+redisClient.on("ready", () => console.log("Redis connected"));
+redisClient.on("reconnecting", () => console.warn("Redis reconnecting…"));
 redisClient.connect().catch(console.error);
 
 module.exports = redisClient;

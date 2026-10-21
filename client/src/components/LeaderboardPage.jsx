@@ -4,6 +4,7 @@ import { twMerge } from "tailwind-merge";
 import { useUser } from "../contexts/UserContext";
 import ShareCardModal from "./ShareCardModal";
 import { track } from "../services/analytics";
+import { reportError } from "../services/errorReporting";
 
 const PER_PAGE = 10;
 
@@ -117,9 +118,10 @@ export default function LeaderboardPage({ onBack, onPlay }) {
           totalPlayers: exactWeeklyTotal,
         });
       }
-    } catch (_) {
+    } catch (err) {
       // Best-effort — no toast wiring here yet; the share button just stays
       // clickable and the user can try again.
+      reportError("share_card", err);
     } finally {
       setShareLoading(false);
     }

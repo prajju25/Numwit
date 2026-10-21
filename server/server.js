@@ -9,6 +9,24 @@ const { Server } = require("socket.io");
 // repo root, where dotenv's default lookup would find nothing).
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
+// Which log levels are printed (LOG_LEVEL env; see utils/logLevel.js)
+const logLevel = require("./utils/logLevel").applyLogLevel();
+
+// Last-resort error logs. A stray rejected promise in one socket handler must
+// not take down every game on the server, so it is logged and the server
+// carries on. An uncaught exception leaves the process in an unknown state:
+// log it and exit, and Fly restarts the machine. Only when this file is run
+// as the server (`node server.js`), not when tests load it.
+if (require.main === module) {
+  process.on("unhandledRejection", function(reason) {
+    console.error("Unhandled promise rejection:", reason && reason.stack ? reason.stack : reason);
+  });
+  process.on("uncaughtException", function(err) {
+    console.error("Uncaught exception — exiting:", err && err.stack ? err.stack : err);
+    process.exit(1);
+  });
+}
+
 const handleLobbyEvents = require("./socketHandlers/lobby");
 const handleGameEvents = require("./socketHandlers/game");
 const handleChatEvents = require("./socketHandlers/chat");
@@ -31,6 +49,20 @@ const server = http.createServer(app);
 // tuning for the inline scripts / websocket connections the client uses --
 // revisit once the production origin is finalized.
 app.use(helmet({ contentSecurityPolicy: false }));
+
+// One log line per failed HTTP request (status 400+), e.g. "HTTP 401 GET
+// /admin 3ms" — so a 4xx/5xx in Fly's metrics can be traced to its URL.
+// Successful requests (200, 304, Socket.IO's 101 upgrade) aren't logged.
+// Path only: query strings never reach the logs.
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    if (res.statusCode < 400) return;
+    const path = String(req.originalUrl || req.url || "").split("?")[0].slice(0, 200);
+    console.warn(`HTTP ${res.statusCode} ${req.method} ${path} ${Date.now() - startedAt}ms`);
+  });
+  next();
+});
 
 // Public images (link-preview image, icons, install screenshots) must be
 // loadable by other sites: Reddit's post editor, Discord, Slack etc. show
@@ -291,7 +323,7 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT} (log level: ${logLevel})`));
 
 // Exported for testing (supertest against `app`, inspecting `io` wiring, etc.)
 module.exports = { app, server, io };

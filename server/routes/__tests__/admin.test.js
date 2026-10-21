@@ -251,9 +251,12 @@ describe("admin routes", () => {
     });
 
     test("DELETE /players/:id", async () => {
-      playerAdminService.deletePlayer.mockResolvedValueOnce({ deleted: "Tester" });
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
+      playerAdminService.deletePlayer.mockResolvedValueOnce({ deleted: "Tester", devices: ["d1", "d2"], games: 3, achievements: 1, feedback: 0 });
       const res = await supertest(makeApp()).delete("/api/admin/players/u9");
-      expect(res.body).toEqual({ deleted: "Tester" });
+      expect(res.body).toEqual({ deleted: "Tester", devices: ["d1", "d2"], games: 3, achievements: 1, feedback: 0 });
+      expect(log).toHaveBeenCalledWith('admin: deleted player u9 ("Tester") — 2 device(s), 3 game(s), 1 achievement(s), 0 feedback');
+      log.mockRestore();
       expect(playerAdminService.deletePlayer).toHaveBeenCalledWith("u9");
 
       playerAdminService.deletePlayer.mockResolvedValueOnce(null);
@@ -264,9 +267,12 @@ describe("admin routes", () => {
     });
 
     test("POST /players/merge", async () => {
-      playerAdminService.mergePlayers.mockResolvedValueOnce({ merged: "Prajju", into: "Prajju" });
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
+      playerAdminService.mergePlayers.mockResolvedValueOnce({ merged: "Prajju", into: "Prajju", games: 4, achievements: 2 });
       const res = await supertest(makeApp()).post("/api/admin/players/merge").send({ sourceId: "phone", targetId: "laptop" });
-      expect(res.body).toEqual({ merged: "Prajju", into: "Prajju" });
+      expect(res.body).toEqual({ merged: "Prajju", into: "Prajju", games: 4, achievements: 2 });
+      expect(log).toHaveBeenCalledWith('admin: merged player phone ("Prajju") into laptop ("Prajju") — 4 game(s), 2 achievement(s)');
+      log.mockRestore();
       expect(playerAdminService.mergePlayers).toHaveBeenCalledWith("phone", "laptop");
 
       expect((await supertest(makeApp()).post("/api/admin/players/merge").send({ sourceId: "a", targetId: "a" })).status).toBe(400);
