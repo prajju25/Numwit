@@ -364,6 +364,34 @@ describe("lobby socket handler", () => {
   });
 
   describe("leave_room", () => {
+    test("logs a person leaving a game that is still running (where players drop off)", async () => {
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
+      const room = { id: "roomL", type: "solo", users: [{ socketId: "bot-1", isBot: true }], game: { round: 3 } };
+      roomManager.removeUserFromRoom.mockResolvedValue(room);
+      botService.hasOnlyBots.mockReturnValue(true);
+      const socket = makeSocket("s1");
+      handleLobbyEvents(makeIo(), socket);
+
+      await getHandler(socket, "leave_room")(jest.fn());
+
+      expect(log).toHaveBeenCalledWith("Player left mid-game in room roomL at round 3 (solo, 0 people left)");
+      log.mockRestore();
+    });
+
+    test("leaving after the game is over is not logged as mid-game", async () => {
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
+      const room = { id: "roomL2", type: "solo", users: [{ socketId: "bot-1", isBot: true }], game: { round: 7 }, gameEnded: true };
+      roomManager.removeUserFromRoom.mockResolvedValue(room);
+      botService.hasOnlyBots.mockReturnValue(true);
+      const socket = makeSocket("s1");
+      handleLobbyEvents(makeIo(), socket);
+
+      await getHandler(socket, "leave_room")(jest.fn());
+
+      expect(log.mock.calls.some((c) => String(c[0]).includes("mid-game"))).toBe(false);
+      log.mockRestore();
+    });
+
     test("removes the user, leaves the socket room, and calls back ok", async () => {
       const room = { id: "room1", users: [{ socketId: "other" }] };
       roomManager.removeUserFromRoom.mockResolvedValue(room);

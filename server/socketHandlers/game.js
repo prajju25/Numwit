@@ -380,12 +380,18 @@ async function resolveRound(io, room, activePlayers) {
     return result.updatedGame.eliminatedPlayers.indexOf(u.socketId) === -1;
   });
 
-  if (remainingPlayers.length <= 1) {
-    const winnerPlayer = remainingPlayers[0] || null;
+  // The game is over when one player is left — or when no people are left
+  // (everyone still in is a bot): nobody wants to watch bots finish it, and
+  // leaving before game over meant the game was never saved.
+  const peopleLeft = remainingPlayers.filter(function(u) { return !u.isBot; }).length;
+  if (remainingPlayers.length <= 1 || peopleLeft === 0) {
+    const winnerPlayer = remainingPlayers.length <= 1
+      ? (remainingPlayers[0] || null)
+      : fewestPoints(remainingPlayers, result.points);
     const gameOverData = {
       winnerSocketId: winnerPlayer ? winnerPlayer.socketId : null,
       points:         result.points,
-      reason:         "elimination",
+      reason:         remainingPlayers.length <= 1 ? "elimination" : "no_people_left",
     };
     io.to(roomId).emit("game_over", gameOverData);
     botService.clearSubmissionTimers(roomId);
@@ -416,6 +422,13 @@ async function resolveRound(io, room, activePlayers) {
   // A player clicking "Skip" on the overlay fires skip_round_result, which
   // cancels this and calls advanceToNextRound immediately.
   scheduleRoundAdvance(io, roomId);
+}
+
+// The player with the fewest penalty points (first in the list on a tie).
+function fewestPoints(players, points) {
+  return players.reduce(function(best, u) {
+    return (points[u.socketId] || 0) < (points[best.socketId] || 0) ? u : best;
+  }, players[0]);
 }
 
 // ── scheduleRoundAdvance / clearRoundAdvance ─────────────────────────────────

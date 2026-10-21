@@ -301,6 +301,7 @@ module.exports = function handleLobbyEvents(io, socket) {
 
     const room = await removeUserLocked(socket.id, leftRoomId);
     if (room) {
+      logLeftMidGame(room, "left");
       socket.leave(room.id);
       roomCleanup.cancelPostGameDelete(room.id);
       roomCleanup.cancelIdleDelete(room.id);
@@ -378,11 +379,24 @@ function removeUserLocked(socketId, roomId) {
   }, "leave");
 }
 
+// ── logLeftMidGame ───────────────────────────────────────────────────────────
+// A person leaving a game that is still running — where new players drop off.
+// (`room` is the room after they were removed.)
+function logLeftMidGame(room, how) {
+  if (!room || !room.game || room.gameEnded) return;
+  const people = room.users.filter(function(u) { return !u.isBot; }).length;
+  console.log(
+    `Player ${how} mid-game in room ${room.id} at round ${room.game.round} ` +
+    `(${room.type || "public"}, ${people} ${people === 1 ? "person" : "people"} left)`
+  );
+}
+
 // ── handlePostRemove ──────────────────────────────────────────────────────────
 // Called after a user is fully removed from a room (grace period expired or
 // immediate). Triggers game_over if too few active players remain, then
 // cleans up bot-only rooms.
 async function handlePostRemove(io, room) {
+  logLeftMidGame(room, "disconnected");
   if (room.game) {
     const activePlayers = room.users.filter(function(u) {
       return room.game.eliminatedPlayers.indexOf(u.socketId) === -1
