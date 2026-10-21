@@ -21,7 +21,17 @@ describe("socket.jsx", () => {
   });
 
   test("creates a socket connection to the current origin with the socket.io path", () => {
-    expect(io).toHaveBeenCalledWith(window.location.origin, { path: "/socket.io" });
+    expect(io).toHaveBeenCalledWith(
+      window.location.origin,
+      expect.objectContaining({ path: "/socket.io" })
+    );
+  });
+
+  test("tries WebSocket first and falls back to polling", () => {
+    expect(io).toHaveBeenCalledWith(
+      window.location.origin,
+      expect.objectContaining({ transports: ["websocket", "polling"], tryAllTransports: true })
+    );
   });
 
   test("exports the socket instance returned by io()", () => {

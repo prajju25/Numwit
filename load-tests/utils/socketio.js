@@ -89,6 +89,18 @@ export function wsUrl(baseUrl, sid) {
 }
 
 /**
+ * WebSocket URL for connecting directly, with no polling handshake — what the
+ * browser client does (transports: ["websocket", "polling"]). The server sends
+ * the Engine.IO open packet ("0{...}") first; reply "40" to connect.
+ */
+export function wsDirectUrl(baseUrl) {
+  const wsBase = baseUrl
+    .replace('https://', 'wss://')
+    .replace('http://',  'ws://');
+  return `${wsBase}/socket.io/?EIO=4&transport=websocket`;
+}
+
+/**
  * Encode a Socket.IO event to send over the WebSocket.
  * encodeEvent('join_room', { roomId: null, ... })
  * → '42["join_room",{"roomId":null,...}]'
@@ -100,6 +112,7 @@ export function encodeEvent(eventName, data) {
 /**
  * Parse a raw WebSocket message from the server.
  * Returns one of:
+ *   { kind: 'open' }                       → Engine.IO open ("0{...}"), reply with "40"
  *   { kind: 'ping' }                       → server sent "2", reply with "3"
  *   { kind: 'connected' }                  → Socket.IO connected ("40")
  *   { kind: 'event', event: '...', data }  → a real Socket.IO event
@@ -110,6 +123,9 @@ export function parseFrame(raw) {
 
   // Engine.IO PING
   if (raw === EIO_PING) return { kind: 'ping' };
+
+  // Engine.IO OPEN — first frame of a direct WebSocket connection
+  if (raw[0] === EIO_OPEN) return { kind: 'open' };
 
   // Engine.IO probe responses
   if (raw === '3probe') return { kind: 'probe_ack' };

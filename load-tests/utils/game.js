@@ -23,7 +23,7 @@ import ws from 'k6/ws';
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
-import { handshake, connectViaPolling, wsUrl, encodeEvent, parseFrame } from './socketio.js';
+import { wsDirectUrl, encodeEvent, parseFrame, EIO_MESSAGE, SIO_CONNECT } from './socketio.js';
 
 export const pickAck      = new Trend('pick_ack_ms', true);
 export const roundResult  = new Trend('round_result_ms', true);
@@ -50,13 +50,9 @@ export function playGame(BASE, { kind = 'solo', label = 'load', thinkMin = 3, th
   const deviceId = `k6-${label}-${__VU}-${__ITER}-${Date.now()}`;
   const user = { name: `k6-${label}${__VU}`.slice(0, 20), avatar: '🤖' };
 
-  const session = handshake(BASE);
-  if (!session) { connectFail.add(1); sleep(5); return; }
-  const poll = connectViaPolling(BASE, session.sid);
-  if (!poll || poll.status !== 200) { connectFail.add(1); sleep(5); return; }
-
+  // Straight to WebSocket, like the browser client (no polling handshake)
   let opened = false;
-  const res = ws.connect(wsUrl(BASE, session.sid), {}, function (socket) {
+  const res = ws.connect(wsDirectUrl(BASE), {}, function (socket) {
     let joined = false;
     let joinAt = 0;
     let gotFirstRound = false;
@@ -71,12 +67,12 @@ export function playGame(BASE, { kind = 'solo', label = 'load', thinkMin = 3, th
     let pickTotal = 0;       // how many players are picking this round
     let lastToPick = false;  // were all the others already done when we picked?
 
-    socket.on('open', () => { opened = true; socket.send('2probe'); });
+    socket.on('open', () => { opened = true; });
 
     socket.on('message', (raw) => {
       const frame = parseFrame(raw);
+      if (frame.kind === 'open') { socket.send(EIO_MESSAGE + SIO_CONNECT); return; }
       if (frame.kind === 'ping') { socket.send('3'); return; }
-      if (frame.kind === 'probe_ack') { socket.send('5'); return; }
 
       if (frame.kind === 'connected' && !joined) {
         joined = true;
@@ -154,7 +150,7 @@ export function playGame(BASE, { kind = 'solo', label = 'load', thinkMin = 3, th
   });
 
   connectFail.add(opened ? 0 : 1);
-  check(res, { 'websocket upgraded (101)': (r) => r && r.status === 101 });
+  check(res, { 'websocket connected (101)': (r) => r && r.status === 101 });
   sleep(rand(2, 6)); // between games
 }
 

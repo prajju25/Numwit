@@ -89,8 +89,11 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "../client/dist")));
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
-const SOCKET_PING_INTERVAL = Number(process.env.SOCKET_PING_INTERVAL) || 5000;
-const SOCKET_PING_TIMEOUT = Number(process.env.SOCKET_PING_TIMEOUT) || 3000;
+// Heartbeat: every connected player is pinged each interval, so a short interval
+// costs CPU at scale (B7 load test, Oct 2026). A dropped connection is still
+// noticed within interval + timeout (~30 s); closed tabs disconnect at once.
+const SOCKET_PING_INTERVAL = Number(process.env.SOCKET_PING_INTERVAL) || 20000;
+const SOCKET_PING_TIMEOUT = Number(process.env.SOCKET_PING_TIMEOUT) || 10000;
 
 const io = new Server(server, {
   cors: { origin: CORS_ORIGIN },
