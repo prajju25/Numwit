@@ -116,7 +116,7 @@ Set these in the hosting platform's secrets/env UI (never commit them):
 | `REDIS_URL` | yes | Upstash/Redis Cloud connection string (use `rediss://` for TLS) |
 | `DATABASE_URL` | optional | Neon/Supabase Postgres connection string |
 | `CORS_ORIGIN` | yes | your production domain, e.g. `https://numwit.com` (or omit if single-origin and you trust default) |
-| `SOCKET_PING_INTERVAL` / `SOCKET_PING_TIMEOUT` | optional | defaults (5000/3000) are fine to start |
+| `SOCKET_PING_INTERVAL` / `SOCKET_PING_TIMEOUT` | optional | defaults (20000/10000) are fine; shorter intervals cost CPU with many players |
 | `REDIS_ADAPTER_URL` | only when scaling to >1 instance | same as `REDIS_URL` initially |
 | `SENTRY_DSN` | recommended | from Sentry project (see §8) |
 

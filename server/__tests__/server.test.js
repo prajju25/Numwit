@@ -114,8 +114,9 @@ describe("server.js", () => {
       expect(ioConstructorArgs[1]).toEqual(
         expect.objectContaining({
           cors: { origin: "*" },
-          pingInterval: 5000,
-          pingTimeout: 3000,
+          // A local server/.env may override the defaults
+          pingInterval: Number(process.env.SOCKET_PING_INTERVAL) || 20000,
+          pingTimeout: Number(process.env.SOCKET_PING_TIMEOUT) || 10000,
         })
       );
     });
