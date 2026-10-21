@@ -95,4 +95,35 @@ describe("prismaClient", () => {
     const { getPrisma } = require("../prismaClient");
     expect(getPrisma()).toBeNull();
   });
+  test("Neon's idle 'connection closed' is not logged; other database errors are", () => {
+    const { isIdleDisconnect, logPrismaError } = require("../prismaClient");
+    const idle = "Error in PostgreSQL connection: Error { kind: Closed, cause: None }";
+    expect(isIdleDisconnect(idle)).toBe(true);
+    expect(isIdleDisconnect("Can't reach database server")).toBe(false);
+    expect(isIdleDisconnect(undefined)).toBe(false);
+
+    const err = jest.spyOn(console, "error").mockImplementation(() => {});
+    logPrismaError({ message: idle });
+    expect(err).not.toHaveBeenCalled();
+    logPrismaError({ message: "Can't reach database server" });
+    expect(err).toHaveBeenCalledWith("prisma:error", "Can't reach database server");
+    err.mockRestore();
+  });
+
+  test("database errors are routed through our logger, not printed by Prisma", () => {
+    process.env.DATABASE_URL = "postgres://fake";
+    const $on = jest.fn();
+    let options;
+    jest.doMock("@prisma/client", () => ({
+      PrismaClient: jest.fn().mockImplementation((opts) => {
+        options = opts;
+        return { $on, $connect: jest.fn().mockResolvedValue(undefined) };
+      }),
+    }));
+
+    const { logPrismaError } = require("../prismaClient");
+    expect(options.log).toContainEqual({ emit: "event", level: "error" });
+    expect(options.log).not.toContain("error");
+    expect($on).toHaveBeenCalledWith("error", logPrismaError);
+  });
 });

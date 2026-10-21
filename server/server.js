@@ -32,6 +32,20 @@ const server = http.createServer(app);
 // revisit once the production origin is finalized.
 app.use(helmet({ contentSecurityPolicy: false }));
 
+// One log line per failed HTTP request (status 400+), e.g. "HTTP 401 GET
+// /admin 3ms" — so a 4xx/5xx in Fly's metrics can be traced to its URL.
+// Successful requests (200, 304, Socket.IO's 101 upgrade) aren't logged.
+// Path only: query strings never reach the logs.
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on("finish", () => {
+    if (res.statusCode < 400) return;
+    const path = String(req.originalUrl || req.url || "").split("?")[0].slice(0, 200);
+    console.warn(`HTTP ${res.statusCode} ${req.method} ${path} ${Date.now() - startedAt}ms`);
+  });
+  next();
+});
+
 // Public images (link-preview image, icons, install screenshots) must be
 // loadable by other sites: Reddit's post editor, Discord, Slack etc. show
 // og-image.jpg straight from here, and helmet's default

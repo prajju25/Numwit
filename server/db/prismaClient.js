@@ -9,12 +9,30 @@
 let prisma = null;
 let dbAvailable = false;
 
+// Neon suspends the database after a few idle minutes and closes the open
+// connections; Prisma logs each as "Error in PostgreSQL connection: Error
+// { kind: Closed, cause: None }" and reconnects on the next query. That's
+// expected, so it isn't logged — every other database error still is.
+function isIdleDisconnect(message) {
+  return /Error in PostgreSQL connection: Error \{ kind: Closed, cause: None \}/.test(String(message || ""));
+}
+
+function logPrismaError(e) {
+  if (isIdleDisconnect(e && e.message)) return;
+  console.error("prisma:error", e && e.message);
+}
+
 if (process.env.DATABASE_URL) {
   try {
     const { PrismaClient } = require("@prisma/client");
+    // Errors come to us as events (not printed by Prisma) so the idle
+    // disconnect above can be skipped; warnings print as before in dev.
     prisma = new PrismaClient({
-      log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+      log: process.env.NODE_ENV === "development"
+        ? ["warn", { emit: "event", level: "error" }]
+        : [{ emit: "event", level: "error" }],
     });
+    if (typeof prisma.$on === "function") prisma.$on("error", logPrismaError);
 
     // Test connection eagerly — suppress errors at startup
     prisma.$connect()
@@ -50,4 +68,4 @@ async function db(fn) {
   }
 }
 
-module.exports = { db, getPrisma: () => prisma };
+module.exports = { db, getPrisma: () => prisma, isIdleDisconnect, logPrismaError };
