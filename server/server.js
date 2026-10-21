@@ -9,6 +9,24 @@ const { Server } = require("socket.io");
 // repo root, where dotenv's default lookup would find nothing).
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
+// Which log levels are printed (LOG_LEVEL env; see utils/logLevel.js)
+const logLevel = require("./utils/logLevel").applyLogLevel();
+
+// Last-resort error logs. A stray rejected promise in one socket handler must
+// not take down every game on the server, so it is logged and the server
+// carries on. An uncaught exception leaves the process in an unknown state:
+// log it and exit, and Fly restarts the machine. Only when this file is run
+// as the server (`node server.js`), not when tests load it.
+if (require.main === module) {
+  process.on("unhandledRejection", function(reason) {
+    console.error("Unhandled promise rejection:", reason && reason.stack ? reason.stack : reason);
+  });
+  process.on("uncaughtException", function(err) {
+    console.error("Uncaught exception — exiting:", err && err.stack ? err.stack : err);
+    process.exit(1);
+  });
+}
+
 const handleLobbyEvents = require("./socketHandlers/lobby");
 const handleGameEvents = require("./socketHandlers/game");
 const handleChatEvents = require("./socketHandlers/chat");
@@ -305,7 +323,7 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT} (log level: ${logLevel})`));
 
 // Exported for testing (supertest against `app`, inspecting `io` wiring, etc.)
 module.exports = { app, server, io };

@@ -17,7 +17,8 @@ module.exports = function handleEmoteEvents(io, socket) {
     if (!VALID_EMOTES.includes(emote)) return; // whitelist only
 
     if (!rateLimiter.isAllowed(socket.id, "emote", EMOTE_RATE_MAX, EMOTE_RATE_WINDOW_MS)) {
-      return; // silently drop — no error needed for emotes
+      console.debug(`Emote rate-limited: ${socket.id} in room ${roomId}`);
+      return; // dropped — no error shown for emotes
     }
 
     const room = await roomManager.getRoomById(roomId);

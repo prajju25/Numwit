@@ -10,6 +10,7 @@ import LevelBadge from "./LevelBadge";
 import ShareCardModal from "./ShareCardModal";
 import { useGame } from "../contexts/GameContext";
 import { track } from "../services/analytics";
+import { reportError } from "../services/errorReporting";
 import { buildShareText, roundSquare, playedRounds } from "../services/shareText";
 import { rankPlayers } from "../services/standings";
 import { computeTitles } from "../services/titles";
@@ -77,8 +78,9 @@ export default function GameOverScreen({ data, players }) {
           stats: cardData,
         });
       }
-    } catch (_) {
+    } catch (err) {
       // Best-effort — share button just stays available to retry.
+      reportError("share_card", err);
     } finally {
       setShareLoading(false);
     }

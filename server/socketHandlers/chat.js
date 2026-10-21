@@ -23,6 +23,8 @@ module.exports = function handleChatEvents(io, socket) {
     if (!message) return;
 
     if (!rateLimiter.isAllowed(socket.id, "chat", CHAT_RATE_MAX, CHAT_RATE_WINDOW_MS)) {
+      // Never log the message itself
+      console.debug(`Chat rate-limited: ${socket.id} in room ${roomId}`);
       return socket.emit("chat_rate_limited", { message: "Slow down — too many messages!" });
     }
 

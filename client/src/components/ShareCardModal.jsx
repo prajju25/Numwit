@@ -4,6 +4,7 @@ import PropTypes from "prop-types";
 import PlayerStatCard from "./PlayerStatCard";
 import { SITE_URL } from "../hooks/usePageMeta";
 import { track } from "../services/analytics";
+import { reportError } from "../services/errorReporting";
 
 /**
  * ShareCardModal
@@ -92,7 +93,8 @@ export default function ShareCardModal({ player, variant, rank, totalPlayers, ti
       link.download = "numwit-player-card.png";
       link.href = dataUrl;
       link.click();
-    } catch (_) {
+    } catch (err) {
+      reportError("card_image", err);
       setError("Couldn't generate the image. Try again.");
     } finally {
       setBusyAction(null);

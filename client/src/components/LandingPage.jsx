@@ -15,7 +15,8 @@ function useLiveStats() {
       fetch("/api/stats")
         .then((r) => r.json())
         .then((d) => setStats(d))
-        .catch(() => {});
+        // Polled every 10 s — a warning only (not reported), it's retried
+        .catch((err) => console.warn("Live stats unavailable:", err.message));
     };
     fetchStats();
     const id = setInterval(fetchStats, STATS_POLL_MS);

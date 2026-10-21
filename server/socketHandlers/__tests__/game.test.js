@@ -602,7 +602,10 @@ describe("game socket handler", () => {
         const socket = makeSocket("p1");
         handleGameEvents(io, socket);
 
+        const log = jest.spyOn(console, "log");
         await getHandler(socket, "send_number")({ roomId: "r1", user: { name: "P" }, no: 50 });
+        expect(log).toHaveBeenCalledWith(expect.stringMatching(/^Game over in room r1 after \d+ round\(s\): a person won$/));
+        log.mockRestore();
 
         expect(io._emit).toHaveBeenCalledWith("game_over", {
           winnerSocketId: "p1",
@@ -898,6 +901,19 @@ describe("game socket handler", () => {
       const io = makeIo();
       await handleGameEvents.startGameForRoom(io, "r1", {});
       expect(roomManager.removeFromPublicSet).not.toHaveBeenCalled();
+    });
+
+    test("logs the game starting: room, type, people and bots", async () => {
+      const log = jest.spyOn(console, "log").mockImplementation(() => {});
+      roomManager.getRoomById.mockResolvedValue({
+        id: "r7", type: "solo", users: [{ socketId: "me" }, { socketId: "b1", isBot: true }, { socketId: "b2", isBot: true }],
+      });
+      gameManager.createGameData.mockResolvedValue({ round: 1, points: {}, turnOrder: [], eliminatedPlayers: [], settings: { botDifficulty: "sharp" } });
+
+      await handleGameEvents.startGameForRoom(makeIo(), "r7", {});
+
+      expect(log).toHaveBeenCalledWith("Game started in room r7 (solo): 1 person, 2 bot(s), sharp bots");
+      log.mockRestore();
     });
   });
 

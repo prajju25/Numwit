@@ -137,6 +137,27 @@ describe("adminAuth hardening", () => {
     expect(call(req({ authorization: good })).next).toHaveBeenCalled();
   });
 
+  test("logs each failed sign-in and the lockout, with the IP partly hidden", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    for (let i = 0; i < 10; i++) call(req({ authorization: bad }));
+    const lines = warn.mock.calls.map((c) => c[0]);
+    expect(lines[0]).toBe("admin: failed sign-in from 1.2.3.x (1/10)");
+    expect(lines).toContain("admin: sign-in locked for 1.2.3.x for 15 min");
+    expect(lines.join(" ")).not.toContain("1.2.3.4");
+  });
+
+  test("the browser's credential-less request is not logged as a failed sign-in", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    call(req());
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test("maskIp hides the last part of IPv4 and IPv6 addresses", () => {
+    expect(adminAuth.maskIp("203.0.113.42")).toBe("203.0.113.x");
+    expect(adminAuth.maskIp("2001:db8::1f")).toBe("2001:db8::x");
+    expect(adminAuth.maskIp(undefined)).toBe("unknown");
+  });
+
   test("a global ceiling stops guessing from many IPs", () => {
     for (let i = 0; i < 100; i++) call(req({ authorization: bad, "fly-client-ip": "10.0.0." + i }));
     const res = call(req({ authorization: good, "fly-client-ip": "9.9.9.9" })).res;

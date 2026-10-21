@@ -92,6 +92,7 @@ router.delete("/rooms/:id", async (req, res) => {
     botService.removeRoom(roomId);
     // Delete from Redis — idempotent: if already gone that's fine
     await roomManager.deleteRoom(roomId);
+    console.log(`admin: deleted room ${roomId}`);
     res.json({ ok: true, deleted: roomId });
   } catch (err) {
     console.error(`DELETE /api/admin/rooms/${roomId} error:`, err.message);
@@ -135,6 +136,7 @@ router.patch("/feedback/:id", async (req, res) => {
   try {
     const updated = await feedbackService.updateFeedbackStatus(req.params.id, status);
     if (!updated) return res.status(404).json({ error: "Feedback not found" });
+    console.log(`admin: feedback ${req.params.id} marked ${status}`);
     res.json(updated);
   } catch (err) {
     console.error(`PATCH /api/admin/feedback/${req.params.id} error:`, err.message);
@@ -176,6 +178,10 @@ router.delete("/players/:id", async (req, res) => {
   try {
     const result = await playerAdminService.deletePlayer(req.params.id);
     if (!result) return res.status(404).json({ error: "Player not found" });
+    console.log(
+      `admin: deleted player ${req.params.id} ("${result.deleted}") — ` +
+      `${(result.devices || []).length} device(s), ${result.games} game(s), ${result.achievements} achievement(s), ${result.feedback} feedback`
+    );
     res.json(result);
   } catch (err) {
     fail(res, "DELETE /api/admin/players", err);
@@ -191,6 +197,10 @@ router.post("/players/merge", async (req, res) => {
   try {
     const result = await playerAdminService.mergePlayers(sourceId, targetId);
     if (!result) return res.status(404).json({ error: "Player not found" });
+    console.log(
+      `admin: merged player ${sourceId} ("${result.merged}") into ${targetId} ("${result.into}") — ` +
+      `${result.games} game(s), ${result.achievements} achievement(s)`
+    );
     res.json(result);
   } catch (err) {
     fail(res, "POST /api/admin/players/merge", err);

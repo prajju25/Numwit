@@ -256,6 +256,7 @@ module.exports = function handleLobbyEvents(io, socket) {
     const me = room.users.find(function(u) { return u.socketId === socket.id; });
     if (!me || me.isBot) return;
     botService.clearFillTimer(roomId);
+    console.log(`Start now in room ${roomId}: ${room.users.length} in the room`);
     await fillRoomWithBotsAndStart(io, roomId);
   });
 
@@ -389,6 +390,7 @@ async function handlePostRemove(io, room) {
     });
     if (activePlayers.length < MIN_PLAYERS) {
       const lastPlayer = activePlayers[0];
+      console.log(`Game over in room ${room.id}: too few players left after someone left (${activePlayers.length} remaining)`);
       io.to(room.id).emit("game_over", {
         winnerSocketId: lastPlayer ? lastPlayer.socketId : null,
         points: room.game.points,

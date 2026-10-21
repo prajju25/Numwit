@@ -51,6 +51,14 @@ function clientIp(req) {
   return req.headers["fly-client-ip"] || req.ip || req.socket?.remoteAddress || "unknown";
 }
 
+/** IP for the logs, with the last part hidden (203.0.113.x, 2001:db8:…:x). */
+function maskIp(ip) {
+  const s = String(ip || "unknown");
+  if (s.includes(".")) return s.replace(/\.\d+$/, ".x");
+  if (s.includes(":")) return s.replace(/:[0-9a-f]*$/i, ":x");
+  return s;
+}
+
 function currentCount(entry, now) {
   return entry && entry.resetAt > now ? entry.count : 0;
 }
@@ -105,7 +113,17 @@ function adminAuth(req, res, next) {
   if (!userOk || !passOk) {
     // A request with no credentials at all is the browser asking for the
     // login box — only real wrong attempts count towards the lockout.
-    if (creds) recordFailure(ip, now);
+    if (creds) {
+      recordFailure(ip, now);
+      const fails = currentCount(failsByIp.get(ip), now);
+      console.warn(`admin: failed sign-in from ${maskIp(ip)} (${fails}/${MAX_FAILS_PER_IP})`);
+      if (fails === MAX_FAILS_PER_IP) {
+        console.warn(`admin: sign-in locked for ${maskIp(ip)} for ${WINDOW_MS / 60000} min`);
+      }
+      if (currentCount(globalFails, now) === MAX_FAILS_GLOBAL) {
+        console.warn(`admin: ${MAX_FAILS_GLOBAL} failed sign-ins — admin sign-in locked for everyone for ${WINDOW_MS / 60000} min`);
+      }
+    }
     res.set("WWW-Authenticate", 'Basic realm="Numwit Admin"');
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -122,5 +140,7 @@ adminAuth.resetLockouts = function resetLockouts() {
   failsByIp.clear();
   globalFails = { count: 0, resetAt: 0 };
 };
+
+adminAuth.maskIp = maskIp;
 
 module.exports = adminAuth;

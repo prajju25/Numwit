@@ -163,6 +163,12 @@ async function startGameForRoom(io, roomId, settings) {
 
   const gameData = await createGameData(room, sanitizeSettings(settings));
   if (!gameData) return;
+  const bots = room.users.filter(function(u) { return u.isBot; }).length;
+  console.log(
+    `Game started in room ${roomId} (${room.type || "public"}): ` +
+    `${room.users.length - bots} ${room.users.length - bots === 1 ? "person" : "people"}, ${bots} bot(s)` +
+    (bots > 0 ? `, ${gameData.settings?.botDifficulty || "adaptive"} bots` : "")
+  );
 
   const timerDuration = gameData.settings?.timerDuration || 30;
   // Small delay so client has time to mount NumwitRuleProvider before next_round arrives
@@ -384,6 +390,11 @@ async function resolveRound(io, room, activePlayers) {
     io.to(roomId).emit("game_over", gameOverData);
     botService.clearSubmissionTimers(roomId);
 
+    console.log(
+      `Game over in room ${roomId} after ${game.round} round(s): ` +
+      (winnerPlayer ? `${winnerPlayer.isBot ? "a bot" : "a person"} won` : "no winner")
+    );
+
     // Mark room as ended so admin dashboard shows correct status
     room.gameEnded = true;
     saveRoom(room).catch(function(e) { console.error("saveRoom(gameEnded) error:", e.message); });
@@ -523,10 +534,15 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer) {
     // Write to DB — awaited so the all-time aggregate fetched below (used for
     // achievement checks and the shareable player card) reliably includes
     // this session's row instead of racing the INSERT.
-    await statsService.writeSessionStat(deviceId, sessionStats).catch(() => {});
+    await statsService.writeSessionStat(deviceId, sessionStats).catch(function(e) {
+      console.error(`writeSessionStat error (room ${roomId}):`, e.message);
+    });
 
     // Update consecutive game-win streak (must await — we need the result for achievement check)
-    const newStreak = await userService.updateConsecutiveGameWins(deviceId, survived).catch(function() { return 0; });
+    const newStreak = await userService.updateConsecutiveGameWins(deviceId, survived).catch(function(e) {
+      console.error(`updateConsecutiveGameWins error (room ${roomId}):`, e.message);
+      return 0;
+    });
 
     // Award XP
     const xpResult = await userService.awardXp(deviceId, sessionStats);
@@ -536,7 +552,10 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer) {
     if (!userRecord) continue;
 
     // Fetch all-time stats (includes duelWins, soloWins from the new DB fields)
-    const allTimeStats = await statsService.getPlayerStats(deviceId).catch(function() { return null; });
+    const allTimeStats = await statsService.getPlayerStats(deviceId).catch(function(e) {
+      console.error(`getPlayerStats error (room ${roomId}):`, e.message);
+      return null;
+    });
     // Override consecutiveGameWins with the freshly updated value
     if (allTimeStats) allTimeStats.consecutiveGameWins = newStreak;
 
@@ -563,6 +582,10 @@ async function persistGameOver(io, room, game, activePlayers, winnerPlayer) {
 
     // Resolve the target socket once — used for both achievements and XP below
     const targetSocket = io.sockets.sockets.get(mySocketId) || null;
+
+    if (newAchievements.length > 0) {
+      console.debug(`Achievements unlocked in room ${roomId}: ${newAchievements.map(function(a) { return a.id; }).join(", ")}`);
+    }
 
     // Emit achievement unlocks to the specific player
     newAchievements.forEach(function(ach) {
