@@ -46,6 +46,41 @@ export function nextRoundTip(prevResult, multiplier) {
     + `the new target lands near ${fmt(mult)} × ${aim} ≈ ${Math.round(aim * mult)}. Stay one step ahead of the crowd.`;
 }
 
+// ── "How many steps did the room think?" ──────────────────────────────────────
+// Step 0 assumes everyone picks at random (average 50). Step 1 picks 50 × m,
+// step 2 assumes everyone did step 1 and picks 50 × m², and so on.
+export const MAX_STEPS = 5;
+const RANDOM_AVERAGE = 50;
+
+/** Steps of thinking a pick represents: 0…MAX_STEPS, or MAX_STEPS + 1 for "more". */
+export function stepsAhead(n, multiplier) {
+  if (n >= RANDOM_AVERAGE) return 0;
+  if (n <= 0) return MAX_STEPS + 1;
+  const steps = Math.round(Math.log(n / RANDOM_AVERAGE) / Math.log(multiplier));
+  return Math.min(Math.max(steps, 0), MAX_STEPS + 1);
+}
+
+export function stepsLabel(steps) {
+  if (steps > MAX_STEPS) return `${MAX_STEPS}+ steps`;
+  return steps === 1 ? "1 step" : `${steps} steps`;
+}
+
+/**
+ * The thinking levels for a round, and where the room's average sits.
+ * Returns { levels: [{ step, value }], room } or null when the round has no
+ * usable multiplier (duel-cycle wins, an average of 0).
+ */
+export function roomDepth(result) {
+  if (!canExplain(result) || !(result.average > 0)) return null;
+  const mult = result.target / result.average;
+  if (!(mult > 0 && mult < 1)) return null;
+  const levels = Array.from({ length: MAX_STEPS + 1 }, (_, step) => ({
+    step,
+    value: RANDOM_AVERAGE * Math.pow(mult, step),
+  }));
+  return { levels, multiplier: mult, room: stepsAhead(result.average, mult) };
+}
+
 // ── "Show the explainer for a player's first few games" ───────────────────────
 const SEEN_KEY = "numwit_explainer_games";
 export const EXPLAINER_GAMES = 3;
