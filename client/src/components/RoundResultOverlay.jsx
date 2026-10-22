@@ -6,7 +6,6 @@ import { useUser } from "../contexts/UserContext";
 import { withYou } from "../services/profile";
 import {
   explainFirstRound, explainerGamesSeen, markExplainerSeen, EXPLAINER_GAMES,
-  roomDepth, stepsAhead, stepsLabel, MAX_STEPS,
 } from "../services/roundInsights";
 
 // The server waits ROUND_RESULT_DELAY_MS (10s) after round_result before
@@ -197,11 +196,10 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
   const flags       = ["p1", "p2", "p3", "p4", "p5"].slice(0, phase).join(" ");
   const clampPct    = (n) => Math.max(0, Math.min(100, n));
 
-  const mine        = result.submissions?.find((s) => s.socketId === mySocketId);
-  const myDiff      = mine && hasLine ? Math.abs(mine.number - tgt) : null;
-  // "How many steps ahead" — the levels 50, 50×m, 50×m²… and where picks sit
-  const depth       = hasLine ? roomDepth(result) : null;
-  const mySteps     = depth && mine && !invalidIds.has(mine.socketId) ? stepsAhead(mine.number, depth.multiplier) : null;
+  const myDiff = (() => {
+    const mine = result.submissions?.find((s) => s.socketId === mySocketId);
+    return mine && hasLine ? Math.abs(mine.number - tgt) : null;
+  })();
 
   // Rows sorted by distance to target; void picks sink to the bottom.
   const rows = [...(result.submissions || [])].sort((a, b) => {
@@ -270,11 +268,6 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
                 </span>
               </div>
               <div className="absolute left-0 right-0 bottom-[34px] h-1 rounded bg-gradient-to-r from-violet-500/60 to-cyan-400/60" />
-              {depth?.levels.map((l) => (
-                <div key={l.step} data-level={l.step}
-                  className={twMerge("absolute bottom-[30px] h-3 w-px", l.step === Math.min(depth.room, MAX_STEPS) ? "bg-cyan-300" : "bg-white/35")}
-                  style={{ left: `${clampPct(l.value)}%` }} />
-              ))}
               <div className="nums absolute left-0 right-0 bottom-3 flex justify-between text-[10px] text-[#6E749A]">
                 <span className="after:content-['0']" /><span className="after:content-['25']" /><span className="after:content-['50']" /><span className="after:content-['75']" /><span className="after:content-['100']" />
               </div>
@@ -309,30 +302,6 @@ export default function RoundResultOverlay({ result, voidData, players, onDismis
                 );
               })}
             </div>
-
-            {depth && (
-              <div className="nw-rv-late flex flex-col gap-1.5 mx-1 mt-1">
-                <p className="text-xs text-[#B4B9D6] m-0">
-                  🧠 The room thought <strong className="text-cyan-300">{stepsLabel(depth.room)}</strong> ahead
-                  {mySteps !== null && <> · you: <strong className="text-violet-200">{stepsLabel(mySteps)}</strong></>}
-                </p>
-                <div className="flex flex-wrap gap-1" aria-label="Thinking steps">
-                  {depth.levels.map((l) => (
-                    <span key={l.step}
-                      className={twMerge(
-                        "nums text-[10px] px-1.5 py-0.5 rounded-full border",
-                        l.step === Math.min(depth.room, MAX_STEPS) ? "border-cyan-400/60 bg-cyan-400/10 text-cyan-200" : "border-white/10 text-[#8F95B8]",
-                        l.step === mySteps && "ring-1 ring-violet-400/70"
-                      )}>
-                      {l.step === 0 ? "random" : `step ${l.step}`} · {l.value.toFixed(1)}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-[11px] text-[#6E749A] m-0">
-                  Each step assumes everyone else stopped one step earlier: 50 → {depth.levels[1].value.toFixed(0)} → {depth.levels[2].value.toFixed(0)}…
-                </p>
-              </div>
-            )}
           </section>
         )}
 

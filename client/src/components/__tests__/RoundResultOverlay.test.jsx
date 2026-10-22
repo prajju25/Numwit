@@ -317,33 +317,3 @@ describe("RoundResultOverlay first-round explainer", () => {
     expect(localStorage.getItem("numwit_explainer_games")).toBeNull();
   });
 });
-
-describe("RoundResultOverlay thinking steps", () => {
-  afterEach(() => { __mockSocket.id = "mock-socket-id"; });
-
-  test("shows how many steps the room and you thought, with a chip per level", () => {
-    __mockSocket.id = "me"; // falls back to socket.id without a UserContext
-    // avg 40 × 0.8 = 32 → the room is at step 1; my 26 is step 3 (50 × 0.8³ = 25.6)
-    const result = { ...baseResult, average: 40, target: 32, submissions: [
-      { socketId: "me", number: 26 }, { socketId: "bob", number: 54 },
-    ] };
-    const { container } = render(<RoundResultOverlay result={result} voidData={null} players={players} onDismiss={() => {}} />);
-    expect(container.textContent).toContain("The room thought 1 step ahead · you: 3 steps");
-    expect(screen.getByText("random · 50.0")).toBeInTheDocument();
-    expect(screen.getByText("step 2 · 32.0")).toBeInTheDocument();
-    expect(container.querySelectorAll("[data-level]")).toHaveLength(6);
-    expect(container.textContent).toContain("50 → 40 → 32…");
-  });
-
-  test("leaves out your steps when you didn't pick", () => {
-    __mockSocket.id = "carl";
-    const { container } = render(<RoundResultOverlay result={baseResult} voidData={null} players={players} onDismiss={() => {}} />);
-    expect(container.textContent).toContain("The room thought 0 steps ahead");
-    expect(container.textContent).not.toContain("· you:");
-  });
-
-  test("hides the steps row on a duel-cycle win", () => {
-    render(<RoundResultOverlay result={{ ...baseResult, twoPlayerCycle: true }} voidData={null} players={players} onDismiss={() => {}} />);
-    expect(screen.queryByText(/steps? ahead/)).not.toBeInTheDocument();
-  });
-});
