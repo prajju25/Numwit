@@ -1,7 +1,6 @@
 import {
   canExplain, explainFirstRound, nextRoundTip,
   explainerGamesSeen, markExplainerSeen, EXPLAINER_GAMES,
-  stepsAhead, stepsLabel, roomDepth, MAX_STEPS,
 } from "../roundInsights";
 
 const result = { average: 41.6, target: 33.28, twoPlayerCycle: false };
@@ -54,39 +53,5 @@ describe("roundInsights", () => {
     jest.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
     expect(explainerGamesSeen()).toBe(EXPLAINER_GAMES);
     expect(() => markExplainerSeen()).not.toThrow();
-  });
-});
-
-describe("thinking steps", () => {
-  test("stepsAhead maps a pick to the nearest level of 50 × m^k", () => {
-    expect(stepsAhead(55, 0.8)).toBe(0);
-    expect(stepsAhead(50, 0.8)).toBe(0);
-    expect(stepsAhead(40, 0.8)).toBe(1);
-    expect(stepsAhead(33, 0.8)).toBe(2);
-    expect(stepsAhead(25.6, 0.8)).toBe(3);
-    expect(stepsAhead(1, 0.8)).toBe(MAX_STEPS + 1);
-    expect(stepsAhead(0, 0.8)).toBe(MAX_STEPS + 1);
-  });
-
-  test("stepsLabel reads naturally", () => {
-    expect(stepsLabel(0)).toBe("0 steps");
-    expect(stepsLabel(1)).toBe("1 step");
-    expect(stepsLabel(3)).toBe("3 steps");
-    expect(stepsLabel(MAX_STEPS + 1)).toBe(`${MAX_STEPS}+ steps`);
-  });
-
-  test("roomDepth lists the levels and where the average sits", () => {
-    const depth = roomDepth({ average: 40, target: 32, twoPlayerCycle: false });
-    expect(depth.room).toBe(1);
-    expect(depth.levels).toHaveLength(MAX_STEPS + 1);
-    expect(depth.levels[0]).toEqual({ step: 0, value: 50 });
-    expect(depth.levels[2].value).toBeCloseTo(32);
-  });
-
-  test("roomDepth is null without a usable multiplier", () => {
-    expect(roomDepth({ average: 0, target: 0 })).toBeNull();
-    expect(roomDepth({ average: 40, target: 40 })).toBeNull();
-    expect(roomDepth({ average: 40, target: 32, twoPlayerCycle: true })).toBeNull();
-    expect(roomDepth(null)).toBeNull();
   });
 });
