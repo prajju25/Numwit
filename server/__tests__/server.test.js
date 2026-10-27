@@ -345,6 +345,21 @@ describe("server.js", () => {
       expect(res.headers["x-dns-prefetch-control"]).toBeDefined();
     });
 
+    test("game pages can be embedded by itch.io; admin and API cannot be framed", async () => {
+      for (const p of ["/", "/main.js", "/play"]) {
+        const res = await supertest(app).get(p);
+        expect(res.headers["content-security-policy"]).toBe(
+          "frame-ancestors 'self' https://itch.io https://*.itch.io https://*.itch.zone"
+        );
+        expect(res.headers["x-frame-options"]).toBeUndefined();
+      }
+      for (const p of ["/admin", "/admin/logo.png", "/api/health"]) {
+        const res = await supertest(app).get(p);
+        expect(res.headers["x-frame-options"]).toBe("SAMEORIGIN");
+        expect(res.headers["content-security-policy"]).toBeUndefined();
+      }
+    });
+
     test("public images can be shown by other sites (link previews); everything else stays same-origin", async () => {
       for (const p of ["/og-image.jpg", "/icons/icon-192.png", "/screenshots/game.JPG", "/favicon.ico"]) {
         const res = await supertest(app).get(p);

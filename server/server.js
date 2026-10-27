@@ -50,6 +50,17 @@ const server = http.createServer(app);
 // revisit once the production origin is finalized.
 app.use(helmet({ contentSecurityPolicy: false }));
 
+// Let itch.io embed the game (itch.io/numwit plays it in an iframe). Only the
+// game's pages: /admin and /api keep helmet's X-Frame-Options: SAMEORIGIN.
+const ITCH_FRAME_ANCESTORS = "frame-ancestors 'self' https://itch.io https://*.itch.io https://*.itch.zone";
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/admin") && !req.path.startsWith("/api")) {
+    res.removeHeader("X-Frame-Options");
+    res.setHeader("Content-Security-Policy", ITCH_FRAME_ANCESTORS);
+  }
+  next();
+});
+
 // One log line per failed HTTP request (status 400+), e.g. "HTTP 401 GET
 // /admin 3ms" — so a 4xx/5xx in Fly's metrics can be traced to its URL.
 // Successful requests (200, 304, Socket.IO's 101 upgrade) aren't logged.
