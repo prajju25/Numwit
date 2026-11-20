@@ -29,8 +29,11 @@
  *     fly.toml [build.args] and docs/FLY_DEPLOYMENT.md), and
  *   - the page is served from the production host,
  * so local dev, previews and numwit.fly.dev never pollute the numbers.
+ * Visits that land on a made-up path are skipped too (see initAnalytics).
  * Calls made before the Umami script has loaded are queued, not lost.
  */
+
+import { pathKind } from "./roomLink";
 
 export const PROD_HOST = "numwit.prajvex.com";
 export const UMAMI_SCRIPT = "https://cloud.umami.is/script.js";
@@ -60,9 +63,14 @@ function flush() {
   pending.forEach(send);
 }
 
-/** Injects the Umami script when configured for this host. Returns true if active. */
-export function initAnalytics(websiteId = WEBSITE_ID, host = window.location.hostname) {
+/**
+ * Injects the Umami script when configured for this host. Returns true if active.
+ * Visits that start on a made-up path (crawlers probing /contact, /careers…)
+ * aren't tracked at all, so they don't show up as players.
+ */
+export function initAnalytics(websiteId = WEBSITE_ID, host = window.location.hostname, pathname = window.location.pathname) {
   if (!websiteId || host !== PROD_HOST) return false;
+  if (pathKind(pathname) === "unknown") return false;
   active = true;
   if (document.querySelector(`script[src="${UMAMI_SCRIPT}"]`)) return true;
 
