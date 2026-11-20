@@ -15,6 +15,8 @@ describe("analytics", () => {
   test("stays off on any host other than production", () => {
     expect(initAnalytics("abc", "localhost")).toBe(false);
     expect(initAnalytics("abc", "numwit.fly.dev")).toBe(false);
+    // visits that start on a made-up path (crawlers) are not tracked
+    expect(initAnalytics("abc", PROD_HOST, "/contact")).toBe(false);
     expect(document.querySelector("script")).toBeNull();
   });
 

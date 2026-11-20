@@ -19,6 +19,7 @@ import BrandMark from "./components/BrandMark";
 import ProfileMenu from "./components/ProfileMenu";
 import usePageMeta from "./hooks/usePageMeta";
 import { track, trackView } from "./services/analytics";
+import { pathKind, roomCodeFrom } from "./services/roomLink";
 
 // Mute toggle button — reads from SoundContext
 function MuteButton() {
@@ -69,12 +70,14 @@ function AppInner() {
 
   // Landing page: shown to visitors who haven't started yet and aren't deep-linking into a room
   // Once they click "Play Now" we flip this flag and show Login.
+  // Unknown paths (crawlers try /contact, /careers…) get the landing page too,
+  // instead of being treated as a room code and auto-starting a game.
   const [showLanding, setShowLanding] = useState(() => {
-    const path = window.location.pathname.replace("/", "").trim();
-    return !path && path !== "leaderboard";
+    const kind = pathKind(window.location.pathname);
+    return kind === "home" || kind === "unknown";
   });
   const [showLeaderboard, setShowLeaderboard] = useState(() => {
-    return window.location.pathname.replace("/", "").trim() === "leaderboard";
+    return pathKind(window.location.pathname) === "leaderboard";
   });
 
   // Keep sessionRef current so the listeners below (registered once) can read
@@ -84,11 +87,13 @@ function AppInner() {
   }, [roomId, user, roomType, deviceId, isWaitingRoom, isInGame]);
 
   useEffect(() => {
-    const path = window.location.pathname.replace("/", "").trim();
-    if (path?.length >= 6) {
+    const code = roomCodeFrom(window.location.pathname);
+    if (code) {
       setRoomType("private");
-      setRoomId(path);
+      setRoomId(code);
       setShowLanding(false); // direct room link → skip landing
+    } else if (pathKind(window.location.pathname) === "unknown") {
+      window.history.replaceState({}, "", "/");
     }
 
     socket.on("error_message", (err) => {

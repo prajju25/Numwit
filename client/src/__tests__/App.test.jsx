@@ -93,6 +93,17 @@ describe("App", () => {
     expect(screen.getByTestId("login")).toBeInTheDocument();
   });
 
+  test("made-up paths (crawlers) show the landing page instead of joining a room", () => {
+    window.history.pushState({}, "", "/contact");
+    useUser.mockReturnValue(baseUser());
+    render(<App />);
+
+    expect(useUser().setRoomId).not.toHaveBeenCalled();
+    expect(useUser().setRoomType).not.toHaveBeenCalledWith("private");
+    expect(screen.getByTestId("landing-page")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
+  });
+
   test("shows WaitingRoom (wrapped in ChatProvider/VoiceProvider) while waiting", () => {
     useUser.mockReturnValue(
       baseUser({
